@@ -7,6 +7,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.resurgeai.core.data.health.HealthSyncRepository
 import com.resurgeai.core.data.health.HealthSyncWorker
+import com.resurgeai.core.data.health.ActivityEventSync
+import com.resurgeai.core.data.health.ActivityEventWorker
+import com.resurgeai.core.data.coach.CoachRepository
+import com.resurgeai.core.model.CoachInsight
+import kotlinx.coroutines.flow.catch
 import com.resurgeai.core.data.session.SessionRepository
 import com.resurgeai.core.healthconnect.HealthConnectAvailability
 import com.resurgeai.core.healthconnect.HealthConnectManager
@@ -41,10 +46,12 @@ data class DashboardUiState(
     val loading: Boolean = false,
     val today: DailyHealth? = null,
     val sparklines: Map<HealthMetric, List<Double?>> = emptyMap(),
-    /** Mon..Sun, true when that day counts as an exercise day. */
+    /** Sun..Sat, true when that day counts as an exercise day. */
     val exerciseWeek: List<Boolean> = List(7) { false },
-    val todayIndex: Int = LocalDate.now().dayOfWeek.value - 1,
+    val todayIndex: Int = HealthMath.dayOfWeekIndex(LocalDate.now()),
     val error: String? = null,
+    /** Most recent coach insight (activity, sleep or weekly), or null before the first one. */
+    val latestInsight: CoachInsight? = null,
 )
 
 @HiltViewModel
@@ -53,6 +60,8 @@ class DashboardViewModel @Inject constructor(
     private val healthConnect: HealthConnectManager,
     private val healthData: HealthDataSource,
     private val healthSync: HealthSyncRepository,
+    private val activityEvents: ActivityEventSync,
+    coachRepository: CoachRepository,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
     private val _state = MutableStateFlow(DashboardUiState())
@@ -71,6 +80,11 @@ class DashboardViewModel @Inject constructor(
             sessionRepository.session.collect { session ->
                 _state.update { it.copy(profile = (session as? SessionState.Ready)?.profile) }
             }
+        }
+        viewModelScope.launch {
+            coachRepository.insights(limit = 1)
+                .catch { Log.w(TAG, "Insights listener failed", it) }
+                .collect { list -> _state.update { it.copy(latestInsight = list.firstOrNull()) } }
         }
     }
 
@@ -102,7 +116,7 @@ class DashboardViewModel @Inject constructor(
         try {
             val zone = ZoneId.systemDefault()
             val today = LocalDate.now(zone)
-            val monday = HealthMath.weekStart(today)
+            val weekStart = HealthMath.weekStart(today)
             coroutineScope {
                 val day = async { healthData.readDay(today, zone) }
                 val week = async { HealthMath.exerciseDays(healthData.exerciseThisWeek(zone), zone) }
@@ -112,8 +126,8 @@ class DashboardViewModel @Inject constructor(
                     it.copy(
                         loading = false,
                         today = day.await(),
-                        exerciseWeek = (0 until 7).map { i -> monday.plusDays(i.toLong()) in activeDays },
-                        todayIndex = today.dayOfWeek.value - 1,
+                        exerciseWeek = (0 until 7).map { i -> weekStart.plusDays(i.toLong()) in activeDays },
+                        todayIndex = HealthMath.dayOfWeekIndex(today),
                         sparklines = series.awaitAll().associate { (m, s) -> m to s.points.map { p -> p.value } },
                     )
                 }
@@ -124,6 +138,9 @@ class DashboardViewModel @Inject constructor(
             viewModelScope.launch {
                 healthSync.syncRecent(zone)
                 HealthSyncWorker.schedule(appContext, healthConnect)
+                // Post any finished workouts/sleep for insights; keep checking in the background.
+                runCatching { activityEvents.syncFinished(zone = zone) }.onFailure { Log.w(TAG, "Event sync failed", it) }
+                ActivityEventWorker.schedule(appContext, healthConnect)
             }
         } catch (e: Exception) {
             Log.w(TAG, "Failed to read Health Connect", e)

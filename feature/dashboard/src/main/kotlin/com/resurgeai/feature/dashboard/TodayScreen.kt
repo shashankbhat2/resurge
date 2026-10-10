@@ -42,7 +42,6 @@ import com.resurgeai.core.designsystem.theme.ResurgeTheme
 import com.resurgeai.core.healthconnect.HealthConnectAvailability
 import com.resurgeai.core.model.HealthMetric
 import com.resurgeai.core.model.SourceKind
-import java.time.LocalTime
 
 @Composable
 fun TodayRoute(
@@ -84,8 +83,15 @@ fun TodayScreen(
             .verticalScroll(rememberScrollState()),
     ) {
         // Greeting lives in the shared header; the latest insight leads the page.
-        Column(Modifier.padding(start = 20.dp, end = 20.dp, top = LocalHeaderInset.current + 20.dp, bottom = 32.dp)) {
-            CoachInsight(text = PLACEHOLDER_INSIGHT, time = LocalTime.of(7, 0), onClick = onOpenInsights)
+        Column(
+            Modifier.padding(
+                start = 20.dp - INSIGHT_INSET,
+                end = 20.dp - INSIGHT_INSET,
+                top = LocalHeaderInset.current + 20.dp - INSIGHT_INSET,
+                bottom = 32.dp - INSIGHT_INSET,
+            ),
+        ) {
+            CoachInsight(insight = state.latestInsight, onClick = onOpenInsights)
         }
 
         Column(Modifier.padding(horizontal = 16.dp)) {
@@ -131,10 +137,6 @@ fun TodayScreen(
     }
 }
 
-/** Shown until the AI coach (Phase 4) writes real insights. */
-private const val PLACEHOLDER_INSIGHT =
-    "You slept 40 minutes less than your weekly average, and your resting heart rate is up 3 bpm. " +
-        "Keep today's training light and aim to be in bed by 10:30."
 
 @DrawableRes
 internal fun sourceIcon(kind: SourceKind): Int = when (kind) {

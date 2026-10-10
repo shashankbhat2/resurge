@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -111,8 +112,12 @@ private val popExit: AnimatedContentTransitionScope<NavBackStackEntry>.() -> Exi
 }
 
 @Composable
-fun MainScreen(profile: UserProfile) {
+fun MainScreen(profile: UserProfile, openInsightsSignal: Int = 0) {
     val rootNav = rememberNavController()
+    // A tapped insight notification opens Coach on the Insights tab.
+    LaunchedEffect(openInsightsSignal) {
+        if (openInsightsSignal > 0) rootNav.navigate(CoachScreenRoute(CoachTab.INSIGHTS.name.lowercase())) { launchSingleTop = true }
+    }
     NavHost(
         navController = rootNav,
         startDestination = TabsRoute,

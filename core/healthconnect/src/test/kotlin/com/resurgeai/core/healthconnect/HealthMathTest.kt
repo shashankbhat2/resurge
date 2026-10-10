@@ -19,10 +19,12 @@ class HealthMathTest {
     }
 
     @Test
-    fun `week starts on Monday`() {
-        assertEquals(LocalDate.of(2026, 10, 5), HealthMath.weekStart(LocalDate.of(2026, 10, 10))) // Sat -> Mon
-        assertEquals(LocalDate.of(2026, 10, 5), HealthMath.weekStart(LocalDate.of(2026, 10, 5))) // Mon -> Mon
-        assertEquals(LocalDate.of(2026, 10, 5), HealthMath.weekStart(LocalDate.of(2026, 10, 11))) // Sun -> Mon
+    fun `week starts on Sunday`() {
+        assertEquals(LocalDate.of(2026, 10, 4), HealthMath.weekStart(LocalDate.of(2026, 10, 10))) // Sat -> Sun
+        assertEquals(LocalDate.of(2026, 10, 4), HealthMath.weekStart(LocalDate.of(2026, 10, 4))) // Sun -> Sun
+        assertEquals(LocalDate.of(2026, 10, 4), HealthMath.weekStart(LocalDate.of(2026, 10, 5))) // Mon -> Sun
+        assertEquals(6, HealthMath.dayOfWeekIndex(LocalDate.of(2026, 10, 10)))
+        assertEquals(0, HealthMath.dayOfWeekIndex(LocalDate.of(2026, 10, 4)))
     }
 
     @Test

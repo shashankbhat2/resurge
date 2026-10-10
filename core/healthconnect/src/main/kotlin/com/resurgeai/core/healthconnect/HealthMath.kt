@@ -15,8 +15,12 @@ object HealthMath {
     /** Sessions shorter than this don't count towards an "exercise day". */
     val MIN_EXERCISE_FOR_DAY: Duration = Duration.ofMinutes(10)
 
+    /** Weeks run Sunday–Saturday (the weekly review is written on Saturday evening). */
     fun weekStart(date: LocalDate): LocalDate =
-        date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        date.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY))
+
+    /** 0 = Sunday … 6 = Saturday, matching [weekStart]. */
+    fun dayOfWeekIndex(date: LocalDate): Int = date.dayOfWeek.value % 7
 
     /** Local dates (in [zone]) with at least [minDuration] of exercise in total. */
     fun exerciseDays(

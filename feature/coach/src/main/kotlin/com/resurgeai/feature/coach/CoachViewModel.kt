@@ -3,113 +3,160 @@ package com.resurgeai.feature.coach
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.resurgeai.core.data.coach.CoachRepository
+import com.resurgeai.core.model.ChatEvent
+import com.resurgeai.core.model.CoachInsight
+import com.resurgeai.core.model.CoachModel
+import com.resurgeai.core.model.CoachThread
+import com.resurgeai.core.model.CoachTurn
+import com.resurgeai.core.model.TurnRole
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.LocalDateTime
 import javax.inject.Inject
 
 enum class CoachTab(val label: String) { INSIGHTS("Insights"), CHAT("Chat") }
 
-enum class InsightCategory(val label: String) { SLEEP("Sleep"), ACTIVITY("Activity"), HEART("Heart"), NUTRITION("Nutrition") }
-
-data class Insight(
-    val id: String,
-    val category: InsightCategory,
-    val title: String,
-    val body: String,
-    val at: LocalDateTime,
+/** A reply being generated: the user's message (until it's saved) and the text streamed so far. */
+data class PendingReply(
+    val userText: String,
+    val streamedText: String = "",
+    val usingTool: String? = null,
+    /** Number of saved turns when the message was sent; later turns belong to this exchange. */
+    val baseline: Int,
+    val done: Boolean = false,
 )
-
-enum class Author { USER, COACH }
-
-data class ChatMessage(val id: Long, val author: Author, val text: String)
 
 data class CoachUiState(
     val tab: CoachTab = CoachTab.INSIGHTS,
-    val insights: List<Insight> = emptyList(),
-    val messages: List<ChatMessage> = emptyList(),
-    val replying: Boolean = false,
-)
+    val insights: List<CoachInsight> = emptyList(),
+    val insightsLoaded: Boolean = false,
+    val threads: List<CoachThread> = emptyList(),
+    val threadId: String? = null,
+    val turns: List<CoachTurn> = emptyList(),
+    val pending: PendingReply? = null,
+    val model: CoachModel = CoachModel.FAST,
+    val showHistory: Boolean = false,
+    val error: String? = null,
+) {
+    val sending: Boolean get() = pending != null && !pending.done
 
-/**
- * Coach screen state. Insights and replies are placeholders until the Claude-backed coach
- * (Cloud Functions, Phase 4) is wired in; the UI contract here is what that will fill.
- */
+    /**
+     * Saved turns to show. While a reply is in flight only the turns from before it are shown; the
+     * screen draws the pending user message and the live streamed text after them instead, so
+     * partially-saved tool rounds never appear twice.
+     */
+    val visibleTurns: List<CoachTurn> get() = pending?.let { turns.take(it.baseline) } ?: turns
+}
+
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class CoachViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
+    private val repository: CoachRepository,
 ) : ViewModel() {
     private val initialTab = savedStateHandle.get<String>(ARG_TAB)
         ?.let { arg -> CoachTab.entries.firstOrNull { it.name.equals(arg, ignoreCase = true) } }
         ?: CoachTab.INSIGHTS
 
-    private val _state = MutableStateFlow(CoachUiState(tab = initialTab, insights = placeholderInsights()))
+    private val _state = MutableStateFlow(CoachUiState(tab = initialTab))
     val state: StateFlow<CoachUiState> = _state.asStateFlow()
 
-    private var nextId = 0L
+    private val threadId = MutableStateFlow<String?>(null)
+    private var sendJob: Job? = null
 
-    fun selectTab(tab: CoachTab) = _state.update { it.copy(tab = tab) }
+    init {
+        viewModelScope.launch {
+            repository.insights()
+                .catch { _state.update { it.copy(insightsLoaded = true) } }
+                .collect { list -> _state.update { it.copy(insights = list, insightsLoaded = true) } }
+        }
+        viewModelScope.launch {
+            repository.threads().catch { emit(emptyList()) }.collect { list ->
+                _state.update { s ->
+                    // Open the most recent conversation on first load.
+                    if (s.threadId == null && s.pending == null && list.isNotEmpty() && threadId.value == null) {
+                        threadId.value = list.first().id
+                    }
+                    s.copy(threads = list)
+                }
+            }
+        }
+        viewModelScope.launch {
+            threadId
+                .flatMapLatest { id -> if (id == null) flowOf(emptyList()) else repository.turns(id) }
+                .catch { emit(emptyList()) }
+                .collect { turns -> _state.update { it.copy(turns = turns).settled() } }
+        }
+        viewModelScope.launch { threadId.collect { id -> _state.update { it.copy(threadId = id) } } }
+    }
 
-    /** Sends a chat message. Sending from the Insights tab jumps to Chat. */
+    fun selectTab(tab: CoachTab) = _state.update { it.copy(tab = tab, showHistory = false) }
+
+    fun selectModel(model: CoachModel) = _state.update { it.copy(model = model) }
+
+    fun toggleHistory() = _state.update { it.copy(showHistory = !it.showHistory) }
+
+    fun openThread(id: String) {
+        if (_state.value.sending) return
+        threadId.value = id
+        _state.update { it.copy(showHistory = false, pending = null, error = null, tab = CoachTab.CHAT) }
+    }
+
+    fun newChat() {
+        if (_state.value.sending) return
+        threadId.value = null
+        _state.update { it.copy(showHistory = false, pending = null, error = null, tab = CoachTab.CHAT, turns = emptyList()) }
+    }
+
+    fun dismissError() = _state.update { it.copy(error = null) }
+
+    /** Sends a message (from either tab — Insights jumps to Chat) and streams the reply. */
     fun send(text: String) {
         val trimmed = text.trim()
-        if (trimmed.isEmpty() || _state.value.replying) return
+        if (trimmed.isEmpty() || _state.value.sending) return
+        val current = _state.value
         _state.update {
             it.copy(
                 tab = CoachTab.CHAT,
-                messages = it.messages + ChatMessage(nextId++, Author.USER, trimmed),
-                replying = true,
+                showHistory = false,
+                error = null,
+                pending = PendingReply(userText = trimmed, baseline = current.turns.size),
             )
         }
-        viewModelScope.launch {
-            delay(REPLY_DELAY_MS)
-            _state.update {
-                it.copy(
-                    replying = false,
-                    messages = it.messages + ChatMessage(nextId++, Author.COACH, PLACEHOLDER_REPLY),
-                )
+        sendJob = viewModelScope.launch {
+            repository.send(current.threadId, trimmed, current.model).collect { event ->
+                when (event) {
+                    is ChatEvent.Thread -> if (threadId.value != event.threadId) threadId.value = event.threadId
+                    is ChatEvent.Delta -> _state.update { s ->
+                        s.copy(pending = s.pending?.copy(streamedText = s.pending.streamedText + event.text, usingTool = null))
+                    }
+                    is ChatEvent.UsingTool -> _state.update { s -> s.copy(pending = s.pending?.copy(usingTool = event.name)) }
+                    is ChatEvent.Done -> _state.update { s -> s.copy(pending = s.pending?.copy(done = true)).settled() }
+                    is ChatEvent.Failed -> _state.update { s -> s.copy(pending = null, error = event.message) }
+                }
             }
         }
+    }
+
+    /** Drops the pending reply once the finished exchange (including the reply) has been saved. */
+    private fun CoachUiState.settled(): CoachUiState {
+        val p = pending ?: return this
+        val saved = turns.drop(p.baseline)
+        val complete = p.done && saved.any { it.role == TurnRole.USER } && saved.any { it.role == TurnRole.COACH }
+        return if (complete) copy(pending = null) else this
     }
 
     companion object {
         /** Must match the property name in the navigation route. */
         const val ARG_TAB = "tab"
-        internal const val REPLY_DELAY_MS = 700L
-        internal const val PLACEHOLDER_REPLY =
-            "I'm not connected yet — soon I'll answer using your sleep, activity, heart and food data. " +
-                "Try asking again once the coach is live."
-
-        private fun placeholderInsights(): List<Insight> {
-            val now = LocalDateTime.now()
-            return listOf(
-                Insight(
-                    "sleep-debt", InsightCategory.SLEEP, "A little short on sleep",
-                    "You slept 40 minutes less than your weekly average, and your resting heart rate is up 3 bpm. " +
-                        "Keep today's training light and aim to be in bed by 10:30.",
-                    now.withHour(7).withMinute(0),
-                ),
-                Insight(
-                    "steps-streak", InsightCategory.ACTIVITY, "Four active days this week",
-                    "You've hit 8,000+ steps on four of the last five days. One more 30-minute walk keeps the streak going.",
-                    now.minusDays(1).withHour(18).withMinute(30),
-                ),
-                Insight(
-                    "rhr-trend", InsightCategory.HEART, "Resting heart rate is trending down",
-                    "Your resting heart rate has dropped 2 bpm over the past month — a good sign your fitness is improving.",
-                    now.minusDays(2).withHour(8).withMinute(15),
-                ),
-                Insight(
-                    "protein", InsightCategory.NUTRITION, "Protein looks light at dinner",
-                    "Once food logging is on, I'll check whether your meals support your training. Start by scanning tonight's dinner.",
-                    now.minusDays(3).withHour(20).withMinute(0),
-                ),
-            )
-        }
     }
 }

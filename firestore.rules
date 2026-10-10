@@ -16,9 +16,11 @@ service cloud.firestore {
     // Fields the client may write on its own profile document.
     function validProfile() {
       let allowed = ['displayName', 'email', 'photoUrl', 'goals', 'targets',
-                     'onboardingComplete', 'onboardedAt', 'updatedAt'];
+                     'onboardingComplete', 'onboardedAt', 'updatedAt', 'timezone'];
       return request.resource.data.keys().hasOnly(allowed)
         && (!('goals' in request.resource.data) || request.resource.data.goals is list)
+        && (!('timezone' in request.resource.data) || (request.resource.data.timezone is string
+              && request.resource.data.timezone.size() < 64))
         && (!('targets' in request.resource.data) || (
               request.resource.data.targets.calories is int
               && request.resource.data.targets.calories >= 800
@@ -30,20 +32,50 @@ service cloud.firestore {
               || request.resource.data.onboardingComplete is bool);
     }
 
+    // A finished workout / night of sleep posted by the app. Create-only: the analyzeEvent
+    // function fires once per new document and owns all later updates (status, insightId).
+    function validEvent(eventId) {
+      let e = request.resource.data;
+      return e.keys().hasOnly(['type', 'hcId', 'startMs', 'endMs', 'timezone', 'localDate',
+                               'workout', 'sleep', 'source', 'status', 'createdAt'])
+        && e.type in ['workout', 'sleep']
+        && e.hcId is string && e.hcId == eventId
+        && e.startMs is int && e.endMs is int && e.endMs > e.startMs
+        && e.timezone is string && e.localDate is string
+        && e.status == 'pending';
+    }
+
     match /users/{uid} {
       allow read: if isOwner(uid);
       allow create, update: if isOwner(uid) && validProfile();
       allow delete: if false; // account deletion goes through a Cloud Function (Phase 6)
 
-      // Server-owned collections: readable by the owner, written only by Cloud Functions.
-      match /usage/{doc} { allow read: if isOwner(uid); allow write: if false; }
-      match /insights/{doc} { allow read: if isOwner(uid); allow write: if false; }
+      match /events/{eventId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && validEvent(eventId);
+        allow update, delete: if false;
+      }
 
-      // Everything else under the user (meals, water, summaries, coach threads) — owner only.
-      // Tightened per collection as each phase lands.
+      // FCM registration tokens (doc id = token).
+      match /devices/{token} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && request.resource.data.keys().hasOnly(['platform', 'updatedAt']);
+      }
+
+      // Written only by Cloud Functions (Admin SDK); the owner can read.
+      match /insights/{doc} { allow read: if isOwner(uid); allow write: if false; }
+      match /usage/{doc} { allow read: if isOwner(uid); allow write: if false; }
+      match /coachThreads/{threadId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+        match /turns/{turnId} { allow read: if isOwner(uid); allow write: if false; }
+      }
+
+      // Everything else under the user (daily summaries, meals, water) — owner only.
       match /{collection}/{doc=**} {
         allow read, write: if isOwner(uid)
-          && !(collection in ['usage', 'insights']);
+          && !(collection in ['events', 'devices', 'insights', 'usage', 'coachThreads']);
       }
     }
 

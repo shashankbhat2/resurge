@@ -1,0 +1,28 @@
+/** The two chat models the user can pick in the composer. */
+export type ModelChoice = "fast" | "smart";
+
+export type Effort = "low" | "medium" | "high";
+
+export interface ModelSpec {
+  id: string;
+  effort: Effort;
+  label: string;
+}
+
+export const MODELS: Record<ModelChoice, ModelSpec> = {
+  fast: { id: "claude-sonnet-5-5", effort: "low", label: "Fast" },
+  smart: { id: "claude-opus-5-5", effort: "high", label: "Smart" },
+};
+
+/** Per-activity insights: quick and cheap, but a bit more thought than chat "Fast". */
+export const ACTIVITY_INSIGHT_MODEL: ModelSpec = { ...MODELS.fast, effort: "medium" };
+
+/** Saturday weekly report: the deeper model. */
+export const WEEKLY_INSIGHT_MODEL: ModelSpec = MODELS.smart;
+
+/** Daily per-user limits, counted in users/{uid}/usage/{localDate}. */
+export const LIMITS = {
+  fastTurns: 40,
+  smartTurns: 10,
+  activityInsights: 4,
+} as const;

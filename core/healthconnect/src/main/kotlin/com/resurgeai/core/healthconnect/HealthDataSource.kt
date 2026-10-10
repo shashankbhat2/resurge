@@ -28,6 +28,7 @@ import com.resurgeai.core.model.MetricSeries
 import com.resurgeai.core.model.SleepSegment
 import com.resurgeai.core.model.SleepSession
 import com.resurgeai.core.model.SourceBreakdown
+import com.resurgeai.core.model.WorkoutMetrics
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -148,11 +149,11 @@ class HealthDataSource @Inject constructor(
         return MetricSeries(metric, dates.map { DailyValue(it, byDay[it]) })
     }
 
-    /** Exercise sessions from Monday of this week up to now. */
+    /** Exercise sessions from the start of this week (Sunday) up to now. */
     suspend fun exerciseThisWeek(zone: ZoneId = ZoneId.systemDefault()): List<ExerciseSession> {
         if (HealthPermission.getReadPermission(ExerciseSessionRecord::class) !in manager.grantedPermissions()) return emptyList()
-        val monday = HealthMath.weekStart(LocalDate.now(zone))
-        return exerciseSessions(monday.atStartOfDay(zone).toInstant(), Instant.now())
+        val weekStart = HealthMath.weekStart(LocalDate.now(zone))
+        return exerciseSessions(weekStart.atStartOfDay(zone).toInstant(), Instant.now())
     }
 
     suspend fun sleepSessions(from: Instant, to: Instant): List<SleepSession> =
@@ -179,6 +180,33 @@ class HealthDataSource @Inject constructor(
             val max = bucket.result[HeartRateRecord.BPM_MAX] ?: return@mapNotNull null
             bucket.startTime.toLocalDate() to (min to max)
         }.toMap()
+    }
+
+    /**
+     * Totals within one session's time window (distance, calories, heart rate, steps). Health Connect
+     * de-duplicates phone + watch data inside the window. Used for post-activity insights.
+     */
+    suspend fun metricsBetween(start: Instant, end: Instant): WorkoutMetrics {
+        val granted = manager.grantedPermissions()
+        fun can(type: KClass<out Record>) = HealthPermission.getReadPermission(type) in granted
+        val metrics = buildSet {
+            if (can(DistanceRecord::class)) add(DistanceRecord.DISTANCE_TOTAL)
+            if (can(ActiveCaloriesBurnedRecord::class)) add(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL)
+            if (can(TotalCaloriesBurnedRecord::class)) add(TotalCaloriesBurnedRecord.ENERGY_TOTAL)
+            if (can(HeartRateRecord::class)) { add(HeartRateRecord.BPM_AVG); add(HeartRateRecord.BPM_MAX); add(HeartRateRecord.BPM_MIN) }
+            if (can(StepsRecord::class)) add(StepsRecord.COUNT_TOTAL)
+        }
+        if (metrics.isEmpty()) return WorkoutMetrics(null, null, null, null, null, null, null)
+        val r = client.aggregate(AggregateRequest(metrics = metrics, timeRangeFilter = TimeRangeFilter.between(start, end)))
+        return WorkoutMetrics(
+            distanceMeters = r[DistanceRecord.DISTANCE_TOTAL]?.inMeters,
+            activeKcal = r[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories,
+            totalKcal = r[TotalCaloriesBurnedRecord.ENERGY_TOTAL]?.inKilocalories,
+            avgBpm = r[HeartRateRecord.BPM_AVG],
+            maxBpm = r[HeartRateRecord.BPM_MAX],
+            minBpm = r[HeartRateRecord.BPM_MIN],
+            steps = r[StepsRecord.COUNT_TOTAL],
+        )
     }
 
     /** Which sources contributed to [metric] between [start] and [end]. */
@@ -284,6 +312,7 @@ class HealthDataSource @Inject constructor(
                     timeline = record.stages
                         .sortedBy { it.startTime }
                         .map { SleepSegment(it.startTime, it.endTime, HealthMath.mapStage(it.stage)) },
+                    id = record.metadata.id,
                 )
             }
 

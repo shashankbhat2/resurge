@@ -5,5 +5,32 @@
       "rules": "firestore.rules",
       "indexes": "firestore.indexes.json"
     }
-  ]
+  ],
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "resurge",
+      "runtime": "nodejs22",
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ],
+      "ignore": [
+        "node_modules",
+        "test",
+        ".git",
+        "*.log"
+      ]
+    }
+  ],
+  "emulators": {
+    "functions": {
+      "port": 5001
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "ui": {
+      "enabled": true
+    }
+  }
 }

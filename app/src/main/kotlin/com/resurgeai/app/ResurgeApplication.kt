@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import com.resurgeai.app.notifications.ResurgeMessagingService
 import com.resurgeai.core.data.di.WebClientId
 import dagger.Module
 import dagger.Provides
@@ -16,6 +17,12 @@ import javax.inject.Inject
 @HiltAndroidApp
 class ResurgeApplication : Application(), Configuration.Provider {
     @Inject lateinit var workerFactory: HiltWorkerFactory
+
+    override fun onCreate() {
+        super.onCreate()
+        installAppCheck()
+        ResurgeMessagingService.createChannel(this)
+    }
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder().setWorkerFactory(workerFactory).build()

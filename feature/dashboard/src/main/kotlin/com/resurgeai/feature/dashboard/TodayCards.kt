@@ -40,7 +40,12 @@ import com.resurgeai.core.model.DailyHealth
 import com.resurgeai.core.model.HealthMetric
 import com.resurgeai.core.model.SleepStage
 import java.time.Duration
-import java.time.LocalTime
+import com.resurgeai.core.model.CoachInsight
+import androidx.compose.ui.text.style.TextOverflow
+import java.time.format.DateTimeFormatter
+import java.time.ZoneId
+import java.time.LocalDate
+import java.time.Instant
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -58,30 +63,50 @@ internal object DashboardGoals {
 // --- Insight ---
 
 /**
- * Latest assistant insight: first row is the AI icon and when it was written, second row the text.
- * Placeholder copy until the assistant lands (Phase 4).
+ * Latest coach insight: first row is the AI icon and when it was written, second row the text.
+ * Before the first insight exists, explains what will trigger one. Tapping opens Coach › Insights.
  */
 @Composable
-internal fun CoachInsight(text: String, time: LocalTime, onClick: () -> Unit) {
+internal fun CoachInsight(insight: CoachInsight?, onClick: () -> Unit) {
     UnstyledButton(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().clip(Resurge.shape.md),
         indication = LocalIndication.current,
         contentAlignment = Alignment.TopStart,
-    ) { InsightContent(text, time) }
+    ) {
+        // Inset inside the rounded press area so the corners never clip the text.
+        Column(Modifier.padding(INSIGHT_INSET)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(ResurgeIcons.CoachFilled, contentDescription = "Coach insight", tint = Resurge.colors.accent, size = 18.dp)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    insight?.let { insightTime(it.createdAt) } ?: "Coach",
+                    style = Resurge.type.label,
+                    color = Resurge.colors.textMuted,
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                insight?.body ?: "Your first insight arrives after your next workout or night of sleep.",
+                style = Resurge.type.body.copy(fontSize = 17.sp, lineHeight = 27.sp),
+                color = if (insight != null) Resurge.colors.text else Resurge.colors.textMuted,
+                maxLines = 6,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
 }
 
+/** "Today, 7:12 am" / "Yesterday, 18:30" / "Thu 8 Oct, 08:15", following the clock setting. */
 @Composable
-private fun InsightContent(text: String, time: LocalTime) {
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(ResurgeIcons.CoachFilled, contentDescription = "Assistant insight", tint = Resurge.colors.accent, size = 18.dp)
-            Spacer(Modifier.width(8.dp))
-            Text("Today, ${time.format(clockFormatter())}", style = Resurge.type.label, color = Resurge.colors.textMuted)
-        }
-        Spacer(Modifier.height(12.dp))
-        Text(text, style = Resurge.type.body.copy(fontSize = 17.sp, lineHeight = 27.sp), color = Resurge.colors.text)
+private fun insightTime(at: Instant): String {
+    val local = at.atZone(ZoneId.systemDefault())
+    val day = when (local.toLocalDate()) {
+        LocalDate.now() -> "Today"
+        LocalDate.now().minusDays(1) -> "Yesterday"
+        else -> local.format(DateTimeFormatter.ofPattern("EEE d MMM"))
     }
+    return "$day, ${local.format(clockFormatter())}"
 }
 
 // --- Sections ---
@@ -333,6 +358,9 @@ private fun SkeletonCell(modifier: Modifier) {
         SkeletonLine(80.dp)
     }
 }
+
+/** Inner padding of the tappable insight; TodayScreen offsets it so text aligns with the cards. */
+internal val INSIGHT_INSET = 8.dp
 
 /** Vertical gap between Today cards. */
 internal val CARD_GAP = 16.dp

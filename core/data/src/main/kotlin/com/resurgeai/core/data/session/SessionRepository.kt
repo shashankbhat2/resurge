@@ -3,6 +3,7 @@ package com.resurgeai.core.data.session
 import android.util.Log
 import com.resurgeai.core.data.auth.AuthRepository
 import com.resurgeai.core.data.auth.AuthUser
+import com.resurgeai.core.data.coach.DeviceRegistration
 import com.resurgeai.core.data.di.ApplicationScope
 import com.resurgeai.core.data.user.UserRepository
 import com.resurgeai.core.model.SessionState
@@ -25,6 +26,7 @@ import javax.inject.Singleton
 class SessionRepository @Inject constructor(
     authRepository: AuthRepository,
     private val userRepository: UserRepository,
+    private val deviceRegistration: DeviceRegistration,
     @param:ApplicationScope private val appScope: CoroutineScope,
 ) {
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -36,6 +38,7 @@ class SessionRepository @Inject constructor(
             appScope.launch {
                 runCatching { userRepository.syncIdentity(user) }
                     .onFailure { Log.w(TAG, "Identity sync failed", it) }
+                deviceRegistration.registerCurrentToken()
             }
             userRepository.observeProfile(user.uid)
                 .map { profile -> profile ?: user.toFallbackProfile() }

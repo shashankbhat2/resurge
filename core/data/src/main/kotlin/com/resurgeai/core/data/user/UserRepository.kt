@@ -12,6 +12,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -43,6 +44,8 @@ class UserRepository @Inject constructor(
                 "displayName" to user.displayName,
                 "email" to user.email,
                 "photoUrl" to user.photoUrl,
+                // Lets the backend schedule the Saturday weekly review in the user's local time.
+                "timezone" to ZoneId.systemDefault().id,
                 "updatedAt" to FieldValue.serverTimestamp(),
             ),
             SetOptions.merge(),

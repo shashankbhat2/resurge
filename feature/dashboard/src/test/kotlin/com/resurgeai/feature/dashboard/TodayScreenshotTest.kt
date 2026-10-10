@@ -66,6 +66,12 @@ class TodayScreenshotTest {
         ),
         exerciseWeek = listOf(true, false, true, true, false, true, false),
         todayIndex = 5,
+        latestInsight = com.resurgeai.core.model.CoachInsight(
+            id = "i", kind = com.resurgeai.core.model.InsightKind.SLEEP, category = "SLEEP",
+            title = "A little short on sleep",
+            body = "You slept 40 minutes less than your weekly average, and your resting heart rate is up 3 bpm. Keep today's training light and aim to be in bed by 10:30.",
+            highlights = emptyList(), suggestion = null, createdAt = now, weekly = null,
+        ),
     )
 
     private fun capture(name: String, scheme: ColorScheme, ui: DashboardUiState = state) {

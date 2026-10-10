@@ -8,6 +8,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.functions.FirebaseFunctions
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -44,6 +45,10 @@ object DataModule {
     @Singleton
     fun firestore(): FirebaseFirestore =
         FirebaseFirestore.getInstance(FirebaseApp.getInstance(), FIRESTORE_DATABASE)
+
+    @Provides
+    @Singleton
+    fun functions(): FirebaseFunctions = FirebaseFunctions.getInstance("us-central1")
 
     @Provides
     @Singleton

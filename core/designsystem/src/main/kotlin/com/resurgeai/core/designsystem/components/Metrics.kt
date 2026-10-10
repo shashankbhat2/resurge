@@ -212,7 +212,7 @@ fun BarChart(
     }
 }
 
-/** Seven dots for Mon–Sun; filled = active day, outlined = today/not yet. */
+/** Seven dots for the week (Sun–Sat); filled = active day, outlined = today/not yet. */
 @Composable
 fun WeekDots(
     active: List<Boolean>,

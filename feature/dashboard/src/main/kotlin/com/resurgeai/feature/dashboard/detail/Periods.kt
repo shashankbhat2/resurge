@@ -34,7 +34,7 @@ object Periods {
         )
     }
 
-    /** Groups days into Monday-start calendar weeks. The first/last week may be partial. */
+    /** Groups days into Sunday–Saturday calendar weeks. The first/last week may be partial. */
     fun weekly(series: MetricSeries): List<PeriodValue> = series.points
         .groupBy { HealthMath.weekStart(it.date) }
         .toSortedMap()

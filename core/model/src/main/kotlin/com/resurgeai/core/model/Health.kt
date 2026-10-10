@@ -49,6 +49,8 @@ data class SleepSession(
     val source: DataSource?,
     /** Stage-by-stage timeline; empty when the source only records total duration. */
     val timeline: List<SleepSegment> = emptyList(),
+    /** Health Connect record ID (stable across reads). */
+    val id: String = "",
 ) {
     val duration: Duration get() = Duration.between(start, end)
 
@@ -91,6 +93,17 @@ data class DailyHealth(
     val sleepDuration: Duration? get() = sleep.takeIf { it.isNotEmpty() }?.fold(Duration.ZERO) { acc, s -> acc + s.duration }
     val exerciseDuration: Duration get() = exercise.fold(Duration.ZERO) { acc, s -> acc + s.duration }
 }
+
+/** Totals over one workout's time window (each null when not recorded or not permitted). */
+data class WorkoutMetrics(
+    val distanceMeters: Double?,
+    val activeKcal: Double?,
+    val totalKcal: Double?,
+    val avgBpm: Long?,
+    val maxBpm: Long?,
+    val minBpm: Long?,
+    val steps: Long?,
+)
 
 /** One value per day, used for charts and sparklines. */
 data class DailyValue(val date: LocalDate, val value: Double?)

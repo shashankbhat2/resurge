@@ -63,9 +63,10 @@ private fun PrivacyPolicy(onBack: () -> Unit) {
             )
             Section(
                 "What leaves your device",
-                "Only daily totals (for example: steps per day, minutes slept, average heart rate) are stored in " +
-                    "your private Resurge account so the coach can look at trends. Raw samples stay on your phone. " +
-                    "When you chat with the coach, a summary of these totals is sent to our AI provider to generate answers.",
+                "Daily totals (for example: steps per day, minutes slept, average heart rate) and a summary of each " +
+                    "finished workout and night of sleep (duration, distance, pace, average and peak heart rate, sleep " +
+                    "stages, bedtime) are stored in your private Resurge account. Raw samples stay on your phone. " +
+                    "To write insights and answer your questions, these summaries are sent to our AI provider (Anthropic).",
             )
             Section(
                 "What we never do",
