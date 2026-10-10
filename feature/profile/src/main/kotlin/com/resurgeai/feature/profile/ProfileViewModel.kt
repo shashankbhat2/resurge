@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.resurgeai.core.data.auth.AuthRepository
 import com.resurgeai.core.data.prefs.PreferencesRepository
 import com.resurgeai.core.data.session.SessionRepository
+import com.resurgeai.core.healthconnect.HealthConnectManager
 import com.resurgeai.core.model.SessionState
 import com.resurgeai.core.model.ThemePreference
 import com.resurgeai.core.model.UserProfile
@@ -26,7 +27,10 @@ class ProfileViewModel @Inject constructor(
     sessionRepository: SessionRepository,
     private val preferencesRepository: PreferencesRepository,
     private val authRepository: AuthRepository,
+    private val healthConnect: HealthConnectManager,
 ) : ViewModel() {
+    fun healthConnectSettingsIntent() = healthConnect.settingsIntent()
+
     val state: StateFlow<ProfileUiState> = combine(
         sessionRepository.session,
         preferencesRepository.themePreference,

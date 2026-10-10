@@ -37,6 +37,7 @@ object ResurgeIcons {
     @DrawableRes val Target = Lucide.drawable.lucide_ic_target
     @DrawableRes val Watch = Lucide.drawable.lucide_ic_watch
     @DrawableRes val Phone = Lucide.drawable.lucide_ic_smartphone
+    @DrawableRes val Sparkles = Lucide.drawable.lucide_ic_sparkles
 }
 
 @Composable

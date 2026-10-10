@@ -1,6 +1,7 @@
 package com.resurgeai.feature.profile
 
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -17,17 +18,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composeunstyled.Text
+import com.composeunstyled.UnstyledButton
 import com.resurgeai.core.designsystem.components.Avatar
 import com.resurgeai.core.designsystem.components.Button
 import com.resurgeai.core.designsystem.components.ButtonVariant
 import com.resurgeai.core.designsystem.components.Card
 import com.resurgeai.core.designsystem.components.Divider
+import com.resurgeai.core.designsystem.components.Icon
 import com.resurgeai.core.designsystem.components.IconBadge
 import com.resurgeai.core.designsystem.components.ResurgeIcons
 import com.resurgeai.core.designsystem.components.SegmentOption
@@ -41,12 +45,18 @@ import com.resurgeai.core.model.ThemePreference
 import com.resurgeai.core.model.UserProfile
 
 @Composable
-fun ProfileRoute(viewModel: ProfileViewModel = hiltViewModel()) {
+fun ProfileRoute(
+    onOpenCatalog: (() -> Unit)? = null,
+    viewModel: ProfileViewModel = hiltViewModel(),
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     ProfileScreen(
         state = state,
         onThemeChange = viewModel::setTheme,
         onSignOut = viewModel::signOut,
+        onOpenHealthConnect = { runCatching { context.startActivity(viewModel.healthConnectSettingsIntent()) } },
+        onOpenCatalog = onOpenCatalog,
     )
 }
 
@@ -55,6 +65,8 @@ fun ProfileScreen(
     state: ProfileUiState,
     onThemeChange: (ThemePreference) -> Unit,
     onSignOut: () -> Unit,
+    onOpenHealthConnect: () -> Unit = {},
+    onOpenCatalog: (() -> Unit)? = null,
 ) {
     Column(Modifier.fillMaxSize()) {
         TopBar(title = "Profile")
@@ -105,6 +117,15 @@ fun ProfileScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
+            SectionLabel("Data")
+            Card(Modifier.fillMaxWidth(), contentPadding = PaddingValues(0.dp)) {
+                LinkRow(ResurgeIcons.Activity, Resurge.colors.activity, "Health Connect", "Permissions and data sources", onOpenHealthConnect)
+                if (onOpenCatalog != null) {
+                    Divider(Modifier.padding(start = 64.dp))
+                    LinkRow(ResurgeIcons.Sparkles, Resurge.colors.accent, "Design catalog", "Debug builds only", onOpenCatalog)
+                }
+            }
+
             Spacer(Modifier.height(32.dp))
             Button(
                 text = "Sign out",
@@ -148,6 +169,31 @@ private fun InfoRow(@DrawableRes icon: Int, tint: Color, label: String, value: S
         Spacer(Modifier.width(16.dp))
         Text(label, style = Resurge.type.label, modifier = Modifier.weight(1f))
         Text(value, style = Resurge.type.label, color = Resurge.colors.textMuted)
+    }
+}
+
+@Composable
+private fun LinkRow(@DrawableRes icon: Int, tint: Color, title: String, subtitle: String, onClick: () -> Unit) {
+    UnstyledButton(
+        onClick = onClick,
+        indication = LocalIndication.current,
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconBadge(icon, tint = tint, size = 32.dp)
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = Resurge.type.label)
+                Text(subtitle, style = Resurge.type.caption, color = Resurge.colors.textMuted)
+            }
+            Icon(ResurgeIcons.ChevronRight, contentDescription = null, tint = Resurge.colors.textSubtle, size = 18.dp)
+        }
     }
 }
 

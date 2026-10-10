@@ -3,6 +3,9 @@ package com.resurgeai.feature.auth.onboarding
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.resurgeai.core.data.user.UserRepository
+import com.resurgeai.core.healthconnect.HealthConnectAvailability
+import com.resurgeai.core.healthconnect.HealthConnectManager
+import com.resurgeai.core.healthconnect.HealthPermissions
 import com.resurgeai.core.model.Goal
 import com.resurgeai.core.model.Targets
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -13,7 +16,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-enum class OnboardingStep { Goals, Targets, Ready }
+enum class OnboardingStep { Goals, Targets, Health, Ready }
 
 data class OnboardingUiState(
     val step: OnboardingStep = OnboardingStep.Goals,
@@ -21,20 +24,39 @@ data class OnboardingUiState(
     val targets: Targets = Targets(),
     val saving: Boolean = false,
     val error: String? = null,
+    val healthAvailability: HealthConnectAvailability? = null,
+    val healthConnected: Boolean = false,
 ) {
     val canContinue: Boolean
         get() = when (step) {
             OnboardingStep.Goals -> goals.isNotEmpty()
-            OnboardingStep.Targets, OnboardingStep.Ready -> !saving
+            OnboardingStep.Targets, OnboardingStep.Health, OnboardingStep.Ready -> !saving
         }
 }
 
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(
     private val userRepository: UserRepository,
+    private val healthConnect: HealthConnectManager,
 ) : ViewModel() {
     private val _state = MutableStateFlow(OnboardingUiState())
     val state: StateFlow<OnboardingUiState> = _state.asStateFlow()
+
+    val healthPermissionContract = healthConnect.permissionContract()
+    val healthPermissionsToRequest: Set<String> get() = healthConnect.permissionsToRequest()
+
+    init { refreshHealthStatus() }
+
+    fun installHealthConnectIntent() = healthConnect.installIntent()
+
+    fun refreshHealthStatus() {
+        viewModelScope.launch {
+            val availability = healthConnect.availability()
+            val connected = availability == HealthConnectAvailability.AVAILABLE &&
+                healthConnect.grantedPermissions().any { it in HealthPermissions.READ }
+            _state.update { it.copy(healthAvailability = availability, healthConnected = connected) }
+        }
+    }
 
     fun toggleGoal(goal: Goal) = _state.update {
         it.copy(goals = if (goal in it.goals) it.goals - goal else it.goals + goal)

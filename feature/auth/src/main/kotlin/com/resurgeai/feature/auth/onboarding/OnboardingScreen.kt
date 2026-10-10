@@ -1,6 +1,7 @@
 package com.resurgeai.feature.auth.onboarding
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -26,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -44,6 +46,7 @@ import com.resurgeai.core.designsystem.components.Screen
 import com.resurgeai.core.designsystem.components.StepIndicator
 import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.designsystem.theme.ResurgeTheme
+import com.resurgeai.core.healthconnect.HealthConnectAvailability
 import com.resurgeai.core.model.Goal
 import com.resurgeai.core.model.UserProfile
 
@@ -53,8 +56,19 @@ fun OnboardingRoute(
     viewModel: OnboardingViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val healthLauncher = rememberLauncherForActivityResult(viewModel.healthPermissionContract) {
+        viewModel.refreshHealthStatus()
+    }
     BackHandler(enabled = state.step != OnboardingStep.Goals) { viewModel.back() }
     OnboardingScreen(
+        onConnectHealth = {
+            if (state.healthAvailability == HealthConnectAvailability.AVAILABLE) {
+                healthLauncher.launch(viewModel.healthPermissionsToRequest)
+            } else {
+                runCatching { context.startActivity(viewModel.installHealthConnectIntent()) }
+            }
+        },
         firstName = profile.firstName,
         state = state,
         onToggleGoal = viewModel::toggleGoal,
@@ -74,6 +88,7 @@ fun OnboardingScreen(
     onWaterChange: (Int) -> Unit,
     onBack: () -> Unit,
     onNext: () -> Unit,
+    onConnectHealth: () -> Unit = {},
 ) {
     Screen {
         Column(
@@ -117,6 +132,7 @@ fun OnboardingScreen(
                     when (step) {
                         OnboardingStep.Goals -> GoalsStep(firstName, state.goals, onToggleGoal)
                         OnboardingStep.Targets -> TargetsStep(state, onCaloriesChange, onWaterChange)
+                        OnboardingStep.Health -> HealthStep(state, onConnectHealth)
                         OnboardingStep.Ready -> ReadyStep(state)
                     }
                 }
@@ -138,11 +154,13 @@ fun OnboardingScreen(
                     text = when (state.step) {
                         OnboardingStep.Goals -> "Continue"
                         OnboardingStep.Targets -> "Continue"
+                        OnboardingStep.Health -> if (state.healthConnected) "Continue" else "Skip for now"
                         OnboardingStep.Ready -> "Start using Resurge"
                     },
                     onClick = onNext,
                     enabled = state.canContinue,
                     loading = state.saving,
+                    variant = if (state.step == OnboardingStep.Health && !state.healthConnected) ButtonVariant.Ghost else ButtonVariant.Primary,
                     trailingIcon = ResurgeIcons.ArrowRight.takeIf { state.step != OnboardingStep.Ready },
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -225,10 +243,66 @@ private fun TargetLabel(icon: Int, tint: Color, label: String) {
 }
 
 @Composable
+private fun HealthStep(state: OnboardingUiState, onConnect: () -> Unit) {
+    StepHeader(
+        title = "Bring in your health data",
+        subtitle = "Resurge reads from Health Connect — the place your phone and watch apps already share data.",
+    )
+    Card {
+        HealthRow(ResurgeIcons.Bed, Resurge.colors.sleep, "Sleep", "Duration and stages")
+        Spacer(Modifier.height(14.dp))
+        HealthRow(ResurgeIcons.Footprints, Resurge.colors.activity, "Activity", "Steps, distance and workouts")
+        Spacer(Modifier.height(14.dp))
+        HealthRow(ResurgeIcons.Flame, Resurge.colors.energy, "Energy", "Calories burned")
+        Spacer(Modifier.height(14.dp))
+        HealthRow(ResurgeIcons.Heart, Resurge.colors.heart, "Heart", "Heart rate and resting heart rate")
+    }
+    Spacer(Modifier.height(16.dp))
+    when {
+        state.healthConnected -> Row(verticalAlignment = Alignment.CenterVertically) {
+            IconBadge(ResurgeIcons.Check, tint = Resurge.colors.success, size = 28.dp)
+            Spacer(Modifier.width(10.dp))
+            Text("Health Connect is connected", style = Resurge.type.label)
+        }
+        state.healthAvailability == HealthConnectAvailability.NOT_SUPPORTED -> Text(
+            "Health Connect isn't available on this device. You can still log food and water.",
+            style = Resurge.type.caption,
+            color = Resurge.colors.textMuted,
+        )
+        else -> Button(
+            text = if (state.healthAvailability == HealthConnectAvailability.AVAILABLE) "Connect Health Connect" else "Install Health Connect",
+            onClick = onConnect,
+            variant = ButtonVariant.Secondary,
+            leadingIcon = ResurgeIcons.Watch,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+    Spacer(Modifier.height(12.dp))
+    Text(
+        "Only daily totals are synced to your account so your coach can spot trends. You can revoke access any time in Health Connect.",
+        style = Resurge.type.caption,
+        color = Resurge.colors.textSubtle,
+    )
+}
+
+@Composable
+private fun HealthRow(icon: Int, tint: Color, title: String, body: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        IconBadge(icon, tint = tint, size = 32.dp)
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text(title, style = Resurge.type.label)
+            Text(body, style = Resurge.type.caption, color = Resurge.colors.textMuted)
+        }
+    }
+}
+
+@Composable
 private fun ReadyStep(state: OnboardingUiState) {
     StepHeader(
         title = "You're all set",
-        subtitle = "Next up: connect Health Connect so your cards fill with real data from your phone and watch.",
+        subtitle = if (state.healthConnected) "Your dashboard will fill with data from your phone and watch."
+        else "You can connect Health Connect any time from the Today tab.",
     )
     Card {
         SummaryRow("Goals", state.goals.joinToString { it.label })

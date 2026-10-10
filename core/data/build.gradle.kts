@@ -16,6 +16,7 @@ android {
 
 dependencies {
     api(project(":core:model"))
+    implementation(project(":core:healthconnect"))
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
@@ -30,4 +31,8 @@ dependencies {
     implementation(libs.googleid)
 
     implementation(libs.androidx.datastore.preferences)
+
+    implementation(libs.androidx.work.runtime)
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.compiler)
 }

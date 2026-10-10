@@ -21,6 +21,8 @@ include(
     ":core:model",
     ":core:designsystem",
     ":core:data",
+    ":core:healthconnect",
     ":feature:auth",
+    ":feature:dashboard",
     ":feature:profile",
 )

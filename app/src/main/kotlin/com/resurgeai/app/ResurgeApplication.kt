@@ -2,6 +2,8 @@ package com.resurgeai.app
 
 import android.app.Application
 import android.content.Context
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.Configuration
 import com.resurgeai.core.data.di.WebClientId
 import dagger.Module
 import dagger.Provides
@@ -9,9 +11,15 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.HiltAndroidApp
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import javax.inject.Inject
 
 @HiltAndroidApp
-class ResurgeApplication : Application()
+class ResurgeApplication : Application(), Configuration.Provider {
+    @Inject lateinit var workerFactory: HiltWorkerFactory
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
+}
 
 @Module
 @InstallIn(SingletonComponent::class)
