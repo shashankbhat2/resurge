@@ -1,0 +1,24 @@
+*.iml
+.gradle/
+.kotlin/
+/local.properties
+/.idea/
+.DS_Store
+build/
+/captures
+.externalNativeBuild
+.cxx
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+functions/node_modules/
+functions/lib/
+
+# Local planning docs
+/plans/
+
+# Local secrets
+.env
+.env.*
