@@ -22,3 +22,5 @@ functions/lib/
 # Local secrets
 .env
 .env.*
+
+/assets/
