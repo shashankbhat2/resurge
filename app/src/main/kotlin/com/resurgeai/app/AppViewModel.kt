@@ -6,6 +6,7 @@ import com.resurgeai.core.data.prefs.PreferencesRepository
 import com.resurgeai.core.data.session.SessionRepository
 import com.resurgeai.core.model.SessionState
 import com.resurgeai.core.model.ThemePreference
+import com.resurgeai.core.model.TimeFormat
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -22,4 +23,7 @@ class AppViewModel @Inject constructor(
 
     val theme: StateFlow<ThemePreference> = preferencesRepository.themePreference
         .stateIn(viewModelScope, SharingStarted.Eagerly, ThemePreference.SYSTEM)
+
+    val timeFormat: StateFlow<TimeFormat?> = preferencesRepository.timeFormat
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 }

@@ -36,30 +36,33 @@ class DayRowsTest {
     }
 
     @Test
-    fun `sleep window sits on a 6pm to noon clock`() {
-        // 23:00 on the 9th -> 06:00 on the 10th, i.e. 5h and 12h after 18:00.
+    fun `sleep rows show a quality bar and no times`() {
         val start = d1.atTime(23, 0).toInstant(zone)
-        val night = SleepSession(start, start.plus(Duration.ofHours(7)), mapOf(SleepStage.DEEP to Duration.ofHours(2), SleepStage.LIGHT to Duration.ofHours(5)), null)
+        // 7h in bed, 42 min awake -> 90% quality.
+        val night = SleepSession(
+            start, start.plus(Duration.ofHours(7)),
+            mapOf(SleepStage.AWAKE to Duration.ofMinutes(42), SleepStage.LIGHT to Duration.ofMinutes(378)),
+            null,
+        )
         val (axis, rows) = DayRows.build(HealthMetric.SLEEP, listOf(day(d2, 7.0)), listOf(night), emptyList(), emptyMap(), zone)
-        val viz = rows.single().viz as DayViz.Window
-        assertEquals(5f / 18, viz.start, 0.001f)
-        assertEquals(12f / 18, viz.end, 0.001f)
-        assertEquals(listOf(SleepStage.DEEP, SleepStage.LIGHT), viz.stages.map { it.second })
-        assertEquals("23:00 → 06:00", rows.single().detail)
-        assertEquals(4, axis.labels.size)
+        assertTrue(axis.labels.isEmpty())
+        assertEquals(0.9f, (rows.single().viz as DayViz.Magnitude).fraction, 0.001f)
+        assertEquals(null, rows.single().detail)
     }
 
     @Test
-    fun `week rows average bedtime and wake time across nights`() {
+    fun `week sleep row averages quality across nights`() {
         val mon = LocalDate.of(2026, 10, 5)
-        // Nights ending Tue (22:00 -> 06:00) and Wed (00:00 -> 08:00): avg 23:00 -> 07:00.
-        val n1 = SleepSession(mon.atTime(22, 0).toInstant(zone), mon.plusDays(1).atTime(6, 0).toInstant(zone), emptyMap(), null)
-        val n2 = SleepSession(mon.plusDays(2).atTime(0, 0).toInstant(zone), mon.plusDays(2).atTime(8, 0).toInstant(zone), emptyMap(), null)
-        val (_, rows) = DayRows.build(HealthMetric.SLEEP, listOf(week(mon, 8.0, null, 7)), listOf(n1, n2), emptyList(), emptyMap(), zone)
-        val viz = rows.single().viz as DayViz.Window
-        assertEquals(5f / 18, viz.start, 0.001f)
-        assertEquals(13f / 18, viz.end, 0.001f)
-        assertEquals("avg 23:00 → 07:00", rows.single().detail)
+        fun night(endDay: Long, awakeMin: Long): SleepSession {
+            val start = mon.plusDays(endDay - 1).atTime(23, 0).toInstant(zone)
+            return SleepSession(start, start.plus(Duration.ofHours(8)), mapOf(SleepStage.AWAKE to Duration.ofMinutes(awakeMin)), null)
+        }
+        val (_, rows) = DayRows.build(
+            HealthMetric.SLEEP, listOf(week(mon, 8.0, null, 7)),
+            listOf(night(1, 48), night(2, 0)), emptyList(), emptyMap(), zone,
+        )
+        // 90% and 100% -> 95%.
+        assertEquals(0.95f, (rows.single().viz as DayViz.Magnitude).fraction, 0.001f)
     }
 
     @Test

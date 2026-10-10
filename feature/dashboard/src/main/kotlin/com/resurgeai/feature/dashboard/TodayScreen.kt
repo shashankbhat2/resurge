@@ -3,6 +3,7 @@ package com.resurgeai.feature.dashboard
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -33,6 +34,7 @@ import com.resurgeai.core.designsystem.components.ButtonVariant
 import com.resurgeai.core.designsystem.components.Card
 import com.resurgeai.core.designsystem.components.IconBadge
 import com.resurgeai.core.designsystem.components.LocalFloatingBarInset
+import com.resurgeai.core.designsystem.components.LocalHeaderInset
 import com.resurgeai.core.designsystem.components.ResurgeIcons
 import com.resurgeai.core.designsystem.components.Spinner
 import com.resurgeai.core.designsystem.theme.Resurge
@@ -40,6 +42,7 @@ import com.resurgeai.core.designsystem.theme.ResurgeTheme
 import com.resurgeai.core.healthconnect.HealthConnectAvailability
 import com.resurgeai.core.model.HealthMetric
 import com.resurgeai.core.model.SourceKind
+import java.time.LocalTime
 
 @Composable
 fun TodayRoute(
@@ -75,53 +78,60 @@ fun TodayScreen(
     Column(
         Modifier
             .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.statusBars)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .verticalScroll(rememberScrollState()),
     ) {
-        TodayHeader(state)
-        Spacer(Modifier.height(20.dp))
+        // Greeting lives in the shared header; the latest insight leads the page.
+        Column(Modifier.padding(start = 20.dp, end = 20.dp, top = LocalHeaderInset.current + 20.dp, bottom = 32.dp)) {
+            CoachInsight(text = PLACEHOLDER_INSIGHT, time = LocalTime.of(7, 0))
+        }
 
-        when (state.availability) {
-            null -> Unit
-            HealthConnectAvailability.NOT_SUPPORTED -> InfoCard(
-                icon = ResurgeIcons.Activity,
-                title = "Health Connect isn't available",
-                body = "This device doesn't support Health Connect, so health data can't be shown.",
-            )
-            HealthConnectAvailability.NOT_INSTALLED, HealthConnectAvailability.UPDATE_REQUIRED -> InfoCard(
-                icon = ResurgeIcons.Activity,
-                title = if (state.availability == HealthConnectAvailability.NOT_INSTALLED) "Install Health Connect" else "Update Health Connect",
-                body = "Resurge reads your steps, sleep and workouts through Health Connect.",
-                action = "Open Play Store",
-                onAction = onInstall,
-            )
-            HealthConnectAvailability.AVAILABLE -> when (state.permissions) {
-                PermissionState.UNKNOWN -> LoadingRow()
-                PermissionState.NONE -> InfoCard(
-                    icon = ResurgeIcons.Watch,
-                    title = "Connect your health data",
-                    body = "Allow Resurge to read sleep, steps, calories, workouts and heart rate from your phone and wearable via Health Connect.",
-                    action = "Connect Health Connect",
-                    onAction = onConnect,
+        Column(Modifier.padding(horizontal = 16.dp)) {
+            when (state.availability) {
+                null -> TodaySkeleton()
+                HealthConnectAvailability.NOT_SUPPORTED -> InfoCard(
+                    icon = ResurgeIcons.Activity,
+                    title = "Health Connect isn't available",
+                    body = "This device doesn't support Health Connect, so health data can't be shown.",
                 )
-                PermissionState.PARTIAL, PermissionState.ALL -> {
-                    if (state.permissions == PermissionState.PARTIAL) {
-                        PartialBanner(onConnect)
-                        Spacer(Modifier.height(12.dp))
+                HealthConnectAvailability.NOT_INSTALLED, HealthConnectAvailability.UPDATE_REQUIRED -> InfoCard(
+                    icon = ResurgeIcons.Activity,
+                    title = if (state.availability == HealthConnectAvailability.NOT_INSTALLED) "Install Health Connect" else "Update Health Connect",
+                    body = "Resurge reads your steps, sleep and workouts through Health Connect.",
+                    action = "Open Play Store",
+                    onAction = onInstall,
+                )
+                HealthConnectAvailability.AVAILABLE -> when (state.permissions) {
+                    PermissionState.UNKNOWN -> TodaySkeleton()
+                    PermissionState.NONE -> InfoCard(
+                        icon = ResurgeIcons.Watch,
+                        title = "Connect your health data",
+                        body = "Allow Resurge to read sleep, steps, calories, workouts and heart rate from your phone and wearable via Health Connect.",
+                        action = "Connect Health Connect",
+                        onAction = onConnect,
+                    )
+                    PermissionState.PARTIAL, PermissionState.ALL -> {
+                        if (state.permissions == PermissionState.PARTIAL) {
+                            PartialBanner(onConnect)
+                            Spacer(Modifier.height(12.dp))
+                        }
+                        state.error?.let {
+                            InfoCard(ResurgeIcons.Activity, "Something went wrong", it, action = "Retry", onAction = onRetry)
+                            Spacer(Modifier.height(12.dp))
+                        }
+                        val today = state.today
+                        if (today == null) TodaySkeleton() else TodayGrid(state, today, onOpenMetric)
                     }
-                    state.error?.let {
-                        InfoCard(ResurgeIcons.Activity, "Something went wrong", it, action = "Retry", onAction = onRetry)
-                        Spacer(Modifier.height(12.dp))
-                    }
-                    val today = state.today
-                    if (today == null) LoadingRow() else TodayGrid(state, today, onOpenMetric)
                 }
             }
+            Spacer(Modifier.height(32.dp + LocalFloatingBarInset.current))
         }
-        Spacer(Modifier.height(24.dp + LocalFloatingBarInset.current))
     }
 }
+
+/** Shown until the AI coach (Phase 4) writes real insights. */
+private const val PLACEHOLDER_INSIGHT =
+    "You slept 40 minutes less than your weekly average, and your resting heart rate is up 3 bpm. " +
+        "Keep today's training light and aim to be in bed by 10:30."
 
 @DrawableRes
 internal fun sourceIcon(kind: SourceKind): Int = when (kind) {
@@ -165,16 +175,6 @@ private fun PartialBanner(onManage: () -> Unit) {
             Button("Review", onClick = onManage, variant = ButtonVariant.Ghost)
         }
     }
-}
-
-@Composable
-private fun LoadingRow() {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(vertical = 48.dp),
-        horizontalArrangement = Arrangement.Center,
-    ) { Spinner() }
 }
 
 @Preview

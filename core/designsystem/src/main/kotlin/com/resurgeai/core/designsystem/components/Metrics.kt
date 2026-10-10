@@ -15,6 +15,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import com.composeunstyled.UnstyledButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -243,7 +247,7 @@ fun WeekDots(
 fun Stat(label: String, value: String, modifier: Modifier = Modifier) {
     Column(modifier) {
         Text(label, style = Resurge.type.caption, color = Resurge.colors.textMuted)
-        Spacer(Modifier.height(2.dp))
+        Spacer(Modifier.height(6.dp))
         Text(value, style = Resurge.type.headline)
     }
 }
@@ -330,5 +334,82 @@ fun RingLabel(value: String?, caption: String?, color: Color = Resurge.colors.te
             maxLines = 1,
         )
         caption?.let { Text(it, style = Resurge.type.caption, color = Resurge.colors.textMuted, maxLines = 1) }
+    }
+}
+
+/**
+ * One card holding several metrics side by side, separated by hairline dividers (e.g. Sleep | Steps).
+ * Each child is laid out with equal width; use [MetricCell] for the children.
+ */
+@Composable
+fun MetricGroup(
+    modifier: Modifier = Modifier,
+    inverse: Boolean = false,
+    cells: List<@Composable (Modifier) -> Unit>,
+) {
+    Card(modifier = modifier.fillMaxWidth(), inverse = inverse, contentPadding = PaddingValues(0.dp)) {
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            cells.forEachIndexed { i, cell ->
+                if (i > 0) {
+                    // Full-height hairline; equal-weight cells keep it exactly centred.
+                    Box(
+                        Modifier
+                            .width(1.dp)
+                            .fillMaxHeight()
+                            .background(Resurge.colors.border),
+                    )
+                }
+                cell(Modifier.weight(1f).fillMaxHeight())
+            }
+        }
+    }
+}
+
+/**
+ * A metric inside a [MetricGroup]: radial [visual] on top, then label, value (+unit) and subtitle
+ * with generous spacing. Tappable when [onClick] is set.
+ */
+@Composable
+fun MetricCell(
+    title: String,
+    value: String?,
+    modifier: Modifier = Modifier,
+    unit: String? = null,
+    subtitle: String? = null,
+    onClick: (() -> Unit)? = null,
+    visual: @Composable (Modifier) -> Unit,
+) {
+    val content = @Composable {
+        Column(Modifier.fillMaxWidth().padding(20.dp)) {
+            visual(Modifier.size(68.dp))
+            Spacer(Modifier.height(18.dp))
+            Text(title, style = Resurge.type.label, color = Resurge.colors.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    value ?: "—",
+                    style = Resurge.type.title.copy(fontFeatureSettings = "tnum"),
+                    color = if (value != null) Resurge.colors.text else Resurge.colors.textSubtle,
+                    maxLines = 1,
+                )
+                if (value != null && unit != null) {
+                    Spacer(Modifier.width(4.dp))
+                    Text(unit, style = Resurge.type.label, color = Resurge.colors.textMuted, modifier = Modifier.padding(bottom = 3.dp), maxLines = 1)
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                subtitle ?: " ",
+                style = Resurge.type.caption.copy(lineHeight = Resurge.type.label.lineHeight),
+                color = Resurge.colors.textMuted,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+    if (onClick != null) {
+        UnstyledButton(onClick = onClick, modifier = modifier, indication = LocalIndication.current, contentAlignment = Alignment.TopStart) { content() }
+    } else {
+        Box(modifier) { content() }
     }
 }

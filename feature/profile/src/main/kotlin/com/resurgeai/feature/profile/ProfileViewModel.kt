@@ -8,6 +8,7 @@ import com.resurgeai.core.data.session.SessionRepository
 import com.resurgeai.core.healthconnect.HealthConnectManager
 import com.resurgeai.core.model.SessionState
 import com.resurgeai.core.model.ThemePreference
+import com.resurgeai.core.model.TimeFormat
 import com.resurgeai.core.model.UserProfile
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -20,6 +21,8 @@ import javax.inject.Inject
 data class ProfileUiState(
     val profile: UserProfile? = null,
     val theme: ThemePreference = ThemePreference.SYSTEM,
+    /** Null = follow the device's 12/24-hour setting. */
+    val timeFormat: TimeFormat? = null,
 )
 
 @HiltViewModel
@@ -34,12 +37,17 @@ class ProfileViewModel @Inject constructor(
     val state: StateFlow<ProfileUiState> = combine(
         sessionRepository.session,
         preferencesRepository.themePreference,
-    ) { session, theme ->
-        ProfileUiState(profile = (session as? SessionState.Ready)?.profile, theme = theme)
+        preferencesRepository.timeFormat,
+    ) { session, theme, timeFormat ->
+        ProfileUiState(profile = (session as? SessionState.Ready)?.profile, theme = theme, timeFormat = timeFormat)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProfileUiState())
 
     fun setTheme(theme: ThemePreference) {
         viewModelScope.launch { preferencesRepository.setThemePreference(theme) }
+    }
+
+    fun setTimeFormat(format: TimeFormat) {
+        viewModelScope.launch { preferencesRepository.setTimeFormat(format) }
     }
 
     fun signOut() {

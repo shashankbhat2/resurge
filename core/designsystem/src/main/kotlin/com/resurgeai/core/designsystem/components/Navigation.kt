@@ -9,6 +9,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,6 +26,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -71,37 +78,50 @@ fun <T> FloatingNavBar(
         modifier = modifier
             .windowInsetsPadding(WindowInsets.navigationBars)
             .padding(start = 20.dp, end = 20.dp, bottom = BarGap)
-            .fillMaxWidth()
-            .height(BarHeight)
-            .clip(Resurge.shape.pill)
-            .background(Resurge.colors.navBar)
-            .border(1.dp, Resurge.colors.border, Resurge.shape.pill)
-            .padding(horizontal = 8.dp),
+            .fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        items.forEach { item ->
-            val isSelected = item.key == selected
-            NavCircle(
-                icon = if (isSelected) item.selectedIcon else item.icon,
-                label = item.label,
-                background = if (isSelected) Resurge.colors.strong else Color.Transparent,
-                tint = if (isSelected) Resurge.colors.onStrong else Resurge.colors.navInactive,
-                role = Role.Tab,
-                selected = isSelected,
-                onClick = { onSelect(item.key) },
-            )
+        // Tabs pill
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .height(BarHeight)
+                .clip(Resurge.shape.pill)
+                .background(Resurge.colors.navBar)
+                .border(1.dp, Resurge.colors.border, Resurge.shape.pill)
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            items.forEach { item ->
+                val isSelected = item.key == selected
+                NavCircle(
+                    icon = if (isSelected) item.selectedIcon else item.icon,
+                    label = item.label,
+                    background = if (isSelected) Resurge.colors.navHighlight else Color.Transparent,
+                    tint = if (isSelected) Resurge.colors.onNavHighlight else Resurge.colors.navInactive,
+                    role = Role.Tab,
+                    selected = isSelected,
+                    onClick = { onSelect(item.key) },
+                )
+            }
         }
+        // Detached action button (e.g. Scan), same height as the pill.
         action?.let {
-            NavCircle(
-                icon = it.icon,
-                label = it.label,
-                background = Resurge.colors.accent,
-                tint = Resurge.colors.onAccent,
-                role = Role.Button,
-                selected = false,
+            Spacer(Modifier.width(10.dp))
+            UnstyledButton(
                 onClick = onAction,
-            )
+                role = Role.Button,
+                modifier = Modifier
+                    .size(BarHeight)
+                    .clip(Resurge.shape.pill)
+                    .background(Resurge.colors.navBar)
+                    .border(1.dp, Resurge.colors.border, Resurge.shape.pill)
+                    .semantics { contentDescription = it.label },
+                indication = LocalIndication.current,
+            ) {
+                Icon(it.icon, contentDescription = null, tint = Resurge.colors.text, size = 24.dp)
+            }
         }
     }
 }
@@ -164,5 +184,61 @@ fun TopBar(
                 .padding(horizontal = 8.dp),
         )
         trailing?.invoke()
+    }
+}
+
+/** Space taken by [MainHeader] (status bar + bar); tab content should start at least this far down. */
+val LocalHeaderInset = compositionLocalOf { 0.dp }
+
+val MainHeaderHeight: Dp = 60.dp
+
+/**
+ * Permanent header for the main tabs: [title] on the left (or any [leading] content, e.g. a greeting),
+ * [trailing] (profile photo) on the right. Its background fades downward so content scrolls softly
+ * underneath, and it repaints the [TopShade] so the shade stays continuous across the header edge.
+ */
+@Composable
+fun MainHeader(
+    title: String?,
+    modifier: Modifier = Modifier,
+    leading: (@Composable () -> Unit)? = null,
+    trailing: @Composable () -> Unit = {},
+) {
+    val bg = Resurge.colors.bg
+    // Same alpha ramp for the background and for the header's copy of the shade: wherever the
+    // background hides the shade behind it, this copy shows through by exactly that amount.
+    val ramp = arrayOf(0f to 1f, 0.6f to 0.9f, 1f to 0f)
+    Box(
+        modifier
+            .fillMaxWidth()
+            .background(Brush.verticalGradient(*ramp.map { (p, a) -> p to bg.copy(alpha = a) }.toTypedArray())),
+    ) {
+        Box(
+            Modifier
+                .matchParentSize()
+                .clipToBounds()
+                .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+                .drawWithContent {
+                    drawContent()
+                    drawRect(
+                        Brush.verticalGradient(*ramp.map { (p, a) -> p to Color.Black.copy(alpha = a) }.toTypedArray()),
+                        blendMode = BlendMode.DstIn,
+                    )
+                },
+        ) { TopShade() }
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .height(MainHeaderHeight)
+                .padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.weight(1f)) {
+                if (leading != null) leading()
+                else Text(title.orEmpty(), style = Resurge.type.title, maxLines = 1)
+            }
+            trailing()
+        }
     }
 }

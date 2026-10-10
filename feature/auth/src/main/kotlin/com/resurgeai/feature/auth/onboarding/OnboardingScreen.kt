@@ -171,7 +171,7 @@ fun OnboardingScreen(
 
 @Composable
 private fun StepHeader(title: String, subtitle: String) {
-    Text(title, style = Resurge.type.display)
+    Text(title, style = Resurge.type.brandLarge)
     Spacer(Modifier.height(8.dp))
     Text(subtitle, style = Resurge.type.body, color = Resurge.colors.textMuted)
     Spacer(Modifier.height(24.dp))

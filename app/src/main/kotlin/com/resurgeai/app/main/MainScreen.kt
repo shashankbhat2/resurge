@@ -10,6 +10,22 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
+import com.composeunstyled.UnstyledButton
+import com.resurgeai.core.designsystem.components.Avatar
+import com.resurgeai.core.designsystem.components.LocalHeaderInset
+import com.resurgeai.core.designsystem.components.MainHeader
+import com.resurgeai.core.designsystem.components.MainHeaderHeight
+import com.resurgeai.core.designsystem.components.TopShade
+import androidx.compose.ui.text.style.TextOverflow
+import com.composeunstyled.Text
+import java.time.LocalTime
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -52,18 +68,26 @@ import kotlinx.serialization.Serializable
 @Serializable data class MetricDetailRoute(val metric: String)
 @Serializable data class MetricSourcesRoute(val metric: String)
 @Serializable data object CatalogRoute
+@Serializable data object SettingsRoute
 
 // Tab graph, nested inside the shell.
 @Serializable data object TodayRoute
+@Serializable data object FitnessRoute
 @Serializable data object FoodRoute
-@Serializable data object CoachRoute
-@Serializable data object ProfileTabRoute
+@Serializable data object AssistantRoute
 
-private enum class Tab(val route: Any, val label: String, val icon: Int, val selectedIcon: Int) {
-    Today(TodayRoute, "Today", ResurgeIcons.Today, ResurgeIcons.TodayFilled),
-    Food(FoodRoute, "Food", ResurgeIcons.Food, ResurgeIcons.FoodFilled),
-    Coach(CoachRoute, "Coach", ResurgeIcons.Coach, ResurgeIcons.CoachFilled),
-    Profile(ProfileTabRoute, "Profile", ResurgeIcons.Profile, ResurgeIcons.ProfileFilled),
+private enum class Tab(
+    val route: Any,
+    val label: String,
+    val icon: Int,
+    val selectedIcon: Int,
+    /** Header title; Today has none because its greeting sits right below. */
+    val title: String?,
+) {
+    Today(TodayRoute, "Today", ResurgeIcons.Today, ResurgeIcons.TodayFilled, null),
+    Fitness(FitnessRoute, "Fitness", ResurgeIcons.Fitness, ResurgeIcons.FitnessFilled, "Fitness"),
+    Food(FoodRoute, "Food", ResurgeIcons.Food, ResurgeIcons.FoodFilled, "Food"),
+    Assistant(AssistantRoute, "Assistant", ResurgeIcons.Coach, ResurgeIcons.CoachFilled, "Assistant"),
 }
 
 private const val PUSH_MS = 280
@@ -71,18 +95,20 @@ private const val POP_MS = 220
 private val easing = FastOutSlowInEasing
 
 /**
- * Pushed screens slide in a quarter-width over a static shell; on back they slide/fade away while
- * the shell underneath is already in place. The shell never changes size, so nothing reflows.
+ * Pushed screens slide in from the right over a static shell; on back they slide out again while
+ * the shell underneath stays put. The shell never changes size, so nothing reflows.
  */
 private val pushEnter: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
-    slideInHorizontally(tween(PUSH_MS, easing = easing)) { it / 4 } + fadeIn(tween(PUSH_MS, easing = easing))
+    slideInHorizontally(tween(PUSH_MS, easing = easing)) { it }
 }
+
+// Back (incl. predictive back gesture) slides the screen away; no fade, so nothing "dissolves".
 private val popExit: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
-    slideOutHorizontally(tween(POP_MS, easing = easing)) { it / 4 } + fadeOut(tween(POP_MS, easing = easing))
+    slideOutHorizontally(tween(POP_MS, easing = easing)) { it }
 }
 
 @Composable
-fun MainScreen(@Suppress("UNUSED_PARAMETER") profile: UserProfile) {
+fun MainScreen(profile: UserProfile) {
     val rootNav = rememberNavController()
     NavHost(
         navController = rootNav,
@@ -95,11 +121,20 @@ fun MainScreen(@Suppress("UNUSED_PARAMETER") profile: UserProfile) {
     ) {
         composable<TabsRoute> {
             TabsShell(
+                profile = profile,
                 onOpenMetric = { metric -> rootNav.navigate(MetricDetailRoute(metric.name)) },
-                onOpenCatalog = if (BuildConfig.DEBUG) {
-                    { rootNav.navigate(CatalogRoute) }
-                } else null,
+                onOpenSettings = { rootNav.navigate(SettingsRoute) },
             )
+        }
+        composable<SettingsRoute> {
+            FullScreen {
+                ProfileRoute(
+                    onBack = { rootNav.popBackStack() },
+                    onOpenCatalog = if (BuildConfig.DEBUG) {
+                        { rootNav.navigate(CatalogRoute) }
+                    } else null,
+                )
+            }
         }
         composable<MetricDetailRoute> {
             FullScreen {
@@ -137,8 +172,9 @@ private fun FullScreen(content: @Composable () -> Unit) {
 
 @Composable
 private fun TabsShell(
+    profile: UserProfile,
     onOpenMetric: (HealthMetric) -> Unit,
-    onOpenCatalog: (() -> Unit)?,
+    onOpenSettings: () -> Unit,
 ) {
     val tabsNav = rememberNavController()
     val backStackEntry by tabsNav.currentBackStackEntryAsState()
@@ -146,26 +182,52 @@ private fun TabsShell(
         backStackEntry?.destination?.hierarchy?.any { it.hasRoute(tab.route::class) } == true
     } ?: Tab.Today
 
-    // The bar floats over the content; scrolling screens pad their end with LocalFloatingBarInset.
-    val inset = FloatingNavBarHeight + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    // Header and navbar float over the content; scrolling screens pad with these insets.
+    val bottomInset = FloatingNavBarHeight + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val topInset = MainHeaderHeight + WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     Box(Modifier.fillMaxSize()) {
-        CompositionLocalProvider(LocalFloatingBarInset provides inset) {
+        TopShade()
+        CompositionLocalProvider(LocalFloatingBarInset provides bottomInset, LocalHeaderInset provides topInset) {
             NavHost(
                 navController = tabsNav,
                 startDestination = TodayRoute,
                 enterTransition = { fadeIn(tween(180, easing = easing)) },
                 exitTransition = { fadeOut(tween(180, easing = easing)) },
+                popEnterTransition = { EnterTransition.None },
+                popExitTransition = { ExitTransition.None },
             ) {
                 composable<TodayRoute> { TodayScreenRoute(onOpenMetric = onOpenMetric) }
+                composable<FitnessRoute> {
+                    ComingSoon("Workouts, training load and activity trends from your wearable.", "a later phase")
+                }
                 composable<FoodRoute> {
-                    ComingSoon("Food", "Scan meals, track calories and log water.", "Phase 3")
+                    ComingSoon("Scan meals, track calories and log water.", "Phase 3")
                 }
-                composable<CoachRoute> {
-                    ComingSoon("Coach", "Chat with an AI coach that knows your data.", "Phase 4")
+                composable<AssistantRoute> {
+                    ComingSoon("Chat with an AI assistant that knows your health data.", "Phase 4")
                 }
-                composable<ProfileTabRoute> { ProfileRoute(onOpenCatalog = onOpenCatalog) }
             }
         }
+        MainHeader(
+            title = currentTab.title,
+            modifier = Modifier.align(Alignment.TopCenter),
+            // Today greets the user in the header, left of the profile photo.
+            leading = if (currentTab == Tab.Today) {
+                { Text(greeting(profile), style = Resurge.type.brand, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            } else null,
+            trailing = {
+                UnstyledButton(
+                    onClick = onOpenSettings,
+                    role = Role.Button,
+                    modifier = Modifier
+                        .clip(Resurge.shape.pill)
+                        .semantics { contentDescription = "Settings" },
+                    indication = LocalIndication.current,
+                ) {
+                    Avatar(profile.displayName, profile.photoUrl, size = 38.dp)
+                }
+            },
+        )
         FloatingNavBar(
             items = Tab.entries.map { NavItem(it, it.label, it.icon, it.selectedIcon) },
             selected = currentTab,
@@ -176,6 +238,16 @@ private fun TabsShell(
             modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
+}
+
+private fun greeting(profile: UserProfile, now: LocalTime = LocalTime.now()): String {
+    val part = when (now.hour) {
+        in 5..11 -> "Good morning"
+        in 12..16 -> "Good afternoon"
+        in 17..20 -> "Good evening"
+        else -> "Good night"
+    }
+    return profile.firstName?.let { "$part, $it" } ?: part
 }
 
 private fun NavHostController.switchTab(route: Any) = navigate(route) {

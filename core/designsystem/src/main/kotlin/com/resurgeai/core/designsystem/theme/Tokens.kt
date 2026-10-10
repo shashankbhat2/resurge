@@ -36,9 +36,14 @@ object ColorTokens {
     val navActive = ThemeToken<Color>("nav_active")
     val navOnActive = ThemeToken<Color>("nav_on_active")
     val navInactive = ThemeToken<Color>("nav_inactive")
+    val navHighlight = ThemeToken<Color>("nav_highlight")
+    val onNavHighlight = ThemeToken<Color>("on_nav_highlight")
 }
 
 object TypeTokens {
+    /** Marketing / personality text only (greeting, sign-in, onboarding headings). Bricolage Grotesque. */
+    val brand = ThemeToken<TextStyle>("brand")
+    val brandLarge = ThemeToken<TextStyle>("brand_large")
     val display = ThemeToken<TextStyle>("display")
     val metric = ThemeToken<TextStyle>("metric")
     val title = ThemeToken<TextStyle>("title")

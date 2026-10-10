@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -27,10 +28,13 @@ import com.resurgeai.core.designsystem.components.ResurgeIcons
 import com.resurgeai.core.designsystem.components.SectionHeader
 import com.resurgeai.core.designsystem.components.SegmentOption
 import com.resurgeai.core.designsystem.components.SegmentedControl
-import com.resurgeai.core.designsystem.components.Spinner
+import com.resurgeai.core.designsystem.components.SkeletonBox
+import com.resurgeai.core.designsystem.components.SkeletonGroup
+import com.resurgeai.core.designsystem.components.SkeletonLine
 import com.resurgeai.core.designsystem.components.Stat
 import com.resurgeai.core.designsystem.components.TopBar
 import com.resurgeai.core.designsystem.theme.Resurge
+import com.resurgeai.core.designsystem.theme.clockFormatter
 import com.resurgeai.core.model.DataSource
 import com.resurgeai.core.model.HealthMetric
 import com.resurgeai.feature.dashboard.Formatters
@@ -65,6 +69,7 @@ fun MetricDetailScreen(
     val color = metricColor(state.metric)
     val zone = ZoneId.systemDefault()
     val selected = state.periods.getOrNull(state.selected)
+    val clock = clockFormatter()
 
     Column(Modifier.fillMaxSize()) {
         TopBar(
@@ -87,21 +92,18 @@ fun MetricDetailScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(20.dp))
 
             when {
                 state.error != null -> Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                     Text(state.error, style = Resurge.type.body, color = Resurge.colors.textMuted)
                 }
-                state.series == null -> Row(
-                    Modifier.fillMaxWidth().padding(48.dp),
-                    horizontalArrangement = Arrangement.Center,
-                ) { Spinner() }
+                state.series == null -> DetailSkeleton()
                 else -> {
                     SummaryCard(state)
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(16.dp))
                     SelectionCard(state, zone, Modifier.padding(horizontal = 16.dp))
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(16.dp))
                     PeriodList(state, color, zone, onSelect)
                 }
             }
@@ -117,7 +119,7 @@ fun MetricDetailScreen(
                             if (i > 0) Divider()
                             SessionRow(
                                 title = s.end.atZone(zone).format(DAY),
-                                subtitle = "${s.start.atZone(zone).format(TIME)} – ${s.end.atZone(zone).format(TIME)}",
+                                subtitle = "${s.start.atZone(zone).format(clock)} – ${s.end.atZone(zone).format(clock)}",
                                 value = Formatters.duration(s.duration),
                                 source = s.source,
                             )
@@ -133,7 +135,7 @@ fun MetricDetailScreen(
                             if (i > 0) Divider()
                             SessionRow(
                                 title = s.title ?: s.type,
-                                subtitle = s.start.atZone(zone).format(DAY_TIME),
+                                subtitle = s.start.atZone(zone).let { t -> "${t.format(DAY)}, ${t.format(clock)}" },
                                 value = Formatters.duration(s.duration),
                                 source = s.source,
                             )
@@ -141,6 +143,47 @@ fun MetricDetailScreen(
                     }
                 }
                 Spacer(Modifier.height(24.dp))
+            }
+        }
+    }
+}
+
+/** Placeholders for the overview, highlight and list cards while the series loads. */
+@Composable
+private fun DetailSkeleton() {
+    SkeletonGroup {
+        Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Card(Modifier.fillMaxWidth()) {
+                SkeletonLine(90.dp)
+                Spacer(Modifier.height(12.dp))
+                SkeletonLine(140.dp, 32.dp)
+                Spacer(Modifier.height(24.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    repeat(3) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            SkeletonLine(60.dp)
+                            SkeletonLine(72.dp, 18.dp)
+                        }
+                    }
+                }
+            }
+            Card(Modifier.fillMaxWidth(), contentPadding = PaddingValues(0.dp)) {
+                repeat(5) { i ->
+                    if (i > 0) Divider()
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            SkeletonLine(32.dp, 10.dp)
+                            SkeletonLine(24.dp, 16.dp)
+                        }
+                        Spacer(Modifier.width(24.dp))
+                        SkeletonBox(Modifier.weight(1f).height(10.dp), Resurge.shape.pill)
+                        Spacer(Modifier.width(24.dp))
+                        SkeletonLine(56.dp, 14.dp)
+                    }
+                }
             }
         }
     }
@@ -157,9 +200,10 @@ private fun SummaryCard(state: MetricDetailUiState) {
             .padding(horizontal = 16.dp),
     ) {
         Text("Daily average", style = Resurge.type.caption, color = Resurge.colors.textMuted)
+        Spacer(Modifier.height(4.dp))
         Text(series.average?.let { Formatters.seriesValue(metric, it) } ?: "—", style = Resurge.type.display)
         if (values.isNotEmpty()) {
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(20.dp))
             Row {
                 when (metric) {
                     HealthMetric.HEART_RATE, HealthMetric.WEIGHT -> {
@@ -228,5 +272,3 @@ internal fun metricColor(metric: HealthMetric): Color = when (metric) {
 private val DAY = DateTimeFormatter.ofPattern("EEE d MMM")
 private val DAY_SHORT = DateTimeFormatter.ofPattern("EEE d")
 private val SHORT_DATE = DateTimeFormatter.ofPattern("d MMM")
-private val TIME = DateTimeFormatter.ofPattern("HH:mm")
-private val DAY_TIME = DateTimeFormatter.ofPattern("EEE d MMM, HH:mm")

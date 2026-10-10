@@ -36,7 +36,6 @@ import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.model.HealthMetric
 import com.resurgeai.core.model.SleepStage
 import com.resurgeai.feature.dashboard.Formatters
-import com.resurgeai.feature.dashboard.sleepStageColor
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.TextStyle
@@ -74,11 +73,6 @@ internal fun PeriodList(
                 selected = row.periodIndex == state.selected,
                 onClick = { onSelect(row.periodIndex) },
             )
-        }
-        if (state.metric == HealthMetric.SLEEP) {
-            Divider()
-            Spacer(Modifier.height(10.dp))
-            StageLegend(color)
         }
     }
 }
@@ -137,7 +131,7 @@ private fun DayRowItem(
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = ROW_PADDING, vertical = 14.dp),
+                .padding(horizontal = ROW_PADDING, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.width(LABEL_COLUMN)) {
@@ -186,43 +180,11 @@ private fun DayRowItem(
 private fun Viz(viz: DayViz, metric: HealthMetric, color: Color, gridLines: List<Float>) {
     when (viz) {
         is DayViz.Magnitude -> MagnitudeBar(viz.fraction, color, marker = viz.marker)
-        is DayViz.Window -> WindowBar(
-            start = viz.start,
-            end = viz.end,
-            segments = viz.stages.map { (w, stage) -> w to sleepStageColor(stage) },
-            gridLines = gridLines,
-        )
+        // One colour for the whole night keeps the list calm; stages live in the day's hypnogram.
+        is DayViz.Window -> WindowBar(start = viz.start, end = viz.end, segments = listOf(1f to color))
         is DayViz.Range -> RangeBar(viz.low, viz.high, viz.mid, color)
         is DayViz.Dot -> DotOnAxis(viz.position, color)
         is DayViz.Segments -> SegmentsBar(viz.fractions, color)
-        DayViz.Empty -> when (metric) {
-            HealthMetric.SLEEP -> WindowBar(0f, 0f, emptyList(), gridLines = gridLines)
-            else -> MagnitudeBar(0f, color)
-        }
-    }
-}
-
-@Composable
-private fun StageLegend(color: Color) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(start = ROW_PADDING + LABEL_COLUMN, top = 4.dp, bottom = 14.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        listOf(SleepStage.DEEP to "Deep", SleepStage.LIGHT to "Light", SleepStage.REM to "REM", SleepStage.AWAKE to "Awake")
-            .forEach { (stage, label) ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Spacer(
-                        Modifier
-                            .width(8.dp)
-                            .height(8.dp)
-                            .clip(Resurge.shape.pill)
-                            .background(sleepStageColor(stage)),
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(label, style = Resurge.type.caption, color = Resurge.colors.textMuted)
-                }
-            }
+        DayViz.Empty -> MagnitudeBar(0f, color)
     }
 }

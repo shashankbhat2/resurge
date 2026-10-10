@@ -1,6 +1,5 @@
 package com.resurgeai.feature.dashboard.detail
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,7 +12,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -22,8 +20,8 @@ import com.resurgeai.core.designsystem.components.Card
 import com.resurgeai.core.designsystem.components.Divider
 import com.resurgeai.core.designsystem.components.HypnoBlock
 import com.resurgeai.core.designsystem.components.Hypnogram
-import com.resurgeai.core.designsystem.components.WindowBar
 import com.resurgeai.core.designsystem.theme.Resurge
+import com.resurgeai.core.designsystem.theme.clockFormatter
 import com.resurgeai.core.model.ExerciseSession
 import com.resurgeai.core.model.HealthMetric
 import com.resurgeai.core.model.SleepSession
@@ -52,9 +50,21 @@ internal fun SelectionCard(state: MetricDetailUiState, zone: ZoneId, modifier: M
     val previous = state.periods.getOrNull(state.selected - 1)?.value
     val average = state.periods.mapNotNull { it.value }.takeIf { it.isNotEmpty() }?.average()
 
+    // For a single night, bedtime → wake sits at the right end of the date heading.
+    val clock = clockFormatter()
+    val nightTimes = if (metric == HealthMetric.SLEEP && !weekly) {
+        state.sleepSessions
+            .filter { it.end.atZone(zone).toLocalDate() == period.start }
+            .maxByOrNull { it.duration }
+            ?.let { "${it.start.atZone(zone).format(clock)} → ${it.end.atZone(zone).format(clock)}" }
+    } else null
+
     Card(modifier.fillMaxWidth()) {
-        Text(periodHeading(period, weekly), style = Resurge.type.caption, color = Resurge.colors.textMuted)
-        Spacer(Modifier.height(12.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(periodHeading(period, weekly), style = Resurge.type.caption, color = Resurge.colors.textMuted, modifier = Modifier.weight(1f))
+            nightTimes?.let { Text(it, style = Resurge.type.caption, color = Resurge.colors.textMuted) }
+        }
+        Spacer(Modifier.height(16.dp))
         when (metric) {
             HealthMetric.SLEEP -> SleepSelection(period, weekly, previous, state.sleepSessions, zone)
             HealthMetric.HEART_RATE -> HeartSelection(period, average, state.heartRanges)
@@ -111,6 +121,7 @@ private fun SleepSelection(p: PeriodValue, weekly: Boolean, previous: Double?, s
     val main = nights.maxByOrNull { it.duration }
     val asleepHours = if (nights.isEmpty()) null else nights.map { it.asleep.toMinutes() / 60.0 }.average()
     val quality = nights.mapNotNull { it.quality }.takeIf { it.isNotEmpty() }?.average()
+    val clock = clockFormatter()
 
     StatRow(
         BigStat(asleepHours?.let(Formatters::hours) ?: "—", if (weekly) "Avg asleep" else "Time asleep"),
@@ -123,21 +134,17 @@ private fun SleepSelection(p: PeriodValue, weekly: Boolean, previous: Double?, s
         Hypnogram(
             blocks = hypnoBlocks(main),
             levelLabels = SLEEP_LEVELS.map { it.label },
-            startLabel = main.start.atZone(zone).format(TIME),
-            endLabel = main.end.atZone(zone).format(TIME),
         )
-    } else if (nights.isNotEmpty()) {
-        // No per-stage timeline (or a whole week): show the stage mix instead.
-        Spacer(Modifier.height(16.dp))
-        StageMix(nights)
-        if (!weekly && main != null) {
-            Spacer(Modifier.height(10.dp))
-            Text(
-                "${main.start.atZone(zone).format(TIME)} → ${main.end.atZone(zone).format(TIME)}",
-                style = Resurge.type.label,
-                color = Resurge.colors.textMuted,
-            )
-        }
+    } else if (weekly && nights.isNotEmpty()) {
+        // A week: the typical bedtime and wake time. (A single night shows its times in the heading.)
+        Spacer(Modifier.height(14.dp))
+        val bed = averageClock(nights.map { it.start.atZone(zone).toLocalTime() })
+        val wake = averageClock(nights.map { it.end.atZone(zone).toLocalTime() })
+        Text(
+            "Avg bedtime ${bed.format(clock)} · wake ${wake.format(clock)}",
+            style = Resurge.type.label,
+            color = Resurge.colors.textMuted,
+        )
     }
 }
 
@@ -148,6 +155,7 @@ private fun ExerciseSelection(p: PeriodValue, weekly: Boolean, sessions: List<Ex
         .sortedBy { it.start }
     val total = inPeriod.fold(Duration.ZERO) { acc, s -> acc + s.duration }
     val activeDays = inPeriod.map { it.start.atZone(zone).toLocalDate() }.distinct().size
+    val clock = clockFormatter()
     StatRow(
         BigStat(Formatters.duration(total), "Total time"),
         BigStat("${inPeriod.size}", if (inPeriod.size == 1) "Workout" else "Workouts"),
@@ -162,7 +170,7 @@ private fun ExerciseSelection(p: PeriodValue, weekly: Boolean, sessions: List<Ex
                 Column(Modifier.weight(1f)) {
                     Text(s.title ?: s.type, style = Resurge.type.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        s.start.atZone(zone).format(if (weekly) DAY_TIME else TIME),
+                        s.start.atZone(zone).let { t -> if (weekly) "${t.format(DAY)}, ${t.format(clock)}" else t.format(clock) },
                         style = Resurge.type.caption,
                         color = Resurge.colors.textMuted,
                     )
@@ -203,41 +211,18 @@ private fun StatRow(vararg stats: StatData) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                Spacer(Modifier.height(4.dp))
                 Text(s.label, style = Resurge.type.caption, color = Resurge.colors.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
 }
 
-@Composable
-private fun StageMix(nights: List<SleepSession>) {
-    val totals = SLEEP_LEVELS.associateWith { stage ->
-        nights.sumOf { n ->
-            if (stage == SleepStage.LIGHT) {
-                listOf(SleepStage.LIGHT, SleepStage.SLEEPING, SleepStage.UNKNOWN).sumOf { n.stages[it]?.toMinutes() ?: 0L }
-            } else n.stages[stage]?.toMinutes() ?: 0L
-        }
-    }.filterValues { it > 0 }
-    if (totals.isEmpty()) return
-    val sum = totals.values.sum().toFloat()
-    val order = listOf(SleepStage.DEEP, SleepStage.LIGHT, SleepStage.REM, SleepStage.AWAKE)
-    WindowBar(
-        start = 0f,
-        end = 1f,
-        segments = order.mapNotNull { st -> totals[st]?.let { it / sum to sleepStageColor(st) } },
-        height = 12.dp,
-    )
-    Spacer(Modifier.height(10.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        order.forEach { st ->
-            val minutes = totals[st] ?: return@forEach
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Spacer(Modifier.size(8.dp).clip(Resurge.shape.pill).background(sleepStageColor(st)))
-                Spacer(Modifier.width(4.dp))
-                Text("${st.label} ${(minutes / sum * 100).roundToInt()}%", style = Resurge.type.caption, color = Resurge.colors.textMuted)
-            }
-        }
-    }
+/** Average of clock times around midnight (e.g. 23:30 and 00:30 average to 00:00, not 12:00). */
+private fun averageClock(times: List<java.time.LocalTime>): java.time.LocalTime {
+    // Shift so the day "starts" at noon; bedtimes and wake times then average without wrapping.
+    val minutes = times.map { ((it.toSecondOfDay() / 60) + 12 * 60) % (24 * 60) }.average()
+    return java.time.LocalTime.ofSecondOfDay((((minutes.roundToInt() - 12 * 60 + 24 * 60) % (24 * 60)) * 60).toLong())
 }
 
 @Composable
@@ -259,7 +244,6 @@ private fun periodHeading(p: PeriodValue, weekly: Boolean): String {
     }
 }
 
-private val TIME = DateTimeFormatter.ofPattern("HH:mm")
-private val DAY_TIME = DateTimeFormatter.ofPattern("EEE d, HH:mm")
+private val DAY = DateTimeFormatter.ofPattern("EEE d")
 private val DAY_LONG = DateTimeFormatter.ofPattern("EEEE, d MMM")
 private val SHORT = DateTimeFormatter.ofPattern("d MMM")

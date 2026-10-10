@@ -28,6 +28,8 @@ object ResurgeIcons {
     @DrawableRes val CoachFilled = R.drawable.ic_sparkles_filled
     @DrawableRes val Profile = Tabler.drawable.tabler_ic_user_circle_outline
     @DrawableRes val ProfileFilled = R.drawable.ic_user_circle_filled
+    @DrawableRes val Fitness = Tabler.drawable.tabler_ic_barbell_outline
+    @DrawableRes val FitnessFilled = TablerFilled.drawable.tabler_ic_barbell_filled
     @DrawableRes val Scan = Tabler.drawable.tabler_ic_scan_outline
 
     // General

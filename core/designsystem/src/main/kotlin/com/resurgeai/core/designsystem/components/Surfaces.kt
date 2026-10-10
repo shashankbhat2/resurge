@@ -58,7 +58,7 @@ fun Card(
     onClick: (() -> Unit)? = null,
     selected: Boolean = false,
     inverse: Boolean = false,
-    contentPadding: PaddingValues = PaddingValues(18.dp),
+    contentPadding: PaddingValues = PaddingValues(20.dp),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val shape = Resurge.shape.lg

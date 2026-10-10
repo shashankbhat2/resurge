@@ -35,9 +35,10 @@ data class HypnoBlock(val start: Float, val end: Float, val level: Int, val colo
 fun Hypnogram(
     blocks: List<HypnoBlock>,
     levelLabels: List<String>,
-    startLabel: String,
-    endLabel: String,
     modifier: Modifier = Modifier,
+    /** Optional bedtime/wake labels drawn under the chart with moon/sun icons. */
+    startLabel: String? = null,
+    endLabel: String? = null,
     chartHeight: Dp = 148.dp,
 ) {
     val grid = Resurge.colors.border
@@ -78,6 +79,7 @@ fun Hypnogram(
                 }
             }
         }
+        if (startLabel == null || endLabel == null) return@Column
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(ResurgeIcons.Moon, contentDescription = "Bedtime", tint = Resurge.colors.textMuted, size = 16.dp)

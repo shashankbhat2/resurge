@@ -10,7 +10,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -33,20 +36,22 @@ import com.resurgeai.core.designsystem.components.Card
 import com.resurgeai.core.designsystem.components.Divider
 import com.resurgeai.core.designsystem.components.Icon
 import com.resurgeai.core.designsystem.components.IconBadge
-import com.resurgeai.core.designsystem.components.LocalFloatingBarInset
 import com.resurgeai.core.designsystem.components.ResurgeIcons
 import com.resurgeai.core.designsystem.components.SegmentOption
 import com.resurgeai.core.designsystem.components.SegmentedControl
 import com.resurgeai.core.designsystem.components.TopBar
 import com.resurgeai.core.designsystem.theme.Resurge
+import com.resurgeai.core.designsystem.theme.LocalUse24HourClock
 import com.resurgeai.core.designsystem.theme.ResurgeTheme
 import com.resurgeai.core.model.Goal
 import com.resurgeai.core.model.Targets
 import com.resurgeai.core.model.ThemePreference
+import com.resurgeai.core.model.TimeFormat
 import com.resurgeai.core.model.UserProfile
 
 @Composable
 fun ProfileRoute(
+    onBack: () -> Unit,
     onOpenCatalog: (() -> Unit)? = null,
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
@@ -54,7 +59,9 @@ fun ProfileRoute(
     val context = LocalContext.current
     ProfileScreen(
         state = state,
+        onBack = onBack,
         onThemeChange = viewModel::setTheme,
+        onTimeFormatChange = viewModel::setTimeFormat,
         onSignOut = viewModel::signOut,
         onOpenHealthConnect = { runCatching { context.startActivity(viewModel.healthConnectSettingsIntent()) } },
         onOpenCatalog = onOpenCatalog,
@@ -64,13 +71,15 @@ fun ProfileRoute(
 @Composable
 fun ProfileScreen(
     state: ProfileUiState,
+    onBack: () -> Unit,
     onThemeChange: (ThemePreference) -> Unit,
+    onTimeFormatChange: (TimeFormat) -> Unit,
     onSignOut: () -> Unit,
     onOpenHealthConnect: () -> Unit = {},
     onOpenCatalog: (() -> Unit)? = null,
 ) {
     Column(Modifier.fillMaxSize()) {
-        TopBar(title = "Profile")
+        TopBar(title = "Settings", onBack = onBack)
         Column(
             Modifier
                 .weight(1f)
@@ -118,6 +127,19 @@ fun ProfileScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
+            SectionLabel("Time format")
+            val use24 = LocalUse24HourClock.current
+            SegmentedControl(
+                options = listOf(
+                    SegmentOption(TimeFormat.H12, "12-hour"),
+                    SegmentOption(TimeFormat.H24, "24-hour"),
+                ),
+                // Unset = device default, which is what LocalUse24HourClock already reflects.
+                selected = state.timeFormat ?: if (use24) TimeFormat.H24 else TimeFormat.H12,
+                onSelect = onTimeFormatChange,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
             SectionLabel("Data")
             Card(Modifier.fillMaxWidth(), contentPadding = PaddingValues(0.dp)) {
                 LinkRow(ResurgeIcons.Activity, Resurge.colors.activity, "Health Connect", "Permissions and data sources", onOpenHealthConnect)
@@ -144,7 +166,7 @@ fun ProfileScreen(
                     .fillMaxWidth()
                     .padding(vertical = 24.dp),
             )
-            Spacer(Modifier.height(LocalFloatingBarInset.current))
+            Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
         }
     }
 }
@@ -210,7 +232,9 @@ private fun ProfilePreview() {
                     goals = setOf(Goal.SLEEP_BETTER, Goal.MOVE_MORE), targets = Targets(), onboardingComplete = true,
                 ),
             ),
+            onBack = {},
             onThemeChange = {},
+            onTimeFormatChange = {},
             onSignOut = {},
         )
     }

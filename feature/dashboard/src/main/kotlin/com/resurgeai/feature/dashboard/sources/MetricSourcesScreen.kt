@@ -29,7 +29,10 @@ import com.resurgeai.core.designsystem.components.SectionHeader
 import com.resurgeai.core.designsystem.components.SegmentOption
 import com.resurgeai.core.designsystem.components.SegmentedControl
 import com.resurgeai.core.designsystem.components.ShareBar
-import com.resurgeai.core.designsystem.components.Spinner
+import com.resurgeai.core.designsystem.components.SkeletonBox
+import com.resurgeai.core.designsystem.components.SkeletonCircle
+import com.resurgeai.core.designsystem.components.SkeletonGroup
+import com.resurgeai.core.designsystem.components.SkeletonLine
 import com.resurgeai.core.designsystem.components.TopBar
 import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.model.SourceKind
@@ -79,7 +82,36 @@ fun MetricSourcesScreen(
             Spacer(Modifier.height(16.dp))
 
             when {
-                state.loading -> Row(Modifier.fillMaxWidth().padding(48.dp), horizontalArrangement = Arrangement.Center) { Spinner() }
+                state.loading -> SkeletonGroup {
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            repeat(2) {
+                                Card(Modifier.weight(1f)) {
+                                    SkeletonCircle(32.dp)
+                                    Spacer(Modifier.height(12.dp))
+                                    SkeletonLine(56.dp, 22.dp)
+                                    Spacer(Modifier.height(8.dp))
+                                    SkeletonLine(64.dp)
+                                }
+                            }
+                        }
+                        Card(Modifier.fillMaxWidth()) {
+                            repeat(2) { i ->
+                                if (i > 0) Spacer(Modifier.height(18.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    SkeletonCircle(32.dp)
+                                    Spacer(Modifier.width(12.dp))
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        SkeletonLine(120.dp)
+                                        SkeletonLine(70.dp, 10.dp)
+                                    }
+                                }
+                                Spacer(Modifier.height(10.dp))
+                                SkeletonBox(Modifier.fillMaxWidth().height(6.dp), Resurge.shape.pill)
+                            }
+                        }
+                    }
+                }
                 state.error != null -> Card(Modifier.fillMaxWidth()) {
                     Text(state.error, style = Resurge.type.body, color = Resurge.colors.textMuted)
                 }

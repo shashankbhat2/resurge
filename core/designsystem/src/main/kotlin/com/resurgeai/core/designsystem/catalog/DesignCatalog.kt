@@ -44,7 +44,9 @@ import com.resurgeai.core.designsystem.components.RingSegment
 import com.resurgeai.core.designsystem.components.RangeBar
 import com.resurgeai.core.designsystem.components.SegmentsBar
 import com.resurgeai.core.designsystem.components.WindowBar
+import com.resurgeai.core.designsystem.components.FloatingNavBar
 import com.resurgeai.core.designsystem.components.IconButton
+import com.resurgeai.core.designsystem.components.NavItem
 import com.resurgeai.core.designsystem.components.MetricCard
 import com.resurgeai.core.designsystem.components.NumberStepper
 import com.resurgeai.core.designsystem.components.ResurgeIcons
@@ -256,6 +258,18 @@ private fun MetricsSection() {
 
 @Composable
 private fun MiscSection() {
+    FloatingNavBar(
+        items = listOf(
+            NavItem(0, "Today", ResurgeIcons.Today, ResurgeIcons.TodayFilled),
+            NavItem(1, "Food", ResurgeIcons.Food, ResurgeIcons.FoodFilled),
+            NavItem(2, "Coach", ResurgeIcons.Coach, ResurgeIcons.CoachFilled),
+            NavItem(3, "Profile", ResurgeIcons.Profile, ResurgeIcons.ProfileFilled),
+        ),
+        selected = 2,
+        onSelect = {},
+        action = NavItem(Unit, "Scan", ResurgeIcons.Scan),
+    )
+    Spacer(Modifier.height(12.dp))
     Card {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Avatar("Shashank Bhat", photoUrl = null, size = 44.dp)

@@ -11,21 +11,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
 import com.resurgeai.core.designsystem.components.Card
-import com.resurgeai.core.designsystem.components.TopBar
+import com.resurgeai.core.designsystem.components.LocalHeaderInset
 import com.resurgeai.core.designsystem.theme.Resurge
 
-/** Placeholder for tabs that land in later phases. */
+/** Placeholder for tabs that land in later phases. The tab title is shown by the shared header. */
 @Composable
-fun ComingSoon(title: String, body: String, phase: String) {
-    Column(Modifier.fillMaxSize()) {
-        TopBar(title = title)
-        Card(
-            Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-        ) {
+fun ComingSoon(body: String, phase: String) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+        Spacer(Modifier.height(LocalHeaderInset.current + 8.dp))
+        Card(Modifier.fillMaxWidth()) {
             Text(body, style = Resurge.type.body)
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(6.dp))
             Text("Coming in $phase", style = Resurge.type.caption, color = Resurge.colors.textSubtle)
         }
     }

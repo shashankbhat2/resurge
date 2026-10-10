@@ -88,17 +88,21 @@ class MetricDetailScreenshotTest {
         )
     }
 
-    private fun capture(name: String, state: MetricDetailUiState, scheme: ColorScheme = ColorScheme.Light) {
+    private fun capture(name: String, state: MetricDetailUiState, scheme: ColorScheme = ColorScheme.Light, use24Hour: Boolean = true) {
         compose.mainClock.autoAdvance = true
         compose.setContent {
             ResurgeTheme(colorScheme = scheme) {
-                Screen { MetricDetailScreen(state, onBack = {}, onRangeChange = {}, onSelect = {}, onOpenSources = {}) }
+                androidx.compose.runtime.CompositionLocalProvider(com.resurgeai.core.designsystem.theme.LocalUse24HourClock provides use24Hour) {
+                    Screen { MetricDetailScreen(state, onBack = {}, onRangeChange = {}, onSelect = {}, onOpenSources = {}) }
+                }
             }
         }
         compose.onRoot().captureRoboImage("src/test/screenshots/detail_$name.png")
     }
 
     @Test fun sleepWeek() = capture("sleep_week", state(HealthMetric.SLEEP, DetailRange.WEEK) { 6.5 + (it % 4) * 0.5 })
+
+    @Test fun sleepWeek12h() = capture("sleep_week_12h", state(HealthMetric.SLEEP, DetailRange.WEEK) { 6.5 + (it % 4) * 0.5 }, use24Hour = false)
 
     @Test fun sleepWeekDark() = capture("sleep_week_dark", state(HealthMetric.SLEEP, DetailRange.WEEK) { 6.5 + (it % 4) * 0.5 }, ColorScheme.Dark)
 

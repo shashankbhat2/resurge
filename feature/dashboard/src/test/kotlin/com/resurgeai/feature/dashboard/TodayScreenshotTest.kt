@@ -29,7 +29,7 @@ import java.time.LocalDate
 /** Today dashboard with synthetic data. Record with :feature:dashboard:recordRoborazziDebug. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35], qualifiers = "w400dp-h1500dp-xhdpi")
+@Config(sdk = [35], qualifiers = "w400dp-h1300dp-xhdpi")
 class TodayScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
@@ -68,10 +68,13 @@ class TodayScreenshotTest {
         todayIndex = 5,
     )
 
-    private fun capture(name: String, scheme: ColorScheme) {
+    private fun capture(name: String, scheme: ColorScheme, ui: DashboardUiState = state) {
+        compose.mainClock.autoAdvance = false // shimmer is an infinite animation
         compose.setContent {
             ResurgeTheme(colorScheme = scheme) {
-                Screen { TodayScreen(state, onConnect = {}, onInstall = {}, onRetry = {}, onOpenMetric = {}) }
+                Screen {
+                    TodayScreen(ui, onConnect = {}, onInstall = {}, onRetry = {}, onOpenMetric = {})
+                }
             }
         }
         compose.mainClock.advanceTimeBy(1_000) // let ring reveal animations finish
@@ -81,4 +84,8 @@ class TodayScreenshotTest {
     @Test fun todayLight() = capture("light", ColorScheme.Light)
 
     @Test fun todayDark() = capture("dark", ColorScheme.Dark)
+
+    @Test fun loadingLight() = capture("loading_light", ColorScheme.Light, state.copy(today = null))
+
+    @Test fun loadingDark() = capture("loading_dark", ColorScheme.Dark, state.copy(today = null))
 }

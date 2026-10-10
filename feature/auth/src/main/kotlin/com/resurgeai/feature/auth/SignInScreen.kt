@@ -63,7 +63,7 @@ fun SignInScreen(state: SignInUiState, onSignIn: () -> Unit) {
                 Spacer(Modifier.height(48.dp))
                 LogoMark()
                 Spacer(Modifier.height(24.dp))
-                Text("Resurge", style = Resurge.type.display)
+                Text("Resurge", style = Resurge.type.brandLarge)
                 Spacer(Modifier.height(8.dp))
                 Text(
                     "Your health data, food and an AI coach — in one calm place.",

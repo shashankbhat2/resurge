@@ -2,6 +2,7 @@ package com.resurgeai.app
 
 import android.graphics.Color
 import android.os.Bundle
+import android.text.format.DateFormat
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -14,16 +15,20 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composeunstyled.theme.ColorScheme
 import com.resurgeai.app.main.MainScreen
 import com.resurgeai.core.designsystem.components.Screen
+import com.resurgeai.core.designsystem.theme.LocalUse24HourClock
 import com.resurgeai.core.designsystem.theme.ResurgeTheme
 import com.resurgeai.core.model.SessionState
 import com.resurgeai.core.model.ThemePreference
+import com.resurgeai.core.model.TimeFormat
 import com.resurgeai.feature.auth.SignInRoute
 import com.resurgeai.feature.auth.onboarding.OnboardingRoute
 import dagger.hilt.android.AndroidEntryPoint
@@ -40,6 +45,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             val theme by viewModel.theme.collectAsStateWithLifecycle()
             val session by viewModel.session.collectAsStateWithLifecycle()
+            val timeFormat by viewModel.timeFormat.collectAsStateWithLifecycle()
+            val use24Hour = when (timeFormat) {
+                TimeFormat.H24 -> true
+                TimeFormat.H12 -> false
+                null -> DateFormat.is24HourFormat(LocalContext.current)
+            }
             val dark = when (theme) {
                 ThemePreference.SYSTEM -> isSystemInDarkTheme()
                 ThemePreference.LIGHT -> false
@@ -57,7 +68,9 @@ class MainActivity : ComponentActivity() {
             }
 
             ResurgeTheme(colorScheme = if (dark) ColorScheme.Dark else ColorScheme.Light) {
-                Screen { AppRoot(session) }
+                CompositionLocalProvider(LocalUse24HourClock provides use24Hour) {
+                    Screen { AppRoot(session) }
+                }
             }
         }
     }

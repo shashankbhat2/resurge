@@ -9,3 +9,6 @@ sealed interface SessionState {
 }
 
 enum class ThemePreference { SYSTEM, LIGHT, DARK }
+
+/** Clock style for times shown in the app. Null preference = follow the device setting. */
+enum class TimeFormat { H12, H24 }

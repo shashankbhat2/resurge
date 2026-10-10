@@ -33,10 +33,25 @@ val Inter = FontFamily(
     interWeight(FontWeight.Bold),
 )
 
+private fun bricolageWeight(weight: FontWeight) = Font(
+    resId = R.font.bricolage_variable,
+    weight = weight,
+    variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight)),
+)
+
+/** Brand typeface for marketing/personality text only; all UI and stats use Inter. */
+val Bricolage = FontFamily(
+    bricolageWeight(FontWeight.Normal),
+    bricolageWeight(FontWeight.Medium),
+    bricolageWeight(FontWeight.SemiBold),
+    bricolageWeight(FontWeight.Bold),
+)
+
 private val Tabular = "tnum"
 
 private object Palette {
-    val accent = Color(0xFF2F6BFF)
+    /** Brand primary. */
+    val accent = Color(0xFF6F66FB)
     val sleep = Color(0xFF6366F1)
     val activity = Color(0xFF16A34A)
     val energy = Color(0xFFF97316)
@@ -51,6 +66,8 @@ val ResurgeTheme = buildThemeV2 {
     properties[colors] = mapOf(
         C.accent to Palette.accent,
         C.onAccent to Color.White,
+        C.navHighlight to Palette.accent,
+        C.onNavHighlight to Color.White,
         C.sleep to Palette.sleep,
         C.activity to Palette.activity,
         C.energy to Palette.energy,
@@ -113,6 +130,14 @@ val ResurgeTheme = buildThemeV2 {
     )
 
     properties[typography] = mapOf(
+        TypeTokens.brand to TextStyle(
+            fontFamily = Bricolage, fontWeight = FontWeight.SemiBold,
+            fontSize = 24.sp, lineHeight = 30.sp, letterSpacing = (-0.3).sp,
+        ),
+        TypeTokens.brandLarge to TextStyle(
+            fontFamily = Bricolage, fontWeight = FontWeight.SemiBold,
+            fontSize = 32.sp, lineHeight = 38.sp, letterSpacing = (-0.5).sp,
+        ),
         TypeTokens.display to TextStyle(
             fontFamily = Inter, fontWeight = FontWeight.SemiBold,
             fontSize = 32.sp, lineHeight = 38.sp, letterSpacing = (-0.5).sp,
@@ -190,6 +215,8 @@ object ColorAccess {
     val navActive @Composable get() = Theme[colors][C.navActive]
     val navOnActive @Composable get() = Theme[colors][C.navOnActive]
     val navInactive @Composable get() = Theme[colors][C.navInactive]
+    val navHighlight @Composable get() = Theme[colors][C.navHighlight]
+    val onNavHighlight @Composable get() = Theme[colors][C.onNavHighlight]
 
     /**
      * Raised surface shared by the navbar, hero card, primary button and segmented control:
@@ -205,6 +232,8 @@ object ColorAccess {
 }
 
 object TypeAccess {
+    val brand @Composable get() = Theme[typography][TypeTokens.brand]
+    val brandLarge @Composable get() = Theme[typography][TypeTokens.brandLarge]
     val display @Composable get() = Theme[typography][TypeTokens.display]
     val metric @Composable get() = Theme[typography][TypeTokens.metric]
     val title @Composable get() = Theme[typography][TypeTokens.title]

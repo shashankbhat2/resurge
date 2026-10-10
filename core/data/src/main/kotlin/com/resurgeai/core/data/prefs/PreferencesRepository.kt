@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.resurgeai.core.model.ThemePreference
+import com.resurgeai.core.model.TimeFormat
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -26,6 +27,15 @@ class PreferencesRepository @Inject constructor(
         dataStore.edit { it[THEME] = preference.name }
     }
 
+    /** User's clock preference, or null to follow the device's 12/24-hour setting. */
+    val timeFormat: Flow<TimeFormat?> = dataStore.data.map { prefs ->
+        prefs[TIME_FORMAT]?.let { stored -> TimeFormat.entries.firstOrNull { it.name == stored } }
+    }
+
+    suspend fun setTimeFormat(format: TimeFormat) {
+        dataStore.edit { it[TIME_FORMAT] = format.name }
+    }
+
     suspend fun isHealthBackfillDone(uid: String): Boolean =
         dataStore.data.first()[booleanPreferencesKey("health_backfill_$uid")] == true
 
@@ -35,5 +45,6 @@ class PreferencesRepository @Inject constructor(
 
     private companion object {
         val THEME = stringPreferencesKey("theme")
+        val TIME_FORMAT = stringPreferencesKey("time_format")
     }
 }
