@@ -23,6 +23,7 @@ include(
     ":core:data",
     ":core:healthconnect",
     ":feature:auth",
+    ":feature:coach",
     ":feature:dashboard",
     ":feature:profile",
 )

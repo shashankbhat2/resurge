@@ -261,13 +261,12 @@ private fun MiscSection() {
     FloatingNavBar(
         items = listOf(
             NavItem(0, "Today", ResurgeIcons.Today, ResurgeIcons.TodayFilled),
-            NavItem(1, "Food", ResurgeIcons.Food, ResurgeIcons.FoodFilled),
-            NavItem(2, "Coach", ResurgeIcons.Coach, ResurgeIcons.CoachFilled),
-            NavItem(3, "Profile", ResurgeIcons.Profile, ResurgeIcons.ProfileFilled),
+            NavItem(1, "Fitness", ResurgeIcons.Fitness, ResurgeIcons.FitnessFilled),
+            NavItem(2, "Food", ResurgeIcons.Food, ResurgeIcons.FoodFilled),
         ),
-        selected = 2,
+        selected = 0,
         onSelect = {},
-        action = NavItem(Unit, "Scan", ResurgeIcons.Scan),
+        action = NavItem(Unit, "Coach", ResurgeIcons.CoachFilled),
     )
     Spacer(Modifier.height(12.dp))
     Card {

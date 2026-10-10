@@ -60,6 +60,8 @@ import com.resurgeai.core.model.UserProfile
 import com.resurgeai.feature.dashboard.TodayRoute as TodayScreenRoute
 import com.resurgeai.feature.dashboard.detail.MetricDetailRoute as MetricDetailScreenRoute
 import com.resurgeai.feature.dashboard.sources.MetricSourcesRoute as MetricSourcesScreenRoute
+import com.resurgeai.feature.coach.CoachRoute as CoachScreen
+import com.resurgeai.feature.coach.CoachTab
 import com.resurgeai.feature.profile.ProfileRoute
 import kotlinx.serialization.Serializable
 
@@ -70,11 +72,13 @@ import kotlinx.serialization.Serializable
 @Serializable data object CatalogRoute
 @Serializable data object SettingsRoute
 
+/** Full-screen coach; [tab] is "insights" or "chat". */
+@Serializable data class CoachScreenRoute(val tab: String)
+
 // Tab graph, nested inside the shell.
 @Serializable data object TodayRoute
 @Serializable data object FitnessRoute
 @Serializable data object FoodRoute
-@Serializable data object AssistantRoute
 
 private enum class Tab(
     val route: Any,
@@ -87,7 +91,6 @@ private enum class Tab(
     Today(TodayRoute, "Today", ResurgeIcons.Today, ResurgeIcons.TodayFilled, null),
     Fitness(FitnessRoute, "Fitness", ResurgeIcons.Fitness, ResurgeIcons.FitnessFilled, "Fitness"),
     Food(FoodRoute, "Food", ResurgeIcons.Food, ResurgeIcons.FoodFilled, "Food"),
-    Assistant(AssistantRoute, "Assistant", ResurgeIcons.Coach, ResurgeIcons.CoachFilled, "Assistant"),
 }
 
 private const val PUSH_MS = 280
@@ -124,7 +127,11 @@ fun MainScreen(profile: UserProfile) {
                 profile = profile,
                 onOpenMetric = { metric -> rootNav.navigate(MetricDetailRoute(metric.name)) },
                 onOpenSettings = { rootNav.navigate(SettingsRoute) },
+                onOpenCoach = { tab -> rootNav.navigate(CoachScreenRoute(tab.name.lowercase())) },
             )
+        }
+        composable<CoachScreenRoute> {
+            FullScreen { CoachScreen(onBack = { rootNav.popBackStack() }) }
         }
         composable<SettingsRoute> {
             FullScreen {
@@ -175,6 +182,7 @@ private fun TabsShell(
     profile: UserProfile,
     onOpenMetric: (HealthMetric) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenCoach: (CoachTab) -> Unit,
 ) {
     val tabsNav = rememberNavController()
     val backStackEntry by tabsNav.currentBackStackEntryAsState()
@@ -196,15 +204,14 @@ private fun TabsShell(
                 popEnterTransition = { EnterTransition.None },
                 popExitTransition = { ExitTransition.None },
             ) {
-                composable<TodayRoute> { TodayScreenRoute(onOpenMetric = onOpenMetric) }
+                composable<TodayRoute> {
+                    TodayScreenRoute(onOpenMetric = onOpenMetric, onOpenInsights = { onOpenCoach(CoachTab.INSIGHTS) })
+                }
                 composable<FitnessRoute> {
                     ComingSoon("Workouts, training load and activity trends from your wearable.", "a later phase")
                 }
                 composable<FoodRoute> {
                     ComingSoon("Scan meals, track calories and log water.", "Phase 3")
-                }
-                composable<AssistantRoute> {
-                    ComingSoon("Chat with an AI assistant that knows your health data.", "Phase 4")
                 }
             }
         }
@@ -232,9 +239,9 @@ private fun TabsShell(
             items = Tab.entries.map { NavItem(it, it.label, it.icon, it.selectedIcon) },
             selected = currentTab,
             onSelect = { tab -> tabsNav.switchTab(tab.route) },
-            // Food scanning lands in Phase 3; until then the action opens the Food tab.
-            action = NavItem(Unit, "Scan food", ResurgeIcons.Scan),
-            onAction = { tabsNav.switchTab(FoodRoute) },
+            // Detached Coach button opens the full-screen coach on its Chat tab.
+            action = NavItem(Unit, "Coach", ResurgeIcons.CoachFilled),
+            onAction = { onOpenCoach(CoachTab.CHAT) },
             modifier = Modifier.align(Alignment.BottomCenter),
         )
     }

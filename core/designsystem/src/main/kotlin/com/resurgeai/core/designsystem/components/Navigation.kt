@@ -1,15 +1,22 @@
 package com.resurgeai.core.designsystem.components
 
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,6 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
@@ -29,10 +37,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -120,12 +128,13 @@ fun <T> FloatingNavBar(
                     .semantics { contentDescription = it.label },
                 indication = LocalIndication.current,
             ) {
-                Icon(it.icon, contentDescription = null, tint = Resurge.colors.text, size = 24.dp)
+                Icon(it.icon, contentDescription = null, tint = Resurge.colors.navHighlight, size = 24.dp)
             }
         }
     }
 }
 
+/** Nav item: icon-only circle when inactive; a pill with icon + label when [selected]. */
 @Composable
 private fun NavCircle(
     @DrawableRes icon: Int,
@@ -142,16 +151,31 @@ private fun NavCircle(
         onClick = onClick,
         role = role,
         modifier = Modifier
-            .size(ItemSize)
+            .height(ItemSize)
+            .widthIn(min = ItemSize)
             .clip(Resurge.shape.pill)
             .background(bg)
+            .animateContentSize(tween(220))
             .semantics {
                 contentDescription = label
                 this.selected = selected
             },
+        contentPadding = PaddingValues(horizontal = if (selected) 16.dp else 0.dp),
         indication = LocalIndication.current,
     ) {
-        Icon(icon, contentDescription = null, tint = fg, size = 22.dp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = fg, size = 22.dp)
+            AnimatedVisibility(
+                visible = selected,
+                enter = fadeIn(tween(180)) + expandHorizontally(tween(220)),
+                exit = fadeOut(tween(120)) + shrinkHorizontally(tween(220)),
+            ) {
+                Row {
+                    Spacer(Modifier.width(8.dp))
+                    Text(label, style = Resurge.type.label, color = fg, maxLines = 1)
+                }
+            }
+        }
     }
 }
 

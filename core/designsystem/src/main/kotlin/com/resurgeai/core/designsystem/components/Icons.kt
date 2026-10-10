@@ -37,6 +37,7 @@ object ResurgeIcons {
     @DrawableRes val ChevronRight = Tabler.drawable.tabler_ic_chevron_right_outline
     @DrawableRes val ArrowLeft = Tabler.drawable.tabler_ic_arrow_left_outline
     @DrawableRes val ArrowRight = Tabler.drawable.tabler_ic_arrow_right_outline
+    @DrawableRes val ArrowUp = Tabler.drawable.tabler_ic_arrow_up_outline
     @DrawableRes val LogOut = Tabler.drawable.tabler_ic_logout_outline
     @DrawableRes val Sun = Tabler.drawable.tabler_ic_sun_outline
     @DrawableRes val Moon = Tabler.drawable.tabler_ic_moon_outline

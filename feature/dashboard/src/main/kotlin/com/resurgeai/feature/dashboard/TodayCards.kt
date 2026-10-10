@@ -19,6 +19,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composeunstyled.Text
+import com.composeunstyled.UnstyledButton
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.ui.draw.clip
 import com.resurgeai.core.designsystem.components.Card
 import com.resurgeai.core.designsystem.components.MetricCell
 import com.resurgeai.core.designsystem.components.MetricGroup
@@ -59,7 +62,17 @@ internal object DashboardGoals {
  * Placeholder copy until the assistant lands (Phase 4).
  */
 @Composable
-internal fun CoachInsight(text: String, time: LocalTime) {
+internal fun CoachInsight(text: String, time: LocalTime, onClick: () -> Unit) {
+    UnstyledButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().clip(Resurge.shape.md),
+        indication = LocalIndication.current,
+        contentAlignment = Alignment.TopStart,
+    ) { InsightContent(text, time) }
+}
+
+@Composable
+private fun InsightContent(text: String, time: LocalTime) {
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(ResurgeIcons.CoachFilled, contentDescription = "Assistant insight", tint = Resurge.colors.accent, size = 18.dp)

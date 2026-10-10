@@ -47,6 +47,7 @@ import java.time.LocalTime
 @Composable
 fun TodayRoute(
     onOpenMetric: (HealthMetric) -> Unit,
+    onOpenInsights: () -> Unit,
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -64,6 +65,7 @@ fun TodayRoute(
         onInstall = { runCatching { context.startActivity(viewModel.installIntent()) } },
         onRetry = { viewModel.refresh(force = true) },
         onOpenMetric = onOpenMetric,
+        onOpenInsights = onOpenInsights,
     )
 }
 
@@ -74,6 +76,7 @@ fun TodayScreen(
     onInstall: () -> Unit,
     onRetry: () -> Unit,
     onOpenMetric: (HealthMetric) -> Unit,
+    onOpenInsights: () -> Unit = {},
 ) {
     Column(
         Modifier
@@ -82,7 +85,7 @@ fun TodayScreen(
     ) {
         // Greeting lives in the shared header; the latest insight leads the page.
         Column(Modifier.padding(start = 20.dp, end = 20.dp, top = LocalHeaderInset.current + 20.dp, bottom = 32.dp)) {
-            CoachInsight(text = PLACEHOLDER_INSIGHT, time = LocalTime.of(7, 0))
+            CoachInsight(text = PLACEHOLDER_INSIGHT, time = LocalTime.of(7, 0), onClick = onOpenInsights)
         }
 
         Column(Modifier.padding(horizontal = 16.dp)) {
