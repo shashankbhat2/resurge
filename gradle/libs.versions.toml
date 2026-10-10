@@ -19,7 +19,7 @@ firebaseBom = "35.0.0"
 coroutines = "1.11.0"
 serialization = "1.11.0"
 composeUnstyled = "2.10.0"
-lucide = "2.2.1"
+tabler = "2.2.1"
 coil = "3.6.3"
 healthConnect = "1.1.0"
 work = "2.12.0"
@@ -50,7 +50,8 @@ compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview"
 compose-unstyled-primitives = { module = "com.composables:composeunstyled-primitives", version.ref = "composeUnstyled" }
 compose-unstyled-theming = { module = "com.composables:composeunstyled-theming", version.ref = "composeUnstyled" }
 compose-unstyled-colored-indication = { module = "com.composables:composeunstyled-colored-indication", version.ref = "composeUnstyled" }
-lucide-icons = { module = "com.composables:icons-lucide-android", version.ref = "lucide" }
+tabler-icons-outline = { module = "com.composables:icons-tabler-outline-android", version.ref = "tabler" }
+tabler-icons-filled = { module = "com.composables:icons-tabler-filled-android", version.ref = "tabler" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
 

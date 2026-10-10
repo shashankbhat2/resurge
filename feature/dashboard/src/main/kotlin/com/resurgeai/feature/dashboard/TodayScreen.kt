@@ -36,9 +36,9 @@ import com.resurgeai.core.designsystem.components.Button
 import com.resurgeai.core.designsystem.components.ButtonVariant
 import com.resurgeai.core.designsystem.components.Card
 import com.resurgeai.core.designsystem.components.IconBadge
+import com.resurgeai.core.designsystem.components.LocalFloatingBarInset
 import com.resurgeai.core.designsystem.components.MetricCard
 import com.resurgeai.core.designsystem.components.ResurgeIcons
-import com.resurgeai.core.designsystem.components.SourceChip
 import com.resurgeai.core.designsystem.components.Spinner
 import com.resurgeai.core.designsystem.components.WeekDots
 import com.resurgeai.core.designsystem.theme.Resurge
@@ -47,7 +47,6 @@ import com.resurgeai.core.healthconnect.HealthConnectAvailability
 import com.resurgeai.core.model.DailyHealth
 import com.resurgeai.core.model.HealthMetric
 import com.resurgeai.core.model.SleepStage
-import com.resurgeai.core.model.SourceBreakdown
 import com.resurgeai.core.model.SourceKind
 import java.time.Duration
 import java.time.LocalTime
@@ -130,7 +129,7 @@ fun TodayScreen(
                 }
             }
         }
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(24.dp + LocalFloatingBarInset.current))
     }
 }
 
@@ -191,29 +190,28 @@ private fun TodayCard(
     modifier: Modifier,
 ) {
     val spark = state.sparklines[metric]
-    val footer = sourceFooter(day.sources[metric])
     when (metric) {
         HealthMetric.STEPS -> MetricCard(
             title = "Steps", icon = ResurgeIcons.Footprints, tint = Resurge.colors.activity,
             value = day.steps?.let(Formatters::count),
-            sparkline = spark, footer = footer, onClick = onClick, modifier = modifier,
+            sparkline = spark, onClick = onClick, modifier = modifier,
         )
         HealthMetric.SLEEP -> MetricCard(
             title = "Sleep", icon = ResurgeIcons.Bed, tint = Resurge.colors.sleep,
             value = day.sleepDuration?.let(Formatters::duration),
             subtitle = sleepSubtitle(day),
-            sparkline = spark, footer = footer, onClick = onClick, modifier = modifier,
+            sparkline = spark, onClick = onClick, modifier = modifier,
         )
         HealthMetric.CALORIES_BURNED -> MetricCard(
             title = "Calories burned", icon = ResurgeIcons.Flame, tint = Resurge.colors.energy,
             value = day.caloriesTotal?.let(Formatters::kcal), unit = "kcal",
             subtitle = day.caloriesActive?.let { "${Formatters.kcal(it)} active" },
-            sparkline = spark, footer = footer, onClick = onClick, modifier = modifier,
+            sparkline = spark, onClick = onClick, modifier = modifier,
         )
         HealthMetric.DISTANCE -> MetricCard(
-            title = "Distance", icon = ResurgeIcons.Activity, tint = Resurge.colors.water,
+            title = "Distance", icon = ResurgeIcons.Distance, tint = Resurge.colors.water,
             value = day.distanceMeters?.let(Formatters::kilometres), unit = "km",
-            sparkline = spark, footer = footer, onClick = onClick, modifier = modifier,
+            sparkline = spark, onClick = onClick, modifier = modifier,
         )
         HealthMetric.EXERCISE -> MetricCard(
             title = "Exercise days", icon = ResurgeIcons.Dumbbell, tint = Resurge.colors.activity,
@@ -233,7 +231,7 @@ private fun TodayCard(
                         if (it.minBpm != null && it.maxBpm != null) "${it.minBpm}–${it.maxBpm}" else null,
                     ).joinToString(" · ")
                 },
-                sparkline = spark, footer = footer, onClick = onClick, modifier = modifier,
+                sparkline = spark, onClick = onClick, modifier = modifier,
             )
         }
         HealthMetric.WEIGHT -> MetricCard(
@@ -253,11 +251,6 @@ private fun sleepSubtitle(day: DailyHealth): String? {
         deep?.let { "Deep ${Formatters.duration(it)}" },
         rem?.let { "REM ${Formatters.duration(it)}" },
     ).joinToString(" · ").ifEmpty { if (day.sleep.isNotEmpty()) "Last night" else null }
-}
-
-private fun sourceFooter(breakdown: SourceBreakdown?): (@Composable () -> Unit)? {
-    val summary = breakdown?.let(Formatters::sourceSummary) ?: return null
-    return { SourceChip(summary.label, sourceIcon(summary.kind)) }
 }
 
 @DrawableRes

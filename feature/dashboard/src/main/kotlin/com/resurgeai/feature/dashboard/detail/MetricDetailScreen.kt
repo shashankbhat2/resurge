@@ -17,47 +17,41 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composeunstyled.Text
-import com.resurgeai.core.designsystem.components.BarChart
-import com.resurgeai.core.designsystem.components.Button
-import com.resurgeai.core.designsystem.components.ButtonVariant
 import com.resurgeai.core.designsystem.components.Card
 import com.resurgeai.core.designsystem.components.Divider
-import com.resurgeai.core.designsystem.components.Icon
+import com.resurgeai.core.designsystem.components.IconButton
+import com.resurgeai.core.designsystem.components.ResurgeIcons
 import com.resurgeai.core.designsystem.components.SectionHeader
 import com.resurgeai.core.designsystem.components.SegmentOption
 import com.resurgeai.core.designsystem.components.SegmentedControl
-import com.resurgeai.core.designsystem.components.ShareBar
 import com.resurgeai.core.designsystem.components.Spinner
 import com.resurgeai.core.designsystem.components.Stat
 import com.resurgeai.core.designsystem.components.TopBar
 import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.model.DataSource
 import com.resurgeai.core.model.HealthMetric
-import com.resurgeai.core.model.MetricSeries
 import com.resurgeai.feature.dashboard.Formatters
-import com.resurgeai.feature.dashboard.sourceIcon
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.time.format.TextStyle
-import java.util.Locale
 
 @Composable
 fun MetricDetailRoute(
     onBack: () -> Unit,
+    onOpenSources: (HealthMetric) -> Unit,
     viewModel: MetricDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val context = LocalContext.current
     MetricDetailScreen(
         state = state,
         onBack = onBack,
         onRangeChange = viewModel::setRange,
-        onManageSources = { runCatching { context.startActivity(viewModel.healthConnectSettingsIntent()) } },
+        onSelect = viewModel::select,
+        onOpenSources = { onOpenSources(state.metric) },
     )
 }
 
@@ -66,110 +60,101 @@ fun MetricDetailScreen(
     state: MetricDetailUiState,
     onBack: () -> Unit,
     onRangeChange: (DetailRange) -> Unit,
-    onManageSources: () -> Unit,
+    onSelect: (Int) -> Unit,
+    onOpenSources: () -> Unit,
 ) {
     val color = metricColor(state.metric)
+    val zone = ZoneId.systemDefault()
+    val selected = state.periods.getOrNull(state.selected)
+
     Column(Modifier.fillMaxSize()) {
-        TopBar(title = state.metric.label, onBack = onBack)
+        TopBar(
+            title = state.metric.label,
+            onBack = onBack,
+            trailing = {
+                IconButton(ResurgeIcons.Devices, contentDescription = "Data sources", onClick = onOpenSources)
+            },
+        )
         Column(
             Modifier
                 .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
+                .verticalScroll(rememberScrollState()),
         ) {
             SegmentedControl(
                 options = DetailRange.entries.map { SegmentOption(it, it.label) },
                 selected = state.range,
                 onSelect = onRangeChange,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
             )
             Spacer(Modifier.height(16.dp))
 
-            val series = state.series
             when {
-                state.error != null -> Card(Modifier.fillMaxWidth()) {
+                state.error != null -> Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                     Text(state.error, style = Resurge.type.body, color = Resurge.colors.textMuted)
                 }
-                series == null -> Row(Modifier.fillMaxWidth().padding(48.dp), horizontalArrangement = Arrangement.Center) { Spinner() }
-                else -> ChartCard(state.metric, state.range, series, color)
-            }
-
-            if (state.sourcesToday.shares.isNotEmpty()) {
-                SectionHeader("Sources today")
-                Card(Modifier.fillMaxWidth()) {
-                    state.sourcesToday.shares.forEachIndexed { i, share ->
-                        if (i > 0) Spacer(Modifier.height(14.dp))
-                        SourceRow(share.source, share.fraction, color)
-                    }
+                state.series == null -> Row(
+                    Modifier.fillMaxWidth().padding(48.dp),
+                    horizontalArrangement = Arrangement.Center,
+                ) { Spinner() }
+                else -> {
+                    SummaryCard(state)
                     Spacer(Modifier.height(12.dp))
-                    Text(
-                        "Health Connect combines overlapping phone and watch data using your app priority.",
-                        style = Resurge.type.caption,
-                        color = Resurge.colors.textSubtle,
-                    )
+                    PeriodList(state, color, zone, onSelect)
                 }
             }
 
-            if (state.sleepSessions.isNotEmpty()) {
-                SectionHeader("Nights")
-                Card(Modifier.fillMaxWidth(), contentPadding = PaddingValues(0.dp)) {
-                    state.sleepSessions.forEachIndexed { i, s ->
-                        if (i > 0) Divider()
-                        SessionRow(
-                            title = s.end.atZone(ZoneId.systemDefault()).format(DAY),
-                            subtitle = "${s.start.atZone(ZoneId.systemDefault()).format(TIME)} – ${s.end.atZone(ZoneId.systemDefault()).format(TIME)}",
-                            value = Formatters.duration(s.duration),
-                            source = s.source,
-                        )
+            Column(Modifier.padding(horizontal = 16.dp)) {
+                val nights = selected?.let { p -> state.sleepSessions.filter { it.end.atZone(zone).toLocalDate() in p } }.orEmpty()
+                if (nights.isNotEmpty()) {
+                    SectionHeader("Nights · ${periodTitle(selected!!, state.range)}")
+                    Card(Modifier.fillMaxWidth(), contentPadding = PaddingValues(0.dp)) {
+                        nights.forEachIndexed { i, s ->
+                            if (i > 0) Divider()
+                            SessionRow(
+                                title = s.end.atZone(zone).format(DAY),
+                                subtitle = "${s.start.atZone(zone).format(TIME)} – ${s.end.atZone(zone).format(TIME)}",
+                                value = Formatters.duration(s.duration),
+                                source = s.source,
+                            )
+                        }
                     }
                 }
-            }
 
-            if (state.exerciseSessions.isNotEmpty()) {
-                SectionHeader("Workouts")
-                Card(Modifier.fillMaxWidth(), contentPadding = PaddingValues(0.dp)) {
-                    state.exerciseSessions.forEachIndexed { i, s ->
-                        if (i > 0) Divider()
-                        SessionRow(
-                            title = s.title ?: s.type,
-                            subtitle = s.start.atZone(ZoneId.systemDefault()).format(DAY_TIME),
-                            value = Formatters.duration(s.duration),
-                            source = s.source,
-                        )
+                val workouts = selected?.let { p -> state.exerciseSessions.filter { it.start.atZone(zone).toLocalDate() in p } }.orEmpty()
+                if (workouts.isNotEmpty()) {
+                    SectionHeader("Workouts · ${periodTitle(selected!!, state.range)}")
+                    Card(Modifier.fillMaxWidth(), contentPadding = PaddingValues(0.dp)) {
+                        workouts.forEachIndexed { i, s ->
+                            if (i > 0) Divider()
+                            SessionRow(
+                                title = s.title ?: s.type,
+                                subtitle = s.start.atZone(zone).format(DAY_TIME),
+                                value = Formatters.duration(s.duration),
+                                source = s.source,
+                            )
+                        }
                     }
                 }
+                Spacer(Modifier.height(24.dp))
             }
-
-            Spacer(Modifier.height(20.dp))
-            Button(
-                "Manage sources in Health Connect",
-                onClick = onManageSources,
-                variant = ButtonVariant.Secondary,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(24.dp))
         }
     }
 }
 
 @Composable
-private fun ChartCard(metric: HealthMetric, range: DetailRange, series: MetricSeries, color: Color) {
+private fun SummaryCard(state: MetricDetailUiState) {
+    val metric = state.metric
+    val series = state.series ?: return
     val values = series.nonNull
-    Card(Modifier.fillMaxWidth()) {
-        val headline = series.average?.let { Formatters.seriesValue(metric, it) } ?: "—"
-        Text(if (metric == HealthMetric.WEIGHT) "Average" else "Daily average", style = Resurge.type.caption, color = Resurge.colors.textMuted)
-        Text(headline, style = Resurge.type.display)
-        Spacer(Modifier.height(16.dp))
-        BarChart(
-            values = series.points.map { it.value },
-            labels = series.points.mapIndexed { i, p ->
-                when (range) {
-                    DetailRange.WEEK -> p.date.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.getDefault())
-                    DetailRange.MONTH -> if (i % 7 == series.points.lastIndex % 7) p.date.dayOfMonth.toString() else ""
-                }
-            },
-            color = color,
-        )
+    Card(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+    ) {
+        Text("Daily average", style = Resurge.type.caption, color = Resurge.colors.textMuted)
+        Text(series.average?.let { Formatters.seriesValue(metric, it) } ?: "—", style = Resurge.type.display)
         if (values.isNotEmpty()) {
             Spacer(Modifier.height(16.dp))
             Row {
@@ -193,26 +178,19 @@ private fun ChartCard(metric: HealthMetric, range: DetailRange, series: MetricSe
     }
 }
 
-@Composable
-private fun SourceRow(source: DataSource, fraction: Float, color: Color) {
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(sourceIcon(source.kind), contentDescription = null, tint = Resurge.colors.textMuted, size = 16.dp)
-            Spacer(Modifier.width(8.dp))
-            Column(Modifier.weight(1f)) {
-                Text(Formatters.sourceLabel(source), style = Resurge.type.label)
-                val secondary = listOfNotNull(
-                    Formatters.kindLabel(source.kind),
-                    source.appName?.takeIf { it != Formatters.sourceLabel(source) },
-                ).joinToString(" · ")
-                Text(secondary, style = Resurge.type.caption, color = Resurge.colors.textMuted)
-            }
-            Text("${(fraction * 100).toInt()}%", style = Resurge.type.label, color = Resurge.colors.textMuted)
+private fun periodTitle(period: PeriodValue, range: DetailRange): String {
+    val today = LocalDate.now()
+    return when (range) {
+        DetailRange.WEEK -> if (period.start == today) "Today" else period.start.format(DAY_SHORT)
+        DetailRange.MONTH -> when {
+            today in period -> "This week"
+            period.start.month == period.end.month -> "${period.start.dayOfMonth}–${period.end.format(SHORT_DATE)}"
+            else -> "${period.start.format(SHORT_DATE)} – ${period.end.format(SHORT_DATE)}"
         }
-        Spacer(Modifier.height(8.dp))
-        ShareBar(fraction, color)
     }
 }
+
+private operator fun PeriodValue.contains(date: LocalDate) = !date.isBefore(start) && !date.isAfter(end)
 
 @Composable
 private fun SessionRow(title: String, subtitle: String, value: String, source: DataSource?) {
@@ -245,5 +223,7 @@ internal fun metricColor(metric: HealthMetric): Color = when (metric) {
 }
 
 private val DAY = DateTimeFormatter.ofPattern("EEE d MMM")
+private val DAY_SHORT = DateTimeFormatter.ofPattern("EEE d")
+private val SHORT_DATE = DateTimeFormatter.ofPattern("d MMM")
 private val TIME = DateTimeFormatter.ofPattern("HH:mm")
 private val DAY_TIME = DateTimeFormatter.ofPattern("EEE d MMM, HH:mm")

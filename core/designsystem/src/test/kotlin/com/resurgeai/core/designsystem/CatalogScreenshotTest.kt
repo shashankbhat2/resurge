@@ -21,7 +21,7 @@ import org.robolectric.annotation.GraphicsMode
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35], qualifiers = "w400dp-h1900dp-xhdpi")
+@Config(sdk = [35], qualifiers = "w400dp-h2100dp-xhdpi")
 class CatalogScreenshotTest {
     @get:Rule val compose = createComposeRule()
 

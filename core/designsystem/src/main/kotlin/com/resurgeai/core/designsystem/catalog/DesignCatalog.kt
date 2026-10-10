@@ -33,6 +33,11 @@ import com.resurgeai.core.designsystem.components.ButtonVariant
 import com.resurgeai.core.designsystem.components.Card
 import com.resurgeai.core.designsystem.components.ChoiceCard
 import com.resurgeai.core.designsystem.components.Divider
+import com.resurgeai.core.designsystem.components.DotOnAxis
+import com.resurgeai.core.designsystem.components.MagnitudeBar
+import com.resurgeai.core.designsystem.components.RangeBar
+import com.resurgeai.core.designsystem.components.SegmentsBar
+import com.resurgeai.core.designsystem.components.WindowBar
 import com.resurgeai.core.designsystem.components.IconButton
 import com.resurgeai.core.designsystem.components.MetricCard
 import com.resurgeai.core.designsystem.components.NumberStepper
@@ -207,6 +212,24 @@ private fun MetricsSection() {
             }
             Spacer(Modifier.height(12.dp))
             ShareBar(0.72f, Resurge.colors.activity)
+        }
+        Card {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                MagnitudeBar(0.8f, Resurge.colors.activity, marker = 0.6f)
+                WindowBar(
+                    start = 0.28f, end = 0.7f,
+                    segments = listOf(
+                        0.25f to Resurge.colors.sleep,
+                        0.5f to Resurge.colors.sleep.copy(alpha = 0.42f),
+                        0.2f to Resurge.colors.sleep.copy(alpha = 0.7f),
+                        0.05f to Resurge.colors.textSubtle,
+                    ),
+                    gridLines = listOf(1f / 3, 2f / 3),
+                )
+                RangeBar(0.1f, 0.85f, 0.3f, Resurge.colors.heart)
+                SegmentsBar(listOf(0.5f, 0.25f), Resurge.colors.activity)
+                DotOnAxis(0.4f, Resurge.colors.textMuted)
+            }
         }
     }
 }

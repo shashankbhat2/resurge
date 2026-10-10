@@ -1,17 +1,15 @@
 package com.resurgeai.feature.dashboard.detail
 
-import android.content.Intent
 import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.resurgeai.core.healthconnect.HealthConnectManager
 import com.resurgeai.core.healthconnect.HealthDataSource
+import com.resurgeai.core.healthconnect.HealthMath
 import com.resurgeai.core.model.ExerciseSession
 import com.resurgeai.core.model.HealthMetric
 import com.resurgeai.core.model.MetricSeries
 import com.resurgeai.core.model.SleepSession
-import com.resurgeai.core.model.SourceBreakdown
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -24,18 +22,34 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 
-enum class DetailRange(val days: Int, val label: String) { WEEK(7, "Week"), MONTH(30, "Month") }
+enum class DetailRange(val label: String) {
+    /** Last 7 days, one period per day. */
+    WEEK("Week"),
+
+    /** Current week plus the 4 before it, one period per calendar week. */
+    MONTH("Month");
+
+    fun firstDay(today: LocalDate): LocalDate = when (this) {
+        WEEK -> today.minusDays(6)
+        MONTH -> HealthMath.weekStart(today).minusWeeks(4)
+    }
+}
 
 data class MetricDetailUiState(
     val metric: HealthMetric,
     val range: DetailRange = DetailRange.WEEK,
     val loading: Boolean = true,
     val series: MetricSeries? = null,
-    val sourcesToday: SourceBreakdown = SourceBreakdown.Empty,
+    val periods: List<PeriodValue> = emptyList(),
+    /** Index into [periods]; defaults to the latest period. */
+    val selected: Int = -1,
     val sleepSessions: List<SleepSession> = emptyList(),
     val exerciseSessions: List<ExerciseSession> = emptyList(),
+    /** Daily min/max bpm, only loaded for heart rate. */
+    val heartRanges: Map<LocalDate, Pair<Long, Long>> = emptyMap(),
     val error: String? = null,
 )
 
@@ -43,7 +57,6 @@ data class MetricDetailUiState(
 class MetricDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val healthData: HealthDataSource,
-    private val healthConnect: HealthConnectManager,
 ) : ViewModel() {
     private val metric: HealthMetric = HealthMetric.valueOf(checkNotNull(savedStateHandle.get<String>(ARG_METRIC)))
 
@@ -52,13 +65,15 @@ class MetricDetailViewModel @Inject constructor(
 
     private var job: Job? = null
 
-    init { load(DetailRange.WEEK) }
+    init {
+        load(DetailRange.WEEK)
+    }
 
     fun setRange(range: DetailRange) {
         if (range != _state.value.range) load(range)
     }
 
-    fun healthConnectSettingsIntent(): Intent = healthConnect.settingsIntent()
+    fun select(index: Int) = _state.update { it.copy(selected = index) }
 
     private fun load(range: DetailRange) {
         job?.cancel()
@@ -67,20 +82,29 @@ class MetricDetailViewModel @Inject constructor(
             try {
                 val zone = ZoneId.systemDefault()
                 val today = LocalDate.now(zone)
-                val from = today.minusDays(range.days - 1L).atStartOfDay(zone).toInstant()
+                val first = range.firstDay(today)
+                val days = ChronoUnit.DAYS.between(first, today).toInt() + 1
+                val from = first.atStartOfDay(zone).toInstant()
                 val to = Instant.now()
                 coroutineScope {
-                    val series = async { healthData.readSeries(metric, range.days, zone) }
-                    val day = async { healthData.readDay(today, zone) }
+                    val series = async { healthData.readSeries(metric, days, zone) }
                     val sleep = async { if (metric == HealthMetric.SLEEP) healthData.sleepSessions(from, to) else emptyList() }
                     val exercise = async { if (metric == HealthMetric.EXERCISE) healthData.exerciseSessionsBetween(from, to) else emptyList() }
+                    val heart = async { if (metric == HealthMetric.HEART_RATE) healthData.readHeartRateRanges(days, zone) else emptyMap() }
+                    val s = series.await()
+                    val periods = when (range) {
+                        DetailRange.WEEK -> Periods.daily(s)
+                        DetailRange.MONTH -> Periods.weekly(s)
+                    }
                     _state.update {
                         it.copy(
                             loading = false,
-                            series = series.await(),
-                            sourcesToday = day.await().sources[metric] ?: SourceBreakdown.Empty,
-                            sleepSessions = sleep.await().sortedByDescending { s -> s.end },
-                            exerciseSessions = exercise.await().sortedByDescending { s -> s.start },
+                            series = s,
+                            periods = periods,
+                            selected = periods.lastIndex,
+                            sleepSessions = sleep.await().sortedByDescending { x -> x.end },
+                            exerciseSessions = exercise.await().sortedByDescending { x -> x.start },
+                            heartRanges = heart.await(),
                         )
                     }
                 }

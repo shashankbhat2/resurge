@@ -70,6 +70,10 @@ val ResurgeTheme = buildThemeV2 {
             C.textMuted to Color(0xFF57534E),
             C.textSubtle to Color(0xFF8A8580),
             C.accentMuted to Palette.accent.copy(alpha = 0.10f),
+            C.navBar to Color(0xFF0C0A09),
+            C.navActive to Color(0xFFFFFFFF),
+            C.navOnActive to Color(0xFF0C0A09),
+            C.navInactive to Color(0xFFA8A29E),
         )
         defaultContentColor = Color(0xFF0C0A09)
         defaultIndication = rememberColoredIndication(
@@ -89,6 +93,10 @@ val ResurgeTheme = buildThemeV2 {
             C.textMuted to Color(0xFFB4AFAA),
             C.textSubtle to Color(0xFF85807B),
             C.accentMuted to Palette.accent.copy(alpha = 0.18f),
+            C.navBar to Color(0xFF1E1E21),
+            C.navActive to Color(0xFFF5F5F4),
+            C.navOnActive to Color(0xFF0B0B0C),
+            C.navInactive to Color(0xFF85807B),
         )
         defaultContentColor = Color(0xFFF5F5F4)
         defaultIndication = rememberColoredIndication(
@@ -178,6 +186,10 @@ object ColorAccess {
     val energy @Composable get() = Theme[colors][C.energy]
     val water @Composable get() = Theme[colors][C.water]
     val heart @Composable get() = Theme[colors][C.heart]
+    val navBar @Composable get() = Theme[colors][C.navBar]
+    val navActive @Composable get() = Theme[colors][C.navActive]
+    val navOnActive @Composable get() = Theme[colors][C.navOnActive]
+    val navInactive @Composable get() = Theme[colors][C.navInactive]
 }
 
 object TypeAccess {

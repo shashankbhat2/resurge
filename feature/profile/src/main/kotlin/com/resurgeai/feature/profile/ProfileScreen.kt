@@ -33,6 +33,7 @@ import com.resurgeai.core.designsystem.components.Card
 import com.resurgeai.core.designsystem.components.Divider
 import com.resurgeai.core.designsystem.components.Icon
 import com.resurgeai.core.designsystem.components.IconBadge
+import com.resurgeai.core.designsystem.components.LocalFloatingBarInset
 import com.resurgeai.core.designsystem.components.ResurgeIcons
 import com.resurgeai.core.designsystem.components.SegmentOption
 import com.resurgeai.core.designsystem.components.SegmentedControl
@@ -143,6 +144,7 @@ fun ProfileScreen(
                     .fillMaxWidth()
                     .padding(vertical = 24.dp),
             )
+            Spacer(Modifier.height(LocalFloatingBarInset.current))
         }
     }
 }

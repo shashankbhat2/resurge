@@ -162,6 +162,42 @@ class HealthDataSource @Inject constructor(
         if (HealthPermission.getReadPermission(ExerciseSessionRecord::class) in manager.grantedPermissions()) exerciseSessions(from, to)
         else emptyList()
 
+    /** Daily heart-rate min/max (bpm) for the last [days] days, keyed by local date. */
+    suspend fun readHeartRateRanges(days: Int, zone: ZoneId = ZoneId.systemDefault()): Map<LocalDate, Pair<Long, Long>> {
+        if (HealthPermission.getReadPermission(HeartRateRecord::class) !in manager.grantedPermissions()) return emptyMap()
+        val today = LocalDate.now(zone)
+        val first = today.minusDays(days - 1L)
+        return client.aggregateGroupByPeriod(
+            AggregateGroupByPeriodRequest(
+                metrics = setOf(HeartRateRecord.BPM_MIN, HeartRateRecord.BPM_MAX),
+                timeRangeFilter = TimeRangeFilter.between(first.atStartOfDay(), today.plusDays(1).atStartOfDay()),
+                timeRangeSlicer = Period.ofDays(1),
+            ),
+        ).mapNotNull { bucket ->
+            val min = bucket.result[HeartRateRecord.BPM_MIN] ?: return@mapNotNull null
+            val max = bucket.result[HeartRateRecord.BPM_MAX] ?: return@mapNotNull null
+            bucket.startTime.toLocalDate() to (min to max)
+        }.toMap()
+    }
+
+    /** Which sources contributed to [metric] between [start] and [end]. */
+    suspend fun readSources(metric: HealthMetric, start: Instant, end: Instant): SourceBreakdown {
+        val granted = manager.grantedPermissions()
+        val range = TimeRangeFilter.between(start, end)
+        fun can(type: KClass<out Record>) = HealthPermission.getReadPermission(type) in granted
+        // Longer ranges have many more step/HR records; allow more pages than a single day needs.
+        val pages = 20
+        return when (metric) {
+            HealthMetric.STEPS -> if (can(StepsRecord::class)) sources(StepsRecord::class, range, pages) { (it as StepsRecord).count.toDouble() } else SourceBreakdown.Empty
+            HealthMetric.DISTANCE -> if (can(DistanceRecord::class)) sources(DistanceRecord::class, range, pages) { (it as DistanceRecord).distance.inMeters } else SourceBreakdown.Empty
+            HealthMetric.CALORIES_BURNED -> if (can(TotalCaloriesBurnedRecord::class)) sources(TotalCaloriesBurnedRecord::class, range, pages) { (it as TotalCaloriesBurnedRecord).energy.inKilocalories } else SourceBreakdown.Empty
+            HealthMetric.HEART_RATE -> if (can(HeartRateRecord::class)) sources(HeartRateRecord::class, range, pages) { (it as HeartRateRecord).samples.size.toDouble() } else SourceBreakdown.Empty
+            HealthMetric.WEIGHT -> if (can(WeightRecord::class)) sources(WeightRecord::class, range, pages) { 1.0 } else SourceBreakdown.Empty
+            HealthMetric.SLEEP -> if (can(SleepSessionRecord::class)) sessionSources(sleepEndingIn(start, end).map { it.source to it.duration }) else SourceBreakdown.Empty
+            HealthMetric.EXERCISE -> if (can(ExerciseSessionRecord::class)) sessionSources(exerciseSessions(start, end).map { it.source to it.duration }) else SourceBreakdown.Empty
+        }
+    }
+
     // --- internals ---
 
     private suspend fun aggregate(granted: Set<String>, range: TimeRangeFilter) =
@@ -204,9 +240,10 @@ class HealthDataSource @Inject constructor(
     private suspend fun <T : Record> sources(
         type: KClass<T>,
         range: TimeRangeFilter,
+        maxPages: Int = 5,
         weight: (Record) -> Double,
     ): SourceBreakdown = SourceResolver.resolve(
-        readAll(type, range).map { record -> contribution(record.metadata, weight(record)) },
+        readAll(type, range, maxPages).map { record -> contribution(record.metadata, weight(record)) },
         appName = ::appName,
     )
 

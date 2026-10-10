@@ -10,34 +10,53 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.LocalContentColor
 import com.composeunstyled.UnstyledIcon
-import com.composables.icons.lucide.R as Lucide
+import com.resurgeai.core.designsystem.R
+import com.composables.icons.tabler.filled.R as TablerFilled
+import com.composables.icons.tabler.outline.R as Tabler
 
-/** Lucide icons used across the app. Add entries here rather than referencing drawables directly. */
+/**
+ * Tabler icons used across the app (outline by default). Add entries here rather than referencing
+ * drawables directly. Navigation uses outline when inactive and the `*Filled` variant when active.
+ */
 object ResurgeIcons {
-    @DrawableRes val Home = Lucide.drawable.lucide_ic_house
-    @DrawableRes val Food = Lucide.drawable.lucide_ic_utensils
-    @DrawableRes val Coach = Lucide.drawable.lucide_ic_sparkles
-    @DrawableRes val Profile = Lucide.drawable.lucide_ic_user
-    @DrawableRes val Check = Lucide.drawable.lucide_ic_check
-    @DrawableRes val ChevronRight = Lucide.drawable.lucide_ic_chevron_right
-    @DrawableRes val ArrowLeft = Lucide.drawable.lucide_ic_arrow_left
-    @DrawableRes val ArrowRight = Lucide.drawable.lucide_ic_arrow_right
-    @DrawableRes val LogOut = Lucide.drawable.lucide_ic_log_out
-    @DrawableRes val Sun = Lucide.drawable.lucide_ic_sun
-    @DrawableRes val Moon = Lucide.drawable.lucide_ic_moon
-    @DrawableRes val Monitor = Lucide.drawable.lucide_ic_monitor
-    @DrawableRes val Flame = Lucide.drawable.lucide_ic_flame
-    @DrawableRes val Droplet = Lucide.drawable.lucide_ic_droplet
-    @DrawableRes val Bed = Lucide.drawable.lucide_ic_bed
-    @DrawableRes val Footprints = Lucide.drawable.lucide_ic_footprints
-    @DrawableRes val Activity = Lucide.drawable.lucide_ic_activity
-    @DrawableRes val Dumbbell = Lucide.drawable.lucide_ic_dumbbell
-    @DrawableRes val Heart = Lucide.drawable.lucide_ic_heart
-    @DrawableRes val Scale = Lucide.drawable.lucide_ic_scale
-    @DrawableRes val Target = Lucide.drawable.lucide_ic_target
-    @DrawableRes val Watch = Lucide.drawable.lucide_ic_watch
-    @DrawableRes val Phone = Lucide.drawable.lucide_ic_smartphone
-    @DrawableRes val Sparkles = Lucide.drawable.lucide_ic_sparkles
+    // Navigation
+    @DrawableRes val Today = Tabler.drawable.tabler_ic_sunrise_outline
+    @DrawableRes val TodayFilled = TablerFilled.drawable.tabler_ic_sunrise_filled
+    @DrawableRes val Food = Tabler.drawable.tabler_ic_salad_outline
+    @DrawableRes val FoodFilled = TablerFilled.drawable.tabler_ic_salad_filled
+    @DrawableRes val Coach = Tabler.drawable.tabler_ic_diamond_outline
+    @DrawableRes val CoachFilled = TablerFilled.drawable.tabler_ic_diamond_filled
+    @DrawableRes val Profile = Tabler.drawable.tabler_ic_user_circle_outline
+    @DrawableRes val ProfileFilled = R.drawable.ic_user_circle_filled
+    @DrawableRes val Scan = Tabler.drawable.tabler_ic_scan_outline
+
+    // General
+    @DrawableRes val Check = Tabler.drawable.tabler_ic_check_outline
+    @DrawableRes val ChevronRight = Tabler.drawable.tabler_ic_chevron_right_outline
+    @DrawableRes val ArrowLeft = Tabler.drawable.tabler_ic_arrow_left_outline
+    @DrawableRes val ArrowRight = Tabler.drawable.tabler_ic_arrow_right_outline
+    @DrawableRes val LogOut = Tabler.drawable.tabler_ic_logout_outline
+    @DrawableRes val Sun = Tabler.drawable.tabler_ic_sun_outline
+    @DrawableRes val Moon = Tabler.drawable.tabler_ic_moon_outline
+    @DrawableRes val Monitor = Tabler.drawable.tabler_ic_device_desktop_outline
+    @DrawableRes val Sparkles = Tabler.drawable.tabler_ic_sparkles_outline
+    @DrawableRes val Target = Tabler.drawable.tabler_ic_target_outline
+    @DrawableRes val Devices = Tabler.drawable.tabler_ic_devices_outline
+
+    // Metrics
+    @DrawableRes val Flame = Tabler.drawable.tabler_ic_flame_outline
+    @DrawableRes val Droplet = Tabler.drawable.tabler_ic_droplet_outline
+    @DrawableRes val Bed = Tabler.drawable.tabler_ic_bed_outline
+    @DrawableRes val Footprints = Tabler.drawable.tabler_ic_walk_outline
+    @DrawableRes val Distance = Tabler.drawable.tabler_ic_route_outline
+    @DrawableRes val Activity = Tabler.drawable.tabler_ic_activity_outline
+    @DrawableRes val Dumbbell = Tabler.drawable.tabler_ic_barbell_outline
+    @DrawableRes val Heart = Tabler.drawable.tabler_ic_heart_outline
+    @DrawableRes val Scale = Tabler.drawable.tabler_ic_scale_outline
+
+    // Sources
+    @DrawableRes val Watch = Tabler.drawable.tabler_ic_device_watch_outline
+    @DrawableRes val Phone = Tabler.drawable.tabler_ic_device_mobile_outline
 }
 
 @Composable
