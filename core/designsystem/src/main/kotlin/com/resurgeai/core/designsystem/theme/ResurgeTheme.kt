@@ -70,10 +70,10 @@ val ResurgeTheme = buildThemeV2 {
             C.textMuted to Color(0xFF57534E),
             C.textSubtle to Color(0xFF8A8580),
             C.accentMuted to Palette.accent.copy(alpha = 0.10f),
-            C.navBar to Color(0xFF0C0A09),
-            C.navActive to Color(0xFFFFFFFF),
-            C.navOnActive to Color(0xFF0C0A09),
-            C.navInactive to Color(0xFFA8A29E),
+            C.navBar to Color(0xFFFFFFFF),
+            C.navActive to Color(0xFF0C0A09),
+            C.navOnActive to Color(0xFFFFFFFF),
+            C.navInactive to Color(0xFF8A8580),
         )
         defaultContentColor = Color(0xFF0C0A09)
         defaultIndication = rememberColoredIndication(
@@ -155,7 +155,7 @@ val ResurgeTheme = buildThemeV2 {
     properties[shapes] = mapOf(
         ShapeTokens.sm to RoundedCornerShape(10.dp),
         ShapeTokens.md to RoundedCornerShape(16.dp),
-        ShapeTokens.lg to RoundedCornerShape(24.dp),
+        ShapeTokens.lg to RoundedCornerShape(28.dp),
         ShapeTokens.pill to CircleShape,
     )
 }
@@ -190,6 +190,18 @@ object ColorAccess {
     val navActive @Composable get() = Theme[colors][C.navActive]
     val navOnActive @Composable get() = Theme[colors][C.navOnActive]
     val navInactive @Composable get() = Theme[colors][C.navInactive]
+
+    /**
+     * Raised surface shared by the navbar, hero card, primary button and segmented control:
+     * white in light mode, charcoal in dark mode. [onInverse] is the text/icon colour on it.
+     */
+    val inverse @Composable get() = navBar
+    val onInverse @Composable get() = navActive
+    val onInverseMuted @Composable get() = navInactive
+
+    /** Highest-contrast fill for active/selected marks (navbar circle, checks, selected pills). */
+    val strong @Composable get() = navActive
+    val onStrong @Composable get() = navOnActive
 }
 
 object TypeAccess {

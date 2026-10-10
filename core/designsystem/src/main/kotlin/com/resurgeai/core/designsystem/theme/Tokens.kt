@@ -31,7 +31,7 @@ object ColorTokens {
     val water = ThemeToken<Color>("water")
     val heart = ThemeToken<Color>("heart")
 
-    // Floating navigation bar: a dark pill in both schemes, with an inverted "active" circle.
+    // Floating navigation bar / raised surfaces: white (light) or charcoal (dark), with a high-contrast active circle.
     val navBar = ThemeToken<Color>("nav_bar")
     val navActive = ThemeToken<Color>("nav_active")
     val navOnActive = ThemeToken<Color>("nav_on_active")

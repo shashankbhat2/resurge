@@ -42,8 +42,9 @@ fun <T> SegmentedControl(
     Row(
         modifier = modifier
             .clip(Resurge.shape.pill)
-            .background(Resurge.colors.surfaceMuted)
-            .padding(4.dp),
+            .background(Resurge.colors.inverse)
+            .border(1.dp, Resurge.colors.border.copy(alpha = 0.6f), Resurge.shape.pill)
+            .padding(5.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         options.forEach { option ->
@@ -55,15 +56,11 @@ fun <T> SegmentedControl(
                     .weight(1f)
                     .semantics { this.selected = isSelected }
                     .clip(Resurge.shape.pill)
-                    .background(if (isSelected) Resurge.colors.surface else Color.Transparent)
-                    .then(
-                        if (isSelected) Modifier.border(1.dp, Resurge.colors.border, Resurge.shape.pill)
-                        else Modifier,
-                    ),
+                    .background(if (isSelected) Resurge.colors.strong else Color.Transparent),
                 contentPadding = PaddingValues(vertical = 10.dp, horizontal = 12.dp),
                 indication = LocalIndication.current,
             ) {
-                val color = if (isSelected) Resurge.colors.text else Resurge.colors.textMuted
+                val color = if (isSelected) Resurge.colors.onStrong else Resurge.colors.onInverseMuted
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -117,11 +114,11 @@ private fun CheckMark(checked: Boolean) {
         modifier = Modifier
             .size(24.dp)
             .clip(shape)
-            .background(if (checked) Resurge.colors.accent else Color.Transparent)
-            .border(1.5.dp, if (checked) Resurge.colors.accent else Resurge.colors.border, shape),
+            .background(if (checked) Resurge.colors.strong else Color.Transparent)
+            .border(1.5.dp, if (checked) Resurge.colors.strong else Resurge.colors.border, shape),
         contentAlignment = Alignment.Center,
     ) {
-        if (checked) Icon(ResurgeIcons.Check, contentDescription = null, tint = Resurge.colors.onAccent, size = 14.dp)
+        if (checked) Icon(ResurgeIcons.Check, contentDescription = null, tint = Resurge.colors.onStrong, size = 14.dp)
     }
 }
 
@@ -182,7 +179,7 @@ fun StepIndicator(current: Int, total: Int, modifier: Modifier = Modifier) {
                     .weight(1f)
                     .height(4.dp)
                     .clip(Resurge.shape.pill)
-                    .background(if (index <= current) Resurge.colors.accent else Resurge.colors.border),
+                    .background(if (index <= current) Resurge.colors.strong else Resurge.colors.border),
             )
         }
     }

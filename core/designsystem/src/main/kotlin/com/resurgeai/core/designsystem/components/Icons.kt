@@ -24,8 +24,8 @@ object ResurgeIcons {
     @DrawableRes val TodayFilled = TablerFilled.drawable.tabler_ic_sunrise_filled
     @DrawableRes val Food = Tabler.drawable.tabler_ic_salad_outline
     @DrawableRes val FoodFilled = TablerFilled.drawable.tabler_ic_salad_filled
-    @DrawableRes val Coach = Tabler.drawable.tabler_ic_diamond_outline
-    @DrawableRes val CoachFilled = TablerFilled.drawable.tabler_ic_diamond_filled
+    @DrawableRes val Coach = Tabler.drawable.tabler_ic_sparkles_outline
+    @DrawableRes val CoachFilled = R.drawable.ic_sparkles_filled
     @DrawableRes val Profile = Tabler.drawable.tabler_ic_user_circle_outline
     @DrawableRes val ProfileFilled = R.drawable.ic_user_circle_filled
     @DrawableRes val Scan = Tabler.drawable.tabler_ic_scan_outline
@@ -52,6 +52,7 @@ object ResurgeIcons {
     @DrawableRes val Activity = Tabler.drawable.tabler_ic_activity_outline
     @DrawableRes val Dumbbell = Tabler.drawable.tabler_ic_barbell_outline
     @DrawableRes val Heart = Tabler.drawable.tabler_ic_heart_outline
+    @DrawableRes val Heartbeat = Tabler.drawable.tabler_ic_heartbeat_outline
     @DrawableRes val Scale = Tabler.drawable.tabler_ic_scale_outline
 
     // Sources

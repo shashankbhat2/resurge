@@ -48,18 +48,26 @@ fun Screen(
     }
 }
 
-/** Flat card: surface fill, 24dp corners, hairline border. Clickable when [onClick] is set. */
+/**
+ * Flat card: surface fill, 28dp corners, no shadow. A hairline border keeps cards separate from the
+ * background; selection uses the inverse (navbar) colour. Clickable when [onClick] is set.
+ */
 @Composable
 fun Card(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     selected: Boolean = false,
-    contentPadding: PaddingValues = PaddingValues(16.dp),
+    inverse: Boolean = false,
+    contentPadding: PaddingValues = PaddingValues(18.dp),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val shape = Resurge.shape.lg
-    val borderColor = if (selected) Resurge.colors.accent else Resurge.colors.border
-    val container = if (selected) Resurge.colors.accentMuted else Resurge.colors.surface
+    val borderColor = when {
+        selected -> Resurge.colors.strong
+        else -> Resurge.colors.border.copy(alpha = 0.6f)
+    }
+    val container = if (inverse) Resurge.colors.inverse else Resurge.colors.surface
+    val contentColor = if (inverse) Resurge.colors.onInverse else Resurge.colors.text
     val base = modifier
         .clip(shape)
         .background(container, shape)
@@ -72,10 +80,14 @@ fun Card(
             indication = LocalIndication.current,
             contentAlignment = Alignment.TopStart,
         ) {
-            Column(Modifier.fillMaxWidth().padding(contentPadding), content = content)
+            ProvideContentColor(contentColor) {
+                Column(Modifier.fillMaxWidth().padding(contentPadding), content = content)
+            }
         }
     } else {
-        Column(base.padding(contentPadding), content = content)
+        ProvideContentColor(contentColor) {
+            Column(base.padding(contentPadding), content = content)
+        }
     }
 }
 
@@ -114,19 +126,20 @@ fun Spinner(
     }
 }
 
-/** Small tinted square holding an icon, used for metric and goal accents. */
+/** Small tinted circle holding an icon (same shape language as the navbar), for metric and goal accents. */
 @Composable
 fun IconBadge(
     icon: Int,
     tint: Color,
     modifier: Modifier = Modifier,
     size: Dp = 36.dp,
+    background: Color = tint.copy(alpha = 0.12f),
 ) {
     Box(
         modifier = modifier
             .size(size)
-            .clip(Resurge.shape.sm)
-            .background(tint.copy(alpha = 0.12f)),
+            .clip(Resurge.shape.pill)
+            .background(background),
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, contentDescription = null, tint = tint, size = size * 0.5f)

@@ -22,6 +22,9 @@ class DayRowsTest {
 
     private fun day(date: LocalDate, value: Double?) = PeriodValue(date, date, value, value, if (value != null) 1 else 0, 1)
 
+    private fun week(start: LocalDate, value: Double?, total: Double?, days: Int) =
+        PeriodValue(start, start.plusDays(days - 1L), value, total, days, days)
+
     @Test
     fun `magnitude is relative to the best day, with an average marker, newest first`() {
         val (_, rows) = DayRows.build(HealthMetric.STEPS, listOf(day(d1, 5000.0), day(d2, 10000.0)), emptyList(), emptyList(), emptyMap(), zone)
@@ -47,25 +50,6 @@ class DayRowsTest {
     }
 
     @Test
-    fun `heart rate ranges share a rounded axis`() {
-        val (axis, rows) = DayRows.build(
-            HealthMetric.HEART_RATE,
-            listOf(day(d1, 70.0), day(d2, 80.0)),
-            emptyList(), emptyList(),
-            mapOf(d1 to (52L to 141L), d2 to (60L to 120L)),
-            zone,
-        )
-        assertEquals(listOf("50 bpm", "150 bpm"), axis.labels.map { it.first })
-        val r = rows.first { it.date == d1 }.viz as DayViz.Range
-        assertEquals(0.02f, r.low, 0.001f)
-        assertEquals(0.91f, r.high, 0.001f)
-        assertEquals(0.2f, r.mid!!, 0.001f)
-    }
-
-    private fun week(start: LocalDate, value: Double?, total: Double?, days: Int) =
-        PeriodValue(start, start.plusDays(days - 1L), value, total, days, days)
-
-    @Test
     fun `week rows average bedtime and wake time across nights`() {
         val mon = LocalDate.of(2026, 10, 5)
         // Nights ending Tue (22:00 -> 06:00) and Wed (00:00 -> 08:00): avg 23:00 -> 07:00.
@@ -79,16 +63,13 @@ class DayRowsTest {
     }
 
     @Test
-    fun `week rows span the lowest and highest heart rate of the week`() {
-        val mon = LocalDate.of(2026, 10, 5)
-        val (_, rows) = DayRows.build(
-            HealthMetric.HEART_RATE,
-            listOf(week(mon, 70.0, null, 7)),
-            emptyList(), emptyList(),
-            mapOf(mon to (55L to 120L), mon.plusDays(3) to (60L to 150L)),
-            zone,
+    fun `heart rate rows carry no visual`() {
+        val (axis, rows) = DayRows.build(
+            HealthMetric.HEART_RATE, listOf(day(d1, 70.0)), emptyList(), emptyList(), mapOf(d1 to (52L to 141L)), zone,
         )
-        assertEquals("55–150 bpm", rows.single().detail)
+        assertTrue(axis.labels.isEmpty())
+        assertTrue(rows.single().viz is DayViz.Empty)
+        assertEquals(70.0, rows.single().value!!, 0.0)
     }
 
     @Test

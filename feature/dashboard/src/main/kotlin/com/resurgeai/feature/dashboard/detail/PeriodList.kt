@@ -36,6 +36,7 @@ import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.model.HealthMetric
 import com.resurgeai.core.model.SleepStage
 import com.resurgeai.feature.dashboard.Formatters
+import com.resurgeai.feature.dashboard.sleepStageColor
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.TextStyle
@@ -129,7 +130,7 @@ private fun DayRowItem(
         indication = LocalIndication.current,
         modifier = Modifier
             .fillMaxWidth()
-            .background(if (selected) Resurge.colors.accentMuted else Color.Transparent)
+            .background(if (selected) Resurge.colors.surfaceMuted else Color.Transparent)
             .semantics { this.selected = selected },
         contentAlignment = Alignment.CenterStart,
     ) {
@@ -149,7 +150,7 @@ private fun DayRowItem(
                 Text(
                     caption,
                     style = Resurge.type.caption,
-                    color = if (isCurrent) Resurge.colors.accent else Resurge.colors.textMuted,
+                    color = if (isCurrent) Resurge.colors.text else Resurge.colors.textMuted,
                     maxLines = 1,
                 )
                 Text(
@@ -159,7 +160,7 @@ private fun DayRowItem(
                 )
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                Viz(row.viz, metric, color, gridLines)
+                if (metric != HealthMetric.HEART_RATE) Viz(row.viz, metric, color, gridLines)
                 row.detail?.let {
                     Spacer(Modifier.height(4.dp))
                     Text(it, style = Resurge.type.caption, color = Resurge.colors.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -188,7 +189,7 @@ private fun Viz(viz: DayViz, metric: HealthMetric, color: Color, gridLines: List
         is DayViz.Window -> WindowBar(
             start = viz.start,
             end = viz.end,
-            segments = viz.stages.map { (w, stage) -> w to stageColor(stage, color) },
+            segments = viz.stages.map { (w, stage) -> w to sleepStageColor(stage) },
             gridLines = gridLines,
         )
         is DayViz.Range -> RangeBar(viz.low, viz.high, viz.mid, color)
@@ -199,15 +200,6 @@ private fun Viz(viz: DayViz, metric: HealthMetric, color: Color, gridLines: List
             else -> MagnitudeBar(0f, color)
         }
     }
-}
-
-@Composable
-private fun stageColor(stage: SleepStage, base: Color): Color = when (stage) {
-    SleepStage.DEEP -> base
-    SleepStage.REM -> base.copy(alpha = 0.7f)
-    SleepStage.LIGHT -> base.copy(alpha = 0.42f)
-    SleepStage.SLEEPING, SleepStage.UNKNOWN -> base.copy(alpha = 0.6f)
-    SleepStage.AWAKE -> Resurge.colors.textSubtle
 }
 
 @Composable
@@ -226,7 +218,7 @@ private fun StageLegend(color: Color) {
                             .width(8.dp)
                             .height(8.dp)
                             .clip(Resurge.shape.pill)
-                            .background(stageColor(stage, color)),
+                            .background(sleepStageColor(stage)),
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(label, style = Resurge.type.caption, color = Resurge.colors.textMuted)

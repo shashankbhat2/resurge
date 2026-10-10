@@ -11,6 +11,7 @@ import com.resurgeai.core.model.DailyValue
 import com.resurgeai.core.model.ExerciseSession
 import com.resurgeai.core.model.HealthMetric
 import com.resurgeai.core.model.MetricSeries
+import com.resurgeai.core.model.SleepSegment
 import com.resurgeai.core.model.SleepSession
 import com.resurgeai.core.model.SleepStage
 import org.junit.Rule
@@ -25,7 +26,7 @@ import java.time.ZoneId
 /** Renders detail screens with synthetic data. Record with :feature:dashboard:recordRoborazziDebug. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35], qualifiers = "w400dp-h1500dp-xhdpi")
+@Config(sdk = [35], qualifiers = "w400dp-h1900dp-xhdpi")
 class MetricDetailScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
@@ -45,7 +46,28 @@ class MetricDetailScreenshotTest {
                 SleepStage.AWAKE to Duration.ofMinutes(15),
             ),
             null,
+            timeline = timeline(bed, (hours * 60).toLong()),
         )
+    }
+
+    /** Typical ~90-minute cycles: light → deep → light → REM, with brief awakenings. */
+    private fun timeline(start: java.time.Instant, minutes: Long): List<SleepSegment> {
+        val pattern = listOf(
+            SleepStage.LIGHT to 25L, SleepStage.DEEP to 40L, SleepStage.LIGHT to 15L, SleepStage.REM to 15L,
+            SleepStage.AWAKE to 4L, SleepStage.LIGHT to 30L, SleepStage.DEEP to 25L, SleepStage.REM to 25L,
+            SleepStage.LIGHT to 35L, SleepStage.AWAKE to 3L, SleepStage.REM to 30L, SleepStage.LIGHT to 40L,
+            SleepStage.REM to 35L, SleepStage.AWAKE to 6L, SleepStage.LIGHT to 60L,
+        )
+        val out = mutableListOf<SleepSegment>()
+        var t = start
+        var used = 0L
+        for ((stage, m) in generateSequence { pattern }.flatten()) {
+            if (used >= minutes) break
+            val len = minOf(m, minutes - used)
+            out += SleepSegment(t, t.plus(Duration.ofMinutes(len)), stage)
+            t = t.plus(Duration.ofMinutes(len)); used += len
+        }
+        return out
     }
 
     private fun state(metric: HealthMetric, range: DetailRange, values: (Int) -> Double?): MetricDetailUiState {
@@ -67,6 +89,7 @@ class MetricDetailScreenshotTest {
     }
 
     private fun capture(name: String, state: MetricDetailUiState, scheme: ColorScheme = ColorScheme.Light) {
+        compose.mainClock.autoAdvance = true
         compose.setContent {
             ResurgeTheme(colorScheme = scheme) {
                 Screen { MetricDetailScreen(state, onBack = {}, onRangeChange = {}, onSelect = {}, onOpenSources = {}) }
@@ -76,6 +99,8 @@ class MetricDetailScreenshotTest {
     }
 
     @Test fun sleepWeek() = capture("sleep_week", state(HealthMetric.SLEEP, DetailRange.WEEK) { 6.5 + (it % 4) * 0.5 })
+
+    @Test fun sleepWeekDark() = capture("sleep_week_dark", state(HealthMetric.SLEEP, DetailRange.WEEK) { 6.5 + (it % 4) * 0.5 }, ColorScheme.Dark)
 
     @Test fun sleepMonth() = capture("sleep_month", state(HealthMetric.SLEEP, DetailRange.MONTH) { 6.5 + (it % 4) * 0.5 })
 

@@ -65,7 +65,8 @@ object DayRows {
         val rows = when (metric) {
             HealthMetric.SLEEP -> sleepRows(periods, sleep, zone, weekly)
             HealthMetric.EXERCISE -> exerciseRows(periods, exercise, zone, weekly)
-            HealthMetric.HEART_RATE -> heartRows(periods, heartRanges)
+            // Heart rate rows are just date + number; ranges live in the selection card.
+            HealthMetric.HEART_RATE -> periods.mapIndexed { i, p -> row(i, p, DayViz.Empty, null) }
             HealthMetric.WEIGHT -> weightRows(periods)
             else -> magnitudeRows(metric, periods)
         }
@@ -74,8 +75,6 @@ object DayRows {
                 listOf("6 pm" to 0f, "12 am" to 1f / 3, "6 am" to 2f / 3, "12 pm" to 1f),
                 gridLines = listOf(1f / 3, 2f / 3),
             )
-            HealthMetric.HEART_RATE -> heartAxis(heartRanges.values)
-                ?.let { (lo, hi) -> DayAxis(listOf("$lo bpm" to 0f, "$hi bpm" to 1f)) } ?: DayAxis(emptyList())
             else -> DayAxis(emptyList())
         }
         return axis to rows.sortedByDescending { it.start }
@@ -153,25 +152,6 @@ object DayRows {
         }
     }
 
-    private fun heartRows(periods: List<PeriodValue>, ranges: Map<LocalDate, Pair<Long, Long>>): List<DayRow> {
-        val (lo, hi) = heartAxis(ranges.values) ?: return periods.mapIndexed { i, p -> row(i, p, DayViz.Empty, null) }
-        return periods.mapIndexed { i, p ->
-            val inPeriod = ranges.filterKeys { it in p }.values
-            val range = if (inPeriod.isEmpty()) null else inPeriod.minOf { it.first } to inPeriod.maxOf { it.second }
-            row(
-                i, p,
-                range?.let { (min, max) ->
-                    DayViz.Range(
-                        frac(min.toDouble(), lo.toDouble(), hi.toDouble()),
-                        frac(max.toDouble(), lo.toDouble(), hi.toDouble()),
-                        p.value?.let { frac(it, lo.toDouble(), hi.toDouble()) },
-                    )
-                } ?: DayViz.Empty,
-                range?.let { (min, max) -> "$min–$max bpm" },
-            )
-        }
-    }
-
     /** Month rows: weekly total for additive metrics, otherwise how many days had data. */
     private fun weekDetail(metric: HealthMetric, p: PeriodValue): String? {
         if (p.daysInPeriod == 1) return null
@@ -187,14 +167,6 @@ object DayRows {
 
     private fun clockLabel(minutesFromAxisStart: Double): String =
         LocalTime.of(SLEEP_AXIS_START_HOUR, 0).plusMinutes(minutesFromAxisStart.roundToLong()).format(TIME)
-
-    /** Rounded axis bounds covering every day's min/max, padded to multiples of 10. */
-    private fun heartAxis(ranges: Collection<Pair<Long, Long>>): Pair<Long, Long>? {
-        if (ranges.isEmpty()) return null
-        val lo = ranges.minOf { it.first } / 10 * 10
-        val hi = (ranges.maxOf { it.second } + 9) / 10 * 10
-        return lo to hi.coerceAtLeast(lo + 10)
-    }
 
     private fun frac(v: Double, lo: Double, hi: Double): Float =
         if (hi <= lo) 0.5f else ((v - lo) / (hi - lo)).toFloat().coerceIn(0f, 1f)

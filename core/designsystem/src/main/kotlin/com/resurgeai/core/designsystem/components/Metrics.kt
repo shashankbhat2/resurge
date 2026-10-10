@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -278,5 +279,56 @@ fun SectionHeader(text: String, modifier: Modifier = Modifier, trailing: (@Compo
     ) {
         Text(text.uppercase(), style = Resurge.type.caption, color = Resurge.colors.textSubtle, modifier = Modifier.weight(1f))
         trailing?.invoke()
+    }
+}
+
+/**
+ * Dashboard card built around a radial [visual] (ring, dial or polar bars): icon + title on top,
+ * the visual centred, and a one-line [subtitle] underneath.
+ */
+@Composable
+fun RadialCard(
+    title: String,
+    @DrawableRes icon: Int,
+    tint: Color,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    onClick: (() -> Unit)? = null,
+    visual: @Composable (Modifier) -> Unit,
+) {
+    Card(modifier = modifier, onClick = onClick, contentPadding = PaddingValues(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconBadge(icon, tint = tint, size = 30.dp)
+            Spacer(Modifier.width(8.dp))
+            Text(title, style = Resurge.type.label, color = Resurge.colors.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Spacer(Modifier.height(14.dp))
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            visual(Modifier.fillMaxWidth(0.84f))
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            subtitle ?: " ",
+            style = Resurge.type.caption,
+            color = Resurge.colors.textMuted,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+/** Value + small caption stacked in the middle of a ring. */
+@Composable
+fun RingLabel(value: String?, caption: String?, color: Color = Resurge.colors.text) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            value ?: "—",
+            style = Resurge.type.title.copy(fontFeatureSettings = "tnum"),
+            color = if (value != null) color else Resurge.colors.textSubtle,
+            maxLines = 1,
+        )
+        caption?.let { Text(it, style = Resurge.type.caption, color = Resurge.colors.textMuted, maxLines = 1) }
     }
 }

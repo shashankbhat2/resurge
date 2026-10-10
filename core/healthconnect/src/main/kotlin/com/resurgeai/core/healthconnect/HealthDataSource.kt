@@ -25,6 +25,7 @@ import com.resurgeai.core.model.ExerciseSession
 import com.resurgeai.core.model.HealthMetric
 import com.resurgeai.core.model.HeartRateSummary
 import com.resurgeai.core.model.MetricSeries
+import com.resurgeai.core.model.SleepSegment
 import com.resurgeai.core.model.SleepSession
 import com.resurgeai.core.model.SourceBreakdown
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -280,6 +281,9 @@ class HealthDataSource @Inject constructor(
                     end = record.endTime,
                     stages = HealthMath.stageTotals(record.stages.map { Triple(it.startTime, it.endTime, it.stage) }),
                     source = dataSource(record.metadata),
+                    timeline = record.stages
+                        .sortedBy { it.startTime }
+                        .map { SleepSegment(it.startTime, it.endTime, HealthMath.mapStage(it.stage)) },
                 )
             }
 

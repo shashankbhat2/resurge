@@ -4,19 +4,16 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -31,25 +28,18 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composeunstyled.Text
-import com.resurgeai.core.designsystem.components.Avatar
 import com.resurgeai.core.designsystem.components.Button
 import com.resurgeai.core.designsystem.components.ButtonVariant
 import com.resurgeai.core.designsystem.components.Card
 import com.resurgeai.core.designsystem.components.IconBadge
 import com.resurgeai.core.designsystem.components.LocalFloatingBarInset
-import com.resurgeai.core.designsystem.components.MetricCard
 import com.resurgeai.core.designsystem.components.ResurgeIcons
 import com.resurgeai.core.designsystem.components.Spinner
-import com.resurgeai.core.designsystem.components.WeekDots
 import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.designsystem.theme.ResurgeTheme
 import com.resurgeai.core.healthconnect.HealthConnectAvailability
-import com.resurgeai.core.model.DailyHealth
 import com.resurgeai.core.model.HealthMetric
-import com.resurgeai.core.model.SleepStage
 import com.resurgeai.core.model.SourceKind
-import java.time.Duration
-import java.time.LocalTime
 
 @Composable
 fun TodayRoute(
@@ -89,7 +79,7 @@ fun TodayScreen(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
-        Header(state)
+        TodayHeader(state)
         Spacer(Modifier.height(20.dp))
 
         when (state.availability) {
@@ -125,132 +115,12 @@ fun TodayScreen(
                         Spacer(Modifier.height(12.dp))
                     }
                     val today = state.today
-                    if (today == null) LoadingRow() else MetricGrid(state, today, onOpenMetric)
+                    if (today == null) LoadingRow() else TodayGrid(state, today, onOpenMetric)
                 }
             }
         }
         Spacer(Modifier.height(24.dp + LocalFloatingBarInset.current))
     }
-}
-
-@Composable
-private fun Header(state: DashboardUiState) {
-    val greeting = when (LocalTime.now().hour) {
-        in 5..11 -> "Good morning"
-        in 12..16 -> "Good afternoon"
-        else -> "Good evening"
-    }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text(greeting, style = Resurge.type.body, color = Resurge.colors.textMuted)
-            Text(state.profile?.firstName ?: "Today", style = Resurge.type.display)
-        }
-        if (state.loading) {
-            Spinner(Modifier.size(18.dp), strokeWidth = 2.dp)
-            Spacer(Modifier.width(12.dp))
-        }
-        state.profile?.let { Avatar(it.displayName, it.photoUrl, size = 44.dp) }
-    }
-}
-
-@Composable
-private fun MetricGrid(state: DashboardUiState, day: DailyHealth, onOpen: (HealthMetric) -> Unit) {
-    val cards = buildList {
-        add(HealthMetric.STEPS)
-        add(HealthMetric.SLEEP)
-        add(HealthMetric.CALORIES_BURNED)
-        add(HealthMetric.DISTANCE)
-        add(HealthMetric.EXERCISE)
-        add(HealthMetric.HEART_RATE)
-        if (day.weightKg != null) add(HealthMetric.WEIGHT)
-    }
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        cards.chunked(2).forEach { row ->
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .height(IntrinsicSize.Min),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                row.forEach { metric ->
-                    TodayCard(metric, state, day, { onOpen(metric) }, Modifier.weight(1f).fillMaxHeight())
-                }
-                if (row.size == 1) Spacer(Modifier.weight(1f))
-            }
-        }
-    }
-}
-
-@Composable
-private fun TodayCard(
-    metric: HealthMetric,
-    state: DashboardUiState,
-    day: DailyHealth,
-    onClick: () -> Unit,
-    modifier: Modifier,
-) {
-    val spark = state.sparklines[metric]
-    when (metric) {
-        HealthMetric.STEPS -> MetricCard(
-            title = "Steps", icon = ResurgeIcons.Footprints, tint = Resurge.colors.activity,
-            value = day.steps?.let(Formatters::count),
-            sparkline = spark, onClick = onClick, modifier = modifier,
-        )
-        HealthMetric.SLEEP -> MetricCard(
-            title = "Sleep", icon = ResurgeIcons.Bed, tint = Resurge.colors.sleep,
-            value = day.sleepDuration?.let(Formatters::duration),
-            subtitle = sleepSubtitle(day),
-            sparkline = spark, onClick = onClick, modifier = modifier,
-        )
-        HealthMetric.CALORIES_BURNED -> MetricCard(
-            title = "Calories burned", icon = ResurgeIcons.Flame, tint = Resurge.colors.energy,
-            value = day.caloriesTotal?.let(Formatters::kcal), unit = "kcal",
-            subtitle = day.caloriesActive?.let { "${Formatters.kcal(it)} active" },
-            sparkline = spark, onClick = onClick, modifier = modifier,
-        )
-        HealthMetric.DISTANCE -> MetricCard(
-            title = "Distance", icon = ResurgeIcons.Distance, tint = Resurge.colors.water,
-            value = day.distanceMeters?.let(Formatters::kilometres), unit = "km",
-            sparkline = spark, onClick = onClick, modifier = modifier,
-        )
-        HealthMetric.EXERCISE -> MetricCard(
-            title = "Exercise days", icon = ResurgeIcons.Dumbbell, tint = Resurge.colors.activity,
-            value = "${state.exerciseWeek.count { it }}", unit = "/ 7",
-            subtitle = if (day.exerciseDuration > Duration.ZERO) "${Formatters.duration(day.exerciseDuration)} today" else "This week",
-            footer = { WeekDots(state.exerciseWeek, Resurge.colors.activity, todayIndex = state.todayIndex) },
-            onClick = onClick, modifier = modifier,
-        )
-        HealthMetric.HEART_RATE -> {
-            val hr = day.heartRate
-            MetricCard(
-                title = "Heart rate", icon = ResurgeIcons.Heart, tint = Resurge.colors.heart,
-                value = (hr?.restingBpm ?: hr?.avgBpm)?.toString(), unit = "bpm",
-                subtitle = hr?.let {
-                    listOfNotNull(
-                        if (it.restingBpm != null) "Resting" else "Average",
-                        if (it.minBpm != null && it.maxBpm != null) "${it.minBpm}–${it.maxBpm}" else null,
-                    ).joinToString(" · ")
-                },
-                sparkline = spark, onClick = onClick, modifier = modifier,
-            )
-        }
-        HealthMetric.WEIGHT -> MetricCard(
-            title = "Weight", icon = ResurgeIcons.Scale, tint = Resurge.colors.textMuted,
-            value = day.weightKg?.let { String.format(java.util.Locale.getDefault(), "%.1f", it) }, unit = "kg",
-            subtitle = "Latest", onClick = onClick, modifier = modifier,
-        )
-    }
-}
-
-private fun sleepSubtitle(day: DailyHealth): String? {
-    val stages = day.sleep.flatMap { it.stages.entries }.groupBy({ it.key }, { it.value })
-        .mapValues { (_, d) -> d.fold(Duration.ZERO, Duration::plus) }
-    val deep = stages[SleepStage.DEEP]
-    val rem = stages[SleepStage.REM]
-    return listOfNotNull(
-        deep?.let { "Deep ${Formatters.duration(it)}" },
-        rem?.let { "REM ${Formatters.duration(it)}" },
-    ).joinToString(" · ").ifEmpty { if (day.sleep.isNotEmpty()) "Last night" else null }
 }
 
 @DrawableRes

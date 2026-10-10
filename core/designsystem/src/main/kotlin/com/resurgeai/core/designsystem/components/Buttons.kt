@@ -22,7 +22,7 @@ import com.composeunstyled.Text
 import com.composeunstyled.UnstyledButton
 import com.resurgeai.core.designsystem.theme.Resurge
 
-enum class ButtonVariant { Primary, Secondary, Ghost, Danger }
+enum class ButtonVariant { Primary, Accent, Secondary, Ghost, Danger }
 
 @Composable
 fun Button(
@@ -37,8 +37,10 @@ fun Button(
 ) {
     val shape = Resurge.shape.pill
     val (container, content, border) = when (variant) {
-        ButtonVariant.Primary -> Triple(Resurge.colors.accent, Resurge.colors.onAccent, Color.Transparent)
-        ButtonVariant.Secondary -> Triple(Resurge.colors.surface, Resurge.colors.text, Resurge.colors.border)
+        // Raised pill that follows the theme (white in light, charcoal in dark), like the navbar.
+        ButtonVariant.Primary -> Triple(Resurge.colors.inverse, Resurge.colors.onInverse, Resurge.colors.border)
+        ButtonVariant.Accent -> Triple(Resurge.colors.accent, Resurge.colors.onAccent, Color.Transparent)
+        ButtonVariant.Secondary -> Triple(Resurge.colors.surfaceMuted, Resurge.colors.text, Color.Transparent)
         ButtonVariant.Ghost -> Triple(Color.Transparent, Resurge.colors.text, Color.Transparent)
         ButtonVariant.Danger -> Triple(Resurge.colors.surface, Resurge.colors.danger, Resurge.colors.border)
     }
@@ -81,13 +83,15 @@ fun IconButton(
     modifier: Modifier = Modifier,
     tint: Color = Resurge.colors.text,
     enabled: Boolean = true,
+    background: Color = Resurge.colors.surface,
 ) {
     UnstyledButton(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier
             .size(44.dp)
-            .clip(Resurge.shape.pill),
+            .clip(Resurge.shape.pill)
+            .background(background),
         indication = LocalIndication.current,
     ) {
         Icon(icon, contentDescription = contentDescription, tint = tint)

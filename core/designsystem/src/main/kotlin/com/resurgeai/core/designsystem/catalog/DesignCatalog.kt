@@ -35,6 +35,12 @@ import com.resurgeai.core.designsystem.components.ChoiceCard
 import com.resurgeai.core.designsystem.components.Divider
 import com.resurgeai.core.designsystem.components.DotOnAxis
 import com.resurgeai.core.designsystem.components.MagnitudeBar
+import com.resurgeai.core.designsystem.components.RadialBars
+import com.resurgeai.core.designsystem.components.RadialCard
+import com.resurgeai.core.designsystem.components.RangeDial
+import com.resurgeai.core.designsystem.components.Ring
+import com.resurgeai.core.designsystem.components.RingLabel
+import com.resurgeai.core.designsystem.components.RingSegment
 import com.resurgeai.core.designsystem.components.RangeBar
 import com.resurgeai.core.designsystem.components.SegmentsBar
 import com.resurgeai.core.designsystem.components.WindowBar
@@ -212,6 +218,20 @@ private fun MetricsSection() {
             }
             Spacer(Modifier.height(12.dp))
             ShareBar(0.72f, Resurge.colors.activity)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            RadialCard("Steps", ResurgeIcons.Footprints, Resurge.colors.activity, Modifier.weight(1f), subtitle = "74% of goal") { m ->
+                Ring(listOf(RingSegment(0.74f, Resurge.colors.activity)), m) { RingLabel("7,412", "of 10k") }
+            }
+            RadialCard("Distance", ResurgeIcons.Distance, Resurge.colors.water, Modifier.weight(1f), subtitle = "7-day avg 5.6 km") { m ->
+                RadialBars(listOf(4.1, 6.3, 2.2, 7.8, 5.0, 8.4, 5.4), Resurge.colors.water, m) { RingLabel("5.43", "km") }
+            }
+        }
+        Card(inverse = true) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Inverse hero card", style = Resurge.type.headline, color = Resurge.colors.onInverse, modifier = Modifier.weight(1f))
+                RangeDial(0.07f, 0.77f, 0.11f, Resurge.colors.heart, Modifier.width(96.dp), trackColor = Resurge.colors.onInverse.copy(alpha = 0.08f), markerColor = Resurge.colors.onInverse, markerRing = Resurge.colors.inverse)
+            }
         }
         Card {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {

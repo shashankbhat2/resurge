@@ -39,13 +39,26 @@ enum class HealthMetric(val label: String) {
 
 enum class SleepStage { AWAKE, LIGHT, DEEP, REM, SLEEPING, UNKNOWN }
 
+/** One stage interval within a night, in time order. */
+data class SleepSegment(val start: Instant, val end: Instant, val stage: SleepStage)
+
 data class SleepSession(
     val start: Instant,
     val end: Instant,
     val stages: Map<SleepStage, Duration>,
     val source: DataSource?,
+    /** Stage-by-stage timeline; empty when the source only records total duration. */
+    val timeline: List<SleepSegment> = emptyList(),
 ) {
     val duration: Duration get() = Duration.between(start, end)
+
+    /** Time actually asleep (excludes awake stages when they're known). */
+    val asleep: Duration get() = duration - (stages[SleepStage.AWAKE] ?: Duration.ZERO)
+
+    /** Sleep efficiency (asleep / in bed), or null without stage data. */
+    val quality: Float?
+        get() = if (stages.isEmpty() || duration.isZero) null
+        else (asleep.toMinutes().toFloat() / duration.toMinutes()).coerceIn(0f, 1f)
 }
 
 data class ExerciseSession(

@@ -136,7 +136,7 @@ class DashboardViewModel @Inject constructor(
         const val MIN_REFRESH_INTERVAL_MS = 30_000L
         val SPARKLINE_METRICS = listOf(
             HealthMetric.STEPS, HealthMetric.DISTANCE, HealthMetric.CALORIES_BURNED,
-            HealthMetric.SLEEP, HealthMetric.HEART_RATE,
+            HealthMetric.SLEEP, HealthMetric.WEIGHT,
         )
     }
 }

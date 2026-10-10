@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -101,12 +100,16 @@ fun MetricDetailScreen(
                 else -> {
                     SummaryCard(state)
                     Spacer(Modifier.height(12.dp))
+                    SelectionCard(state, zone, Modifier.padding(horizontal = 16.dp))
+                    Spacer(Modifier.height(12.dp))
                     PeriodList(state, color, zone, onSelect)
                 }
             }
 
             Column(Modifier.padding(horizontal = 16.dp)) {
-                val nights = selected?.let { p -> state.sleepSessions.filter { it.end.atZone(zone).toLocalDate() in p } }.orEmpty()
+                // Day selections are fully covered by the selection card; weeks list their sessions here.
+                val showSessions = state.range == DetailRange.MONTH
+                val nights = if (!showSessions) emptyList() else selected?.let { p -> state.sleepSessions.filter { it.end.atZone(zone).toLocalDate() in p } }.orEmpty()
                 if (nights.isNotEmpty()) {
                     SectionHeader("Nights · ${periodTitle(selected!!, state.range)}")
                     Card(Modifier.fillMaxWidth(), contentPadding = PaddingValues(0.dp)) {
@@ -122,7 +125,7 @@ fun MetricDetailScreen(
                     }
                 }
 
-                val workouts = selected?.let { p -> state.exerciseSessions.filter { it.start.atZone(zone).toLocalDate() in p } }.orEmpty()
+                val workouts = if (!showSessions) emptyList() else selected?.let { p -> state.exerciseSessions.filter { it.start.atZone(zone).toLocalDate() in p } }.orEmpty()
                 if (workouts.isNotEmpty()) {
                     SectionHeader("Workouts · ${periodTitle(selected!!, state.range)}")
                     Card(Modifier.fillMaxWidth(), contentPadding = PaddingValues(0.dp)) {

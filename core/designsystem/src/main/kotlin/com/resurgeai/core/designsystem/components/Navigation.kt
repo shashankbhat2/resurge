@@ -75,7 +75,7 @@ fun <T> FloatingNavBar(
             .height(BarHeight)
             .clip(Resurge.shape.pill)
             .background(Resurge.colors.navBar)
-            .border(1.dp, Resurge.colors.border.copy(alpha = 0.4f), Resurge.shape.pill)
+            .border(1.dp, Resurge.colors.border, Resurge.shape.pill)
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -85,8 +85,8 @@ fun <T> FloatingNavBar(
             NavCircle(
                 icon = if (isSelected) item.selectedIcon else item.icon,
                 label = item.label,
-                background = if (isSelected) Resurge.colors.navActive else Color.Transparent,
-                tint = if (isSelected) Resurge.colors.navOnActive else Resurge.colors.navInactive,
+                background = if (isSelected) Resurge.colors.strong else Color.Transparent,
+                tint = if (isSelected) Resurge.colors.onStrong else Resurge.colors.navInactive,
                 role = Role.Tab,
                 selected = isSelected,
                 onClick = { onSelect(item.key) },
