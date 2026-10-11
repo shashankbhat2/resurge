@@ -24,3 +24,8 @@ functions/lib/
 .env.*
 
 /assets/
+# Release signing (back these up somewhere safe)
+keystore/
+keystore.properties
+*.jks
+/dist/

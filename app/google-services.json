@@ -88,6 +88,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "611722796398-5jl8k5iqd5btqbo2vchfrqqarjdndajq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.resurgeai.app",
+            "certificate_hash": "bb5c105b9d5eba89da88d9011e2009b9c1c0cef8"
+          }
+        },
+        {
           "client_id": "611722796398-5rnu8ft0hf65mfs827b2jtdvlfg4lhn7.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
@@ -100,6 +108,43 @@
           "client_type": 1,
           "android_info": {
             "package_name": "com.resurgeai.app",
+            "certificate_hash": "56b440558b1b254eb9637e94be3d1bd11121b7c0"
+          }
+        },
+        {
+          "client_id": "611722796398-a7c7b0ho0jufliaiclhucq149jrfeti3.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCG2UMo9v09I8JGG3I0nIHu9EQWhr_Utp0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "611722796398-a7c7b0ho0jufliaiclhucq149jrfeti3.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:611722796398:android:8e991583511b8e82e8357f",
+        "android_client_info": {
+          "package_name": "com.resurgeai.app.debug"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "611722796398-ujic3u2pagmqvb2jhm2oqmo92a3j2gr3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.resurgeai.app.debug",
             "certificate_hash": "56b440558b1b254eb9637e94be3d1bd11121b7c0"
           }
         },
