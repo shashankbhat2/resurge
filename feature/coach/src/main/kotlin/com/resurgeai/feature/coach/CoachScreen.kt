@@ -291,32 +291,19 @@ private fun EmptyChat(style: CoachStyle, onSuggestion: (String) -> Unit) {
     Column(
         Modifier
             .fillMaxSize()
-            .padding(start = 24.dp, end = 24.dp, bottom = ComposerSpace),
+            .padding(start = 16.dp, end = 16.dp, bottom = ComposerSpace),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         CoachMascot(commander = style == CoachStyle.COMMANDER, size = 88.dp, heading = true)
         Spacer(Modifier.height(20.dp))
         Text("Ask your coach", style = Resurge.type.brand)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "Questions about your sleep, training, heart or food — answered with your own data.",
-            style = Resurge.type.body,
-            color = Resurge.colors.textMuted,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(24.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Spacer(Modifier.height(28.dp))
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             SUGGESTIONS.forEach { suggestion ->
-                UnstyledButton(
-                    onClick = { onSuggestion(suggestion) },
-                    modifier = Modifier
-                        .clip(Resurge.shape.pill)
-                        .background(Resurge.colors.surface)
-                        .border(1.dp, Resurge.colors.border, Resurge.shape.pill),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
-                    indication = LocalIndication.current,
-                ) { Text(suggestion, style = Resurge.type.label) }
+                Card(Modifier.fillMaxWidth(), onClick = { onSuggestion(suggestion) }, contentPadding = PaddingValues(horizontal = 20.dp, vertical = 18.dp)) {
+                    Text(suggestion, style = Resurge.type.body)
+                }
             }
         }
     }

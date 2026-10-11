@@ -1,5 +1,6 @@
 package com.resurgeai.feature.coach
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.resurgeai.core.data.coach.CoachRepository
@@ -61,12 +62,16 @@ data class CoachUiState(
 class CoachViewModel @Inject constructor(
     private val repository: CoachRepository,
     sessionRepository: SessionRepository,
+    private val savedState: SavedStateHandle,
 ) : ViewModel() {
     private val _state = MutableStateFlow(CoachUiState())
     val state: StateFlow<CoachUiState> = _state.asStateFlow()
 
     private val threadId = MutableStateFlow<String?>(null)
     private var sendJob: Job? = null
+
+    /** Message typed in the tabs' ask bar; sent once the latest conversation has loaded. */
+    private var prompt: String? = savedState.get<String>(PROMPT_KEY)?.takeIf { it.isNotBlank() }
 
     init {
         viewModelScope.launch {
@@ -83,15 +88,28 @@ class CoachViewModel @Inject constructor(
                     }
                     s.copy(threads = list)
                 }
+                // No conversations yet: the ask-bar message starts the first one.
+                if (list.isEmpty()) sendPrompt()
             }
         }
         viewModelScope.launch {
             threadId
                 .flatMapLatest { id -> if (id == null) flowOf(emptyList()) else repository.turns(id) }
                 .catch { emit(emptyList()) }
-                .collect { turns -> _state.update { it.copy(turns = turns).settled() } }
+                .collect { turns ->
+                    _state.update { it.copy(turns = turns).settled() }
+                    // Continue the opened conversation with the ask-bar message.
+                    if (threadId.value != null) sendPrompt()
+                }
         }
         viewModelScope.launch { threadId.collect { id -> _state.update { it.copy(threadId = id) } } }
+    }
+
+    private fun sendPrompt() {
+        val text = prompt ?: return
+        prompt = null
+        savedState[PROMPT_KEY] = null
+        send(text)
     }
 
     fun selectModel(model: CoachModel) = _state.update { it.copy(model = model) }
@@ -125,7 +143,7 @@ class CoachViewModel @Inject constructor(
             )
         }
         sendJob = viewModelScope.launch {
-            repository.send(current.threadId, trimmed, current.model).collect { event ->
+            repository.send(threadId.value, trimmed, current.model).collect { event ->
                 when (event) {
                     is ChatEvent.Thread -> if (threadId.value != event.threadId) threadId.value = event.threadId
                     is ChatEvent.Delta -> _state.update { s ->
@@ -145,5 +163,10 @@ class CoachViewModel @Inject constructor(
         val saved = turns.drop(p.baseline)
         val complete = p.done && saved.any { it.role == TurnRole.USER } && saved.any { it.role == TurnRole.COACH }
         return if (complete) copy(pending = null) else this
+    }
+
+    companion object {
+        /** Name of the optional `prompt` argument on the coach route. */
+        const val PROMPT_KEY = "prompt"
     }
 }

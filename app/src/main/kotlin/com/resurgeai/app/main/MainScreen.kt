@@ -19,7 +19,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.UnstyledButton
 import com.resurgeai.core.designsystem.components.Avatar
-import com.resurgeai.core.designsystem.components.CoachMascot
+import com.resurgeai.core.designsystem.components.AskBar
+import com.resurgeai.core.designsystem.components.AskBarHeight
 import com.resurgeai.core.model.CoachStyle
 import androidx.compose.foundation.layout.size
 import com.resurgeai.core.designsystem.components.LocalHeaderInset
@@ -31,7 +32,11 @@ import com.composeunstyled.Text
 import java.time.LocalTime
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.fillMaxSize
@@ -87,8 +92,8 @@ import kotlinx.serialization.Serializable
 /** Add a habit (id = null) or edit one. */
 @Serializable data class HabitEditorRoute(val id: String? = null)
 
-/** Full-screen coach chat. */
-@Serializable data object CoachScreenRoute
+/** Full-screen coach chat; [prompt] (from the tabs' ask bar) is sent into the latest conversation. */
+@Serializable data class CoachScreenRoute(val prompt: String? = null)
 
 /** Standalone list of past insights. */
 @Serializable data object InsightsScreenRoute
@@ -153,7 +158,8 @@ fun MainScreen(profile: UserProfile, openInsightsSignal: Int = 0, openHabitsSign
                 onOpenCatalog = if (BuildConfig.DEBUG) {
                     { rootNav.navigate(CatalogRoute) }
                 } else null,
-                onOpenCoach = { rootNav.navigate(CoachScreenRoute) },
+                onOpenCoach = { rootNav.navigate(CoachScreenRoute()) },
+                onAsk = { text -> rootNav.navigate(CoachScreenRoute(prompt = text)) },
                 onOpenInsights = { rootNav.navigate(InsightsScreenRoute) },
                 onOpenHabit = { id -> rootNav.navigate(HabitDetailRoute(id)) },
                 onAddHabit = { rootNav.navigate(HabitEditorRoute()) },
@@ -214,12 +220,14 @@ private fun FullScreen(content: @Composable () -> Unit) {
     ) { content() }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TabsShell(
     profile: UserProfile,
     onOpenMetric: (HealthMetric) -> Unit,
     onOpenCatalog: (() -> Unit)?,
     onOpenCoach: () -> Unit,
+    onAsk: (String) -> Unit,
     onOpenInsights: () -> Unit,
     onOpenHabit: (String) -> Unit,
     onAddHabit: () -> Unit,
@@ -241,8 +249,8 @@ private fun TabsShell(
         backStackEntry?.destination?.hierarchy?.any { it.hasRoute(tab.route::class) } == true
     } ?: Tab.Today
 
-    // Header and navbar float over the content; scrolling screens pad with these insets.
-    val bottomInset = FloatingNavBarHeight + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    // Header, ask bar and navbar float over the content; scrolling screens pad with these insets.
+    val bottomInset = AskBarHeight + AskBarGap + FloatingNavBarHeight + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val topInset = MainHeaderHeight + WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     Box(Modifier.fillMaxSize()) {
         val glow = when (currentTab) {
@@ -294,26 +302,32 @@ private fun TabsShell(
                 }
             },
         )
-        FloatingNavBar(
-            items = Tab.entries.map { NavItem(it, it.label, it.icon, it.selectedIcon) },
-            selected = currentTab,
-            onSelect = { tab -> tabsNav.switchTab(tab.route) },
-            // Coach sits in the middle of the bar, shown as the selected persona's mascot.
-            center = {
-                UnstyledButton(
-                    onClick = onOpenCoach,
-                    role = Role.Button,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(Resurge.shape.pill)
-                        .semantics { contentDescription = "Coach" },
-                    indication = LocalIndication.current,
-                ) { CoachMascot(commander = profile.coachStyle == CoachStyle.COMMANDER, size = 30.dp) }
-            },
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
+        // Ask bar above the navbar on every tab; while typing, the navbar steps aside so the bar
+        // rests on the keyboard.
+        val typing = WindowInsets.isImeVisible
+        Column(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .imePadding(),
+        ) {
+            AskBar(
+                commander = profile.coachStyle == CoachStyle.COMMANDER,
+                onSubmit = onAsk,
+                onOpenCoach = onOpenCoach,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = if (typing) 12.dp else AskBarGap),
+            )
+            if (!typing) {
+                FloatingNavBar(
+                    items = Tab.entries.map { NavItem(it, it.label, it.icon, it.selectedIcon) },
+                    selected = currentTab,
+                    onSelect = { tab -> tabsNav.switchTab(tab.route) },
+                )
+            }
+        }
     }
 }
+
+private val AskBarGap = 8.dp
 
 private fun greeting(profile: UserProfile, now: LocalTime = LocalTime.now()): String {
     val part = when (now.hour) {

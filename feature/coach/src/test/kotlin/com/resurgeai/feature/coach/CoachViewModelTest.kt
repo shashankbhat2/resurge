@@ -1,5 +1,6 @@
 package com.resurgeai.feature.coach
 
+import androidx.lifecycle.SavedStateHandle
 import com.resurgeai.core.data.coach.CoachRepository
 import com.resurgeai.core.data.session.SessionRepository
 import com.resurgeai.core.model.SessionState
@@ -45,7 +46,8 @@ class CoachViewModelTest {
 
     private val session = mockk<SessionRepository> { every { session } returns flowOf(SessionState.Loading) }
 
-    private fun vm() = CoachViewModel(repo, session)
+    private fun vm(prompt: String? = null) =
+        CoachViewModel(repo, session, SavedStateHandle(mapOf(CoachViewModel.PROMPT_KEY to prompt)))
 
     @Test
     fun `sending streams text, then hands over to the saved turns`() = runTest {
@@ -91,5 +93,20 @@ class CoachViewModelTest {
     fun `opens the most recent thread on load`() {
         every { repo.threads(any()) } returns flowOf(listOf(CoachThread("recent", "Sleep", null, null)))
         assertEquals("recent", vm().state.value.threadId)
+    }
+
+    @Test
+    fun `ask bar prompt continues the most recent thread once it has loaded`() {
+        every { repo.threads(any()) } returns flowOf(listOf(CoachThread("recent", "Sleep", null, null)))
+        turns.value = listOf(CoachTurn("0", TurnRole.USER, "Hi", null, false), CoachTurn("1", TurnRole.COACH, "Hey", CoachModel.FAST, false))
+        val vm = vm(prompt = "How was my sleep?")
+        verify(exactly = 1) { repo.send("recent", "How was my sleep?", CoachModel.FAST) }
+        assertEquals(2, vm.state.value.pending?.baseline)
+    }
+
+    @Test
+    fun `ask bar prompt starts a conversation when there are none`() {
+        vm(prompt = "Hello")
+        verify(exactly = 1) { repo.send(null, "Hello", CoachModel.FAST) }
     }
 }
