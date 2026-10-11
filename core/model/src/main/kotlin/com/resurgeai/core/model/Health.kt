@@ -70,6 +70,8 @@ data class ExerciseSession(
     val start: Instant,
     val end: Instant,
     val source: DataSource?,
+    /** Health Connect exercise-type key, e.g. "running" (see ActivityCatalog.forHealthConnect). */
+    val typeKey: String = "",
 ) {
     val duration: Duration get() = Duration.between(start, end)
 }

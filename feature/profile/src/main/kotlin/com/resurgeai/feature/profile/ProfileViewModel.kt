@@ -9,7 +9,9 @@ import com.resurgeai.core.healthconnect.HealthConnectManager
 import com.resurgeai.core.data.user.UserRepository
 import com.resurgeai.core.model.HabitSettings
 import com.resurgeai.core.model.CoachStyle
+import com.resurgeai.core.model.MealReminders
 import com.resurgeai.core.model.Targets
+import com.resurgeai.core.model.UnitSystem
 import com.resurgeai.core.model.SessionState
 import com.resurgeai.core.model.ThemePreference
 import com.resurgeai.core.model.TimeFormat
@@ -64,6 +66,17 @@ class ProfileViewModel @Inject constructor(
     fun setCoachStyle(style: CoachStyle) {
         val uid = state.value.profile?.uid ?: return
         viewModelScope.launch { runCatching { userRepository.updateCoachStyle(uid, style) } }
+    }
+
+    fun setUnits(units: UnitSystem) {
+        val uid = state.value.profile?.uid ?: return
+        viewModelScope.launch { runCatching { userRepository.updateUnits(uid, units) } }
+    }
+
+    /** Saves meal reminder times; the app reschedules the local alarms when they change. */
+    fun setMealReminders(reminders: MealReminders) {
+        val uid = state.value.profile?.uid ?: return
+        viewModelScope.launch { runCatching { userRepository.updateMealReminders(uid, reminders) } }
     }
 
     fun setTargets(targets: Targets) {

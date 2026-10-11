@@ -63,6 +63,8 @@ dependencies {
     implementation(project(":feature:auth"))
     implementation(project(":feature:coach"))
     implementation(project(":feature:habits"))
+    implementation(project(":feature:fitness"))
+    implementation(project(":feature:food"))
     implementation(project(":feature:dashboard"))
     implementation(project(":feature:profile"))
 

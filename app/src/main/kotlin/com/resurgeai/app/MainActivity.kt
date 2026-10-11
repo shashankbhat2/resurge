@@ -29,7 +29,9 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composeunstyled.theme.ColorScheme
 import com.resurgeai.app.main.MainScreen
+import com.resurgeai.app.main.FoodSignal
 import com.resurgeai.app.notifications.HabitReminder
+import com.resurgeai.app.notifications.MealReminder
 import com.resurgeai.app.notifications.ResurgeMessagingService
 import com.resurgeai.core.designsystem.components.Screen
 import com.resurgeai.core.designsystem.theme.LocalUse24HourClock
@@ -80,12 +82,14 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(LocalUse24HourClock provides use24Hour) {
                     val openInsights by viewModel.openInsights.collectAsStateWithLifecycle()
                     val openHabits by viewModel.openHabits.collectAsStateWithLifecycle()
+                    val openFood by viewModel.openFood.collectAsStateWithLifecycle()
                     val askNotifications by viewModel.askNotifications.collectAsStateWithLifecycle()
                     Screen {
                         AppRoot(
                             session = session,
                             openInsightsSignal = openInsights,
                             openHabitsSignal = openHabits,
+                            openFoodSignal = openFood,
                             askNotifications = askNotifications,
                             onNotificationPromptShown = viewModel::onNotificationPromptShown,
                         )
@@ -105,6 +109,9 @@ class MainActivity : ComponentActivity() {
         when (intent?.getStringExtra(ResurgeMessagingService.EXTRA_OPEN)) {
             ResurgeMessagingService.OPEN_INSIGHTS -> viewModel.requestOpenInsights()
             HabitReminder.OPEN_HABITS -> viewModel.requestOpenHabits()
+            MealReminder.OPEN_SCAN -> viewModel.requestOpenFood("scan")
+            MealReminder.OPEN_TYPE -> viewModel.requestOpenFood("type")
+            MealReminder.OPEN_FOOD -> viewModel.requestOpenFood(null)
             else -> return
         }
         intent.removeExtra(ResurgeMessagingService.EXTRA_OPEN)
@@ -131,6 +138,7 @@ private fun AppRoot(
     session: SessionState,
     openInsightsSignal: Int,
     openHabitsSignal: Int,
+    openFoodSignal: FoodSignal,
     askNotifications: Boolean,
     onNotificationPromptShown: () -> Unit,
 ) {
@@ -147,7 +155,12 @@ private fun AppRoot(
             is SessionState.NeedsOnboarding -> OnboardingRoute(profile = state.profile)
             is SessionState.Ready -> {
                 NotificationPermissionPrompt(askNotifications, onNotificationPromptShown)
-                MainScreen(profile = state.profile, openInsightsSignal = openInsightsSignal, openHabitsSignal = openHabitsSignal)
+                MainScreen(
+                    profile = state.profile,
+                    openInsightsSignal = openInsightsSignal,
+                    openHabitsSignal = openHabitsSignal,
+                    openFoodSignal = openFoodSignal,
+                )
             }
         }
     }

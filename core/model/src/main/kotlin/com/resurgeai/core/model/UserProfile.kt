@@ -10,6 +10,8 @@ data class UserProfile(
     val onboardingComplete: Boolean,
     val habitSettings: HabitSettings = HabitSettings(),
     val coachStyle: CoachStyle = CoachStyle.FRIEND,
+    val units: UnitSystem = UnitSystem.METRIC,
+    val mealReminders: MealReminders = MealReminders(),
 ) {
     val firstName: String?
         get() = displayName?.substringBefore(' ')?.takeIf { it.isNotBlank() }

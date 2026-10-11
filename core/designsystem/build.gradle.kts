@@ -24,6 +24,7 @@ dependencies {
     api(libs.compose.unstyled.primitives)
     api(libs.compose.unstyled.theming)
     api(libs.compose.unstyled.colored.indication)
+    implementation(project(":core:model"))
     implementation(libs.tabler.icons.outline)
     implementation(libs.tabler.icons.filled)
     implementation(libs.coil.compose)

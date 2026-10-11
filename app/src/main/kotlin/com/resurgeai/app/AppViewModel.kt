@@ -17,7 +17,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.map
 import android.content.Context
+import com.resurgeai.app.main.FoodSignal
 import com.resurgeai.app.notifications.HabitReminder
+import com.resurgeai.app.notifications.MealReminder
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -50,6 +52,12 @@ class AppViewModel @Inject constructor(
 
     fun requestOpenHabits() = _openHabits.update { it + 1 }
 
+    /** Meal reminder taps: mode "scan" / "type" opens the log screen, null opens the Food tab. */
+    private val _openFood = MutableStateFlow(FoodSignal())
+    val openFood: StateFlow<FoodSignal> = _openFood.asStateFlow()
+
+    fun requestOpenFood(mode: String?) = _openFood.update { FoodSignal(it.count + 1, mode) }
+
     /** True until we've asked for the notification permission once. */
     private val _askNotifications = MutableStateFlow(false)
     val askNotifications: StateFlow<Boolean> = _askNotifications.asStateFlow()
@@ -65,6 +73,17 @@ class AppViewModel @Inject constructor(
                 .collect { settings ->
                     preferencesRepository.saveHabitSettingsMirror(settings)
                     HabitReminder.schedule(appContext, settings)
+                }
+        }
+        // And the meal reminders with the user's meal reminder times.
+        viewModelScope.launch {
+            sessionRepository.session
+                .filterIsInstance<SessionState.Ready>()
+                .map { it.profile.mealReminders }
+                .distinctUntilChanged()
+                .collect { reminders ->
+                    preferencesRepository.saveMealRemindersMirror(reminders)
+                    MealReminder.scheduleAll(appContext, reminders)
                 }
         }
     }

@@ -75,6 +75,16 @@ import com.resurgeai.feature.habits.HabitDetailRoute as HabitDetailScreen
 import com.resurgeai.feature.habits.HabitEditorRoute as HabitEditorScreen
 import com.resurgeai.feature.habits.HabitsRoute as HabitsScreenRoute
 import com.resurgeai.feature.profile.SettingsSheet
+import com.resurgeai.core.designsystem.components.IconButton
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.resurgeai.feature.fitness.ActivityPickerRoute as ActivityPickerScreen
+import com.resurgeai.feature.fitness.FitnessRoute as FitnessScreenRoute
+import com.resurgeai.feature.fitness.WorkoutEditorRoute as WorkoutEditorScreen
+import com.resurgeai.feature.food.FoodLogRoute as FoodLogScreen
+import com.resurgeai.feature.food.FoodRoute as FoodScreenRoute
+import com.resurgeai.feature.food.MealReviewRoute as MealReviewScreen
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -94,6 +104,18 @@ import kotlinx.serialization.Serializable
 
 /** Full-screen coach chat; [prompt] (from the tabs' ask bar) is sent into the latest conversation. */
 @Serializable data class CoachScreenRoute(val prompt: String? = null)
+
+/** Activity catalog search; [forResult] returns the pick to the workout editor instead of opening it. */
+@Serializable data class ActivityPickerRoute(val forResult: Boolean = false)
+
+/** Log a workout ([activityId]) or edit one ([workoutId]). */
+@Serializable data class WorkoutEditorRoute(val workoutId: String? = null, val activityId: String? = null)
+
+/** Scan / photo / type / log again. [mode] "scan" opens the camera, "type" focuses the text field. */
+@Serializable data class FoodLogRoute(val mode: String? = null)
+
+/** Review a fresh estimate (mealId null) or edit a logged meal. */
+@Serializable data class MealReviewRoute(val mealId: String? = null)
 
 /** Standalone list of past insights. */
 @Serializable data object InsightsScreenRoute
@@ -136,11 +158,19 @@ private val popExit: AnimatedContentTransitionScope<NavBackStackEntry>.() -> Exi
 }
 
 @Composable
-fun MainScreen(profile: UserProfile, openInsightsSignal: Int = 0, openHabitsSignal: Int = 0) {
+fun MainScreen(profile: UserProfile, openInsightsSignal: Int = 0, openHabitsSignal: Int = 0, openFoodSignal: FoodSignal = FoodSignal()) {
     val rootNav = rememberNavController()
     // A tapped insight notification opens Coach on the Insights tab.
     LaunchedEffect(openInsightsSignal) {
         if (openInsightsSignal > 0) rootNav.navigate(InsightsScreenRoute) { launchSingleTop = true }
+    }
+    // Meal reminder actions: Scan / Type open the log screen in that mode.
+    LaunchedEffect(openFoodSignal.count) {
+        val mode = openFoodSignal.mode
+        if (openFoodSignal.count > 0 && mode != null) {
+            rootNav.popBackStack(TabsRoute, inclusive = false)
+            rootNav.navigate(FoodLogRoute(mode))
+        }
     }
     NavHost(
         navController = rootNav,
@@ -163,6 +193,11 @@ fun MainScreen(profile: UserProfile, openInsightsSignal: Int = 0, openHabitsSign
                 onOpenInsights = { rootNav.navigate(InsightsScreenRoute) },
                 onOpenHabit = { id -> rootNav.navigate(HabitDetailRoute(id)) },
                 onAddHabit = { rootNav.navigate(HabitEditorRoute()) },
+                onLogWorkout = { rootNav.navigate(ActivityPickerRoute()) },
+                onOpenWorkout = { id -> rootNav.navigate(WorkoutEditorRoute(workoutId = id)) },
+                onLogMeal = { rootNav.navigate(FoodLogRoute()) },
+                onOpenMeal = { id -> rootNav.navigate(MealReviewRoute(mealId = id)) },
+                openFoodTabSignal = if (openFoodSignal.mode == null) openFoodSignal.count else 0,
                 openHabitsSignal = openHabitsSignal,
                 onReturnToTabs = { rootNav.popBackStack(TabsRoute, inclusive = false) },
             )
@@ -182,6 +217,49 @@ fun MainScreen(profile: UserProfile, openInsightsSignal: Int = 0, openHabitsSign
         }
         composable<CoachScreenRoute> {
             FullScreen { CoachScreen(onBack = { rootNav.popBackStack() }) }
+        }
+        composable<ActivityPickerRoute> { entry ->
+            val forResult = entry.toRoute<ActivityPickerRoute>().forResult
+            FullScreen {
+                ActivityPickerScreen(
+                    onPick = { id ->
+                        if (forResult) {
+                            rootNav.previousBackStackEntry?.savedStateHandle?.set(PICKED_ACTIVITY, id)
+                            rootNav.popBackStack()
+                        } else {
+                            rootNav.navigate(WorkoutEditorRoute(activityId = id)) {
+                                popUpTo<ActivityPickerRoute> { inclusive = true }
+                            }
+                        }
+                    },
+                    onBack = { rootNav.popBackStack() },
+                )
+            }
+        }
+        composable<WorkoutEditorRoute> { entry ->
+            val picked by entry.savedStateHandle.getStateFlow<String?>(PICKED_ACTIVITY, null).collectAsStateWithLifecycle()
+            FullScreen {
+                WorkoutEditorScreen(
+                    onDone = { rootNav.popBackStack() },
+                    onChangeActivity = { rootNav.navigate(ActivityPickerRoute(forResult = true)) },
+                    pickedActivity = picked,
+                    onPickedActivityConsumed = { entry.savedStateHandle[PICKED_ACTIVITY] = null },
+                )
+            }
+        }
+        composable<FoodLogRoute> { entry ->
+            FullScreen {
+                FoodLogScreen(
+                    mode = entry.toRoute<FoodLogRoute>().mode,
+                    onReview = {
+                        rootNav.navigate(MealReviewRoute()) { popUpTo<FoodLogRoute> { inclusive = true } }
+                    },
+                    onBack = { rootNav.popBackStack() },
+                )
+            }
+        }
+        composable<MealReviewRoute> {
+            FullScreen { MealReviewScreen(onDone = { rootNav.popBackStack() }) }
         }
         composable<InsightsScreenRoute> {
             FullScreen { InsightsScreen(onBack = { rootNav.popBackStack() }) }
@@ -231,6 +309,11 @@ private fun TabsShell(
     onOpenInsights: () -> Unit,
     onOpenHabit: (String) -> Unit,
     onAddHabit: () -> Unit,
+    onLogWorkout: () -> Unit,
+    onOpenWorkout: (String) -> Unit,
+    onLogMeal: () -> Unit,
+    onOpenMeal: (String) -> Unit,
+    openFoodTabSignal: Int,
     openHabitsSignal: Int,
     onReturnToTabs: () -> Unit,
 ) {
@@ -242,6 +325,13 @@ private fun TabsShell(
         if (openHabitsSignal > 0) {
             onReturnToTabs()
             tabsNav.switchTab(HabitsRoute)
+        }
+    }
+    // The meal reminder's main tap opens the Food tab.
+    LaunchedEffect(openFoodTabSignal) {
+        if (openFoodTabSignal > 0) {
+            onReturnToTabs()
+            tabsNav.switchTab(FoodRoute)
         }
     }
     val backStackEntry by tabsNav.currentBackStackEntryAsState()
@@ -272,12 +362,8 @@ private fun TabsShell(
                 composable<TodayRoute> {
                     TodayScreenRoute(onOpenMetric = onOpenMetric, onOpenInsights = onOpenInsights)
                 }
-                composable<FitnessRoute> {
-                    ComingSoon("Workouts, training load and activity trends from your wearable.", "a later phase")
-                }
-                composable<FoodRoute> {
-                    ComingSoon("Scan meals, track calories and log water.", "Phase 3")
-                }
+                composable<FitnessRoute> { FitnessScreenRoute(onOpenWorkout = onOpenWorkout, onLogWorkout = onLogWorkout) }
+                composable<FoodRoute> { FoodScreenRoute(onOpenMeal = onOpenMeal, onLogMeal = onLogMeal) }
                 composable<HabitsRoute> { HabitsScreenRoute(onOpenHabit = onOpenHabit, onAddHabit = onAddHabit) }
             }
         }
@@ -290,6 +376,20 @@ private fun TabsShell(
                 { Text(greeting(profile), style = Resurge.type.brand, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             } else null,
             trailing = {
+                // Fitness and Food get a "+" to log, left of the profile photo.
+                val onAdd = when (currentTab) {
+                    Tab.Fitness -> onLogWorkout
+                    Tab.Food -> onLogMeal
+                    else -> null
+                }
+                if (onAdd != null) {
+                    IconButton(
+                        ResurgeIcons.Plus,
+                        contentDescription = if (currentTab == Tab.Fitness) "Log a workout" else "Log a meal",
+                        onClick = onAdd,
+                    )
+                    Spacer(Modifier.width(10.dp))
+                }
                 UnstyledButton(
                     onClick = { showSettings = true },
                     role = Role.Button,
@@ -328,6 +428,11 @@ private fun TabsShell(
 }
 
 private val AskBarGap = 8.dp
+
+private const val PICKED_ACTIVITY = "pickedActivity"
+
+/** Request from a meal reminder: [mode] "scan" / "type" opens the log screen, null opens the Food tab. */
+data class FoodSignal(val count: Int = 0, val mode: String? = null)
 
 private fun greeting(profile: UserProfile, now: LocalTime = LocalTime.now()): String {
     val part = when (now.hour) {

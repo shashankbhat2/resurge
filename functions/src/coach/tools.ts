@@ -1,7 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { formatInsightList, loadEvents, loadRecentInsights, loadSummaries } from "../lib/data";
-import { formatEvents, formatSummaries } from "../lib/format";
+import { formatInsightList, loadEvents, loadMeals, loadRecentInsights, loadSummaries, loadWorkoutLogs } from "../lib/data";
+import { formatEvents, formatMeals, formatSummaries, formatWorkoutLogs } from "../lib/format";
 import { addDays } from "../lib/time";
 
 /*
@@ -54,6 +54,30 @@ export const COACH_TOOLS: Anthropic.Beta.BetaTool[] = [
       properties: { days: { type: "integer", description: "How many days back (1-60)" } },
     },
   },
+  {
+    name: "get_meals",
+    description:
+      "Meals the user logged (scanned or typed) over the last N days (1-60): per-meal calories, protein, carbs, fat and items, with daily totals. Use for nutrition questions.",
+    strict: true,
+    input_schema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["days"],
+      properties: { days: { type: "integer", description: "How many days back (1-60)" } },
+    },
+  },
+  {
+    name: "get_workout_logs",
+    description:
+      "Workouts the user logged by hand or edited in the app over the last N days (1-90), including strength sets, reps and weights, effort (RPE) and notes. Device workouts without edits come from get_activities.",
+    strict: true,
+    input_schema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["days"],
+      properties: { days: { type: "integer", description: "How many days back (1-90)" } },
+    },
+  },
 ];
 
 const SummariesInput = z.object({ from: isoDate, to: isoDate });
@@ -88,6 +112,19 @@ export async function runTool(uid: string, name: string, input: unknown): Promis
       if (!p.success) return error(`Invalid input: ${p.error.message}`);
       const days = Math.min(Math.max(p.data.days, 1), 60);
       return { content: formatInsightList(await loadRecentInsights(uid, Date.now() - days * DAY_MS, 40)), isError: false };
+    }
+    case "get_meals": {
+      const p = InsightsInput.safeParse(input);
+      if (!p.success) return error(`Invalid input: ${p.error.message}`);
+      const days = Math.min(Math.max(p.data.days, 1), 60);
+      const from = new Date(Date.now() - days * DAY_MS).toISOString().slice(0, 10);
+      return { content: formatMeals(await loadMeals(uid, from)), isError: false };
+    }
+    case "get_workout_logs": {
+      const p = InsightsInput.safeParse(input);
+      if (!p.success) return error(`Invalid input: ${p.error.message}`);
+      const days = Math.min(Math.max(p.data.days, 1), 90);
+      return { content: formatWorkoutLogs(await loadWorkoutLogs(uid, Date.now() - days * DAY_MS)), isError: false };
     }
     default:
       return error(`Unknown tool: ${name}`);

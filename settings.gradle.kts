@@ -26,5 +26,7 @@ include(
     ":feature:coach",
     ":feature:dashboard",
     ":feature:habits",
+    ":feature:fitness",
+    ":feature:food",
     ":feature:profile",
 )

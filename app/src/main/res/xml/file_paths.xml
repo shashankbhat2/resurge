@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Meal photos taken with the camera; deleted after analysis. -->
+    <cache-path name="meal_photos" path="meal_photos/" />
+</paths>

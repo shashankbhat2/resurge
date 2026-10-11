@@ -84,4 +84,65 @@ export async function loadHabits(uid: string, from: string): Promise<HabitSummar
   });
 }
 
+export interface MealSummary {
+  date: string;
+  type: string;
+  title: string;
+  kcal: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  items: string[];
+}
+
+/** Logged meals from [from] (yyyy-MM-dd), with totals computed from per-100 g item values. */
+export async function loadMeals(uid: string, from: string, limit = 120): Promise<MealSummary[]> {
+  const snap = await userDoc(uid).collection("meals").where("localDate", ">=", from).limit(limit).get();
+  return snap.docs
+    .map((d) => {
+      const items = (d.get("items") ?? []) as Array<Record<string, unknown>>;
+      const sum = (k: string) =>
+        Math.round(items.reduce((acc, i) => acc + (Number(i[k] ?? 0) * Number(i.grams ?? 0)) / 100, 0));
+      return {
+        date: String(d.get("localDate") ?? ""),
+        type: String(d.get("type") ?? "snack"),
+        title: String(d.get("title") ?? "Meal"),
+        kcal: sum("kcal"),
+        protein: sum("protein"),
+        carbs: sum("carbs"),
+        fat: sum("fat"),
+        items: items.map((i) => `${String(i.name ?? "")} ${Math.round(Number(i.grams ?? 0))}g`),
+      };
+    })
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+}
+
+export interface WorkoutLog {
+  date: string;
+  activity: string;
+  title: string | null;
+  durationMin: number;
+  source: string;
+  deleted: boolean;
+  metrics: Record<string, unknown>;
+  notes: string | null;
+}
+
+/** Workouts logged or edited in the app (Health Connect sessions themselves arrive as events). */
+export async function loadWorkoutLogs(uid: string, sinceMs: number, limit = 60): Promise<WorkoutLog[]> {
+  const snap = await userDoc(uid).collection("workouts").where("startMs", ">=", sinceMs).limit(limit).get();
+  return snap.docs
+    .map((d) => ({
+      date: String(d.get("localDate") ?? ""),
+      activity: String(d.get("activityId") ?? "other"),
+      title: (d.get("title") as string | undefined) ?? null,
+      durationMin: Math.round((Number(d.get("endMs") ?? 0) - Number(d.get("startMs") ?? 0)) / 60000),
+      source: String(d.get("source") ?? "manual"),
+      deleted: d.get("deleted") === true,
+      metrics: (d.get("metrics") ?? {}) as Record<string, unknown>,
+      notes: (d.get("notes") as string | undefined) ?? null,
+    }))
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+}
+
 export { db };

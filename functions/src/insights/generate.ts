@@ -12,7 +12,8 @@ export class InsightGenerationError extends Error {}
 export async function generateStructured<T>(args: {
   model: ModelSpec;
   system: string;
-  context: string;
+  /** User message: plain text, or content blocks (e.g. an image then text). */
+  context: string | Anthropic.Beta.BetaContentBlockParam[];
   jsonSchema: Record<string, unknown>;
   schema: z.ZodType<T>;
   maxTokens?: number;

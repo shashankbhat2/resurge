@@ -164,6 +164,11 @@ class HealthDataSource @Inject constructor(
         if (HealthPermission.getReadPermission(ExerciseSessionRecord::class) in manager.grantedPermissions()) exerciseSessions(from, to)
         else emptyList()
 
+    /** Most recent weight in the last 30 days, for calorie estimates. */
+    suspend fun latestWeight(): Double? =
+        if (HealthPermission.getReadPermission(WeightRecord::class) in manager.grantedPermissions()) latestWeightKg(Instant.now())
+        else null
+
     /** Daily heart-rate min/max (bpm) for the last [days] days, keyed by local date. */
     suspend fun readHeartRateRanges(days: Int, zone: ZoneId = ZoneId.systemDefault()): Map<LocalDate, Pair<Long, Long>> {
         if (HealthPermission.getReadPermission(HeartRateRecord::class) !in manager.grantedPermissions()) return emptyMap()
@@ -328,6 +333,7 @@ class HealthDataSource @Inject constructor(
                 start = record.startTime,
                 end = record.endTime,
                 source = dataSource(record.metadata),
+                typeKey = ExerciseSessionRecord.EXERCISE_TYPE_INT_TO_STRING_MAP[record.exerciseType].orEmpty(),
             )
         }
 

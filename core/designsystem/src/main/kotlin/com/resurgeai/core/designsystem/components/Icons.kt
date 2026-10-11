@@ -72,6 +72,24 @@ object ResurgeIcons {
     // Sources
     @DrawableRes val Watch = Tabler.drawable.tabler_ic_device_watch_outline
     @DrawableRes val Phone = Tabler.drawable.tabler_ic_device_mobile_outline
+
+    // Logging
+    @DrawableRes val Camera = Tabler.drawable.tabler_ic_camera_outline
+    @DrawableRes val Photo = Tabler.drawable.tabler_ic_photo_outline
+    @DrawableRes val Keyboard = Tabler.drawable.tabler_ic_keyboard_outline
+    @DrawableRes val Search = Tabler.drawable.tabler_ic_search_outline
+    @DrawableRes val Clock = Tabler.drawable.tabler_ic_clock_outline
+    @DrawableRes val Stopwatch = Tabler.drawable.tabler_ic_stopwatch_outline
+    @DrawableRes val Repeat = Tabler.drawable.tabler_ic_repeat_outline
+    @DrawableRes val Mountain = Tabler.drawable.tabler_ic_mountain_outline
+    @DrawableRes val Note = Tabler.drawable.tabler_ic_notes_outline
+    @DrawableRes val Bowl = Tabler.drawable.tabler_ic_bowl_outline
+    @DrawableRes val AlertCircle = Tabler.drawable.tabler_ic_alert_circle_outline
+
+    // Macros
+    @DrawableRes val Protein = Tabler.drawable.tabler_ic_meat_outline
+    @DrawableRes val Carbs = Tabler.drawable.tabler_ic_wheat_outline
+    @DrawableRes val Fat = Tabler.drawable.tabler_ic_droplet_outline
 }
 
 @Composable

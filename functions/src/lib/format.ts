@@ -94,3 +94,42 @@ export function formatEvents(events: ActivityEvent[]): string {
   if (events.length === 0) return "None.";
   return [...events].sort((a, b) => a.startMs - b.startMs).map((e) => `- ${formatEvent(e)}`).join("\n");
 }
+
+/** Logged meals grouped by day, with daily totals. */
+export function formatMeals(meals: { date: string; type: string; title: string; kcal: number; protein: number; carbs: number; fat: number; items: string[] }[]): string {
+  if (meals.length === 0) return "No meals logged in this period.";
+  const byDay = new Map<string, typeof meals>();
+  for (const m of meals) byDay.set(m.date, [...(byDay.get(m.date) ?? []), m]);
+  return [...byDay.entries()]
+    .map(([date, list]) => {
+      const t = list.reduce((a, m) => ({ kcal: a.kcal + m.kcal, p: a.p + m.protein, c: a.c + m.carbs, f: a.f + m.fat }), { kcal: 0, p: 0, c: 0, f: 0 });
+      const rows = list.map((m) => `  - ${m.type}: ${m.title} — ${m.kcal} kcal, P${m.protein} C${m.carbs} F${m.fat} (${m.items.join(", ")})`);
+      return `${date}: ${t.kcal} kcal, protein ${t.p} g, carbs ${t.c} g, fat ${t.f} g\n${rows.join("\n")}`;
+    })
+    .join("\n");
+}
+
+/** Workouts logged or edited in the app. */
+export function formatWorkoutLogs(logs: { date: string; activity: string; title: string | null; durationMin: number; source: string; deleted: boolean; metrics: Record<string, unknown>; notes: string | null }[]): string {
+  const visible = logs.filter((l) => !l.deleted);
+  if (visible.length === 0) return "No workouts logged or edited in the app in this period.";
+  return visible
+    .map((l) => {
+      const m = l.metrics;
+      const parts = [`${l.durationMin} min`];
+      if (typeof m.distanceM === "number") parts.push(`${(m.distanceM / 1000).toFixed(2)} km`);
+      if (typeof m.kcal === "number") parts.push(`${m.kcal} kcal`);
+      if (typeof m.avgHr === "number") parts.push(`avg HR ${m.avgHr}`);
+      if (typeof m.rpe === "number") parts.push(`RPE ${m.rpe}`);
+      if (typeof m.reps === "number") parts.push(`${m.reps} reps`);
+      if (typeof m.laps === "number") parts.push(`${m.laps} laps`);
+      const exercises = Array.isArray(m.exercises)
+        ? (m.exercises as Array<{ name?: string; sets?: Array<{ reps?: number; weightKg?: number | null }> }>)
+            .map((e) => `${e.name}: ${(e.sets ?? []).map((s) => (s.weightKg ? `${s.reps}×${s.weightKg}kg` : `${s.reps}`)).join(", ")}`)
+            .join("; ")
+        : "";
+      const origin = l.source === "health_connect" ? "edited device workout" : "logged manually";
+      return `${l.date} ${l.title ?? l.activity} (${origin}): ${parts.join(", ")}${exercises ? ` — ${exercises}` : ""}${l.notes ? ` — note: ${l.notes}` : ""}`;
+    })
+    .join("\n");
+}

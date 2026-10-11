@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.resurgeai.core.model.HabitSettings
+import com.resurgeai.core.model.MealReminders
 import com.resurgeai.core.model.ThemePreference
 import com.resurgeai.core.model.TimeFormat
 import kotlinx.coroutines.flow.Flow
@@ -82,6 +83,24 @@ class PreferencesRepository @Inject constructor(
             reminderEnabled = prefs[HABIT_REMINDER_ON] ?: true,
             reminderTime = prefs[HABIT_REMINDER_TIME]?.let(LocalTime::parse) ?: HabitSettings.DEFAULT_REMINDER,
         )
+    }
+
+    /** Local copy of the meal reminder times ("off" when disabled), for rescheduling after a reboot. */
+    suspend fun saveMealRemindersMirror(reminders: MealReminders) {
+        dataStore.edit { prefs ->
+            MealReminders.DEFAULT_TIMES.keys.forEach { type ->
+                prefs[stringPreferencesKey("meal_reminder_${type.wire}")] = reminders.time(type)?.toString() ?: "off"
+            }
+        }
+    }
+
+    suspend fun mealRemindersMirror(): MealReminders? {
+        val prefs = dataStore.data.first()
+        if (prefs[stringPreferencesKey("meal_reminder_breakfast")] == null) return null
+        return MealReminders.DEFAULT_TIMES.keys.fold(MealReminders()) { acc, type ->
+            val value = prefs[stringPreferencesKey("meal_reminder_${type.wire}")]
+            acc.with(type, if (value == null || value == "off") null else runCatching { LocalTime.parse(value) }.getOrNull())
+        }
     }
 
     /** Whether we've already asked for the notification permission (ask once). */

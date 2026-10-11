@@ -57,7 +57,9 @@ import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.designsystem.theme.clockFormatter
 import com.resurgeai.core.model.CoachStyle
 import com.resurgeai.core.model.HabitSettings
+import com.resurgeai.core.model.MealReminders
 import com.resurgeai.core.model.Targets
+import com.resurgeai.core.model.UnitSystem
 import com.resurgeai.core.model.ThemePreference
 import com.resurgeai.core.model.TimeFormat
 
@@ -67,6 +69,8 @@ private enum class Page(val title: String) {
     TIME_FORMAT("Time format"),
     COACH_STYLE("Coaching style"),
     HABITS("Habits"),
+    MEALS("Meal reminders"),
+    UNITS("Units"),
     TARGETS("Daily targets"),
 }
 
@@ -155,6 +159,12 @@ fun SettingsSheet(
                                 Footnote("Sets how your coach talks in chat, insights and your weekly review.")
                             }
                             Page.HABITS -> state.profile?.habitSettings?.let { HabitsPage(it, viewModel::setHabitSettings) }
+                            Page.MEALS -> state.profile?.mealReminders?.let { MealsPage(it, viewModel::setMealReminders) }
+                            Page.UNITS -> Options(
+                                options = UnitSystem.entries.map { it to it.label },
+                                selected = state.profile?.units ?: UnitSystem.METRIC,
+                                onSelect = viewModel::setUnits,
+                            )
                             Page.TARGETS -> state.profile?.targets?.let { TargetsPage(it, viewModel::setTargets) }
                         }
                     }
@@ -203,6 +213,10 @@ private fun MainMenu(
         MenuRow("Habits", "Resets ${h.resetTime.format(clockFormatter())}") { onOpen(Page.HABITS) }
     }
     profile?.targets?.let { t ->
+        val m = profile.mealReminders
+        val on = MealReminders.DEFAULT_TIMES.keys.count { m.time(it) != null }
+        MenuRow("Meal reminders", if (on == 0) "Off" else "$on a day") { onOpen(Page.MEALS) }
+        MenuRow("Units", if (profile.units == UnitSystem.METRIC) "Metric" else "Imperial") { onOpen(Page.UNITS) }
         MenuRow("Daily targets", "%,d kcal · %,d ml".format(t.calories, t.waterMl)) { onOpen(Page.TARGETS) }
     }
     MenuRow("Health Connect", "Permissions", chevron = false, onClick = onHealthConnect)
@@ -282,6 +296,30 @@ private fun HabitsPage(settings: HabitSettings, onChange: (HabitSettings) -> Uni
         if (settings.reminderEnabled) {
             TimeStepper(settings.reminderTime, { onChange(settings.copy(reminderTime = it)) }, caption = "Reminder time")
         }
+    }
+}
+
+@Composable
+private fun MealsPage(reminders: MealReminders, onChange: (MealReminders) -> Unit) {
+    Column(Modifier.padding(horizontal = 24.dp)) {
+        MealReminders.DEFAULT_TIMES.forEach { (type, default) ->
+            val time = reminders.time(type)
+            Row(Modifier.fillMaxWidth().padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(type.label, style = Resurge.type.body)
+                    Text(if (time != null) "Reminds at ${time.format(clockFormatter())}" else "Off", style = Resurge.type.caption, color = Resurge.colors.textMuted)
+                }
+                Switch(time != null, { on -> onChange(reminders.with(type, if (on) default else null)) }, accessibilityLabel = "${type.label} reminder")
+            }
+            if (time != null) TimeStepper(time, { onChange(reminders.with(type, it)) }, caption = "${type.label} reminder", stepMinutes = 15)
+            Divider(Modifier.padding(top = 8.dp))
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            "Only sent if you haven't logged that meal yet. Tap Scan in the notification to open the camera.",
+            style = Resurge.type.caption,
+            color = Resurge.colors.textSubtle,
+        )
     }
 }
 

@@ -11,7 +11,9 @@ import com.resurgeai.core.model.Goal
 import com.resurgeai.core.model.HabitDraft
 import com.resurgeai.core.model.HabitSettings
 import com.resurgeai.core.model.HabitStreaks
+import com.resurgeai.core.model.MealReminders
 import com.resurgeai.core.model.Targets
+import com.resurgeai.core.model.UnitSystem
 import com.resurgeai.core.model.UserProfile
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -103,6 +105,16 @@ class UserRepository @Inject constructor(
         ).await()
     }
 
+    suspend fun updateUnits(uid: String, units: UnitSystem) {
+        doc(uid).update(mapOf("units" to units.wire, "updatedAt" to FieldValue.serverTimestamp())).await()
+    }
+
+    /** Stored as { breakfast: "08:30" | "off", lunch: …, dinner: … }. */
+    suspend fun updateMealReminders(uid: String, reminders: MealReminders) {
+        val map = MealReminders.DEFAULT_TIMES.keys.associate { type -> type.wire to (reminders.time(type)?.format(HHMM) ?: OFF) }
+        doc(uid).update(mapOf("mealReminders" to map, "updatedAt" to FieldValue.serverTimestamp())).await()
+    }
+
     private fun HabitSettings.reminderMap() = mapOf("enabled" to reminderEnabled, "time" to reminderTime.format(HHMM))
 
     suspend fun updateTargets(uid: String, targets: Targets) {
@@ -137,7 +149,18 @@ class UserRepository @Inject constructor(
             onboardingComplete = getBoolean("onboardingComplete") ?: false,
             habitSettings = habitSettings(),
             coachStyle = CoachStyle.fromWire(getString("coachStyle")),
+            units = UnitSystem.fromWire(getString("units")),
+            mealReminders = mealReminders(),
         )
+    }
+
+    private fun DocumentSnapshot.mealReminders(): MealReminders {
+        @Suppress("UNCHECKED_CAST")
+        val map = get("mealReminders") as? Map<String, Any?> ?: return MealReminders()
+        return MealReminders.DEFAULT_TIMES.entries.fold(MealReminders()) { acc, (type, default) ->
+            val value = map[type.wire] as? String
+            acc.with(type, if (value == OFF) null else parseTime(value) ?: default)
+        }
     }
 
     private fun DocumentSnapshot.habitSettings(): HabitSettings {
@@ -154,6 +177,7 @@ class UserRepository @Inject constructor(
 
     private companion object {
         const val USERS = "users"
+        const val OFF = "off"
         val HHMM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
     }
 }
