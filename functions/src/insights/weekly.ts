@@ -2,9 +2,9 @@ import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { ANTHROPIC_API_KEY } from "../lib/anthropic";
-import { formatInsightList, loadEvents, loadProfile, loadRecentInsights, loadSummaries } from "../lib/data";
+import { formatInsightList, loadEvents, loadHabits, loadProfile, loadRecentInsights, loadSummaries } from "../lib/data";
 import { db, userDoc } from "../lib/firebase";
-import { formatEvents, formatProfile, formatSummaries } from "../lib/format";
+import { formatEvents, formatHabits, formatProfile, formatSummaries } from "../lib/format";
 import { WEEKLY_INSIGHT_MODEL } from "../lib/models";
 import { notifyInsight } from "../lib/push";
 import { recordUsage } from "../lib/quota";
@@ -56,13 +56,15 @@ export async function writeWeekly(uid: string, saturday: string): Promise<void> 
   const { start, end } = weekWindow(saturday);
   const prevStart = addDays(start, -7);
   const startMs = Date.parse(`${start}T00:00:00Z`) - 14 * 3600_000; // generous: covers all timezones
-  const [profile, thisWeek, lastWeek, events, insights] = await Promise.all([
+  const [profile, thisWeek, lastWeek, events, insights, habits] = await Promise.all([
     loadProfile(uid),
     loadSummaries(uid, start, end),
     loadSummaries(uid, prevStart, addDays(start, -1)),
     loadEvents(uid, startMs, undefined, 60),
     loadRecentInsights(uid, startMs, 30),
+    loadHabits(uid, start),
   ]);
+  const weekDates = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   if (thisWeek.length === 0) {
     logger.info("weekly insight skipped: no data", { uid, start, end });
     return;
@@ -75,6 +77,7 @@ export async function writeWeekly(uid: string, saturday: string): Promise<void> 
     `<workouts_and_sleep>\n${formatEvents(weekEvents)}\n</workouts_and_sleep>`,
     `<previous_week>\n${formatSummaries(lastWeek)}\n</previous_week>`,
     `<insights_this_week>\n${formatInsightList(insights)}\n</insights_this_week>`,
+    `<habits_this_week>\n${formatHabits(habits, weekDates)}\n</habits_this_week>`,
     "Write the weekly review for this_week.",
   ].join("\n\n");
 

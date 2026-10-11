@@ -1,6 +1,12 @@
 package com.resurgeai.core.designsystem.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.runtime.getValue
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.animateColorAsState
+import android.os.Build
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
@@ -14,34 +20,30 @@ import androidx.compose.ui.unit.dp
 import com.resurgeai.core.designsystem.theme.Resurge
 
 /** Height of the soft shade at the top of the main screens. */
-val TopShadeHeight: Dp = 340.dp
+val TopShadeHeight: Dp = 380.dp
 
 /**
- * Soft neutral shade at the top of the main screens: a slightly lighter tone in the dark theme and a
- * slightly darker tone in the light theme, blurred (wide radial falloff) and fading into the page.
- * Drawn at a fixed height from the top, so the header can draw the same shade over its own
- * background and line up seamlessly with the copy behind the content.
+ * Ambient glow at the top of a screen: a large, heavily blurred circle of [color] (each main tab
+ * passes its own) that fades into the page background. Drawn at a fixed height from the top, so the
+ * header can draw the same glow over its own background and line up seamlessly.
  */
 @Composable
-fun TopShade(modifier: Modifier = Modifier) {
+fun TopShade(color: Color = Resurge.colors.accent, modifier: Modifier = Modifier) {
     val dark = Resurge.colors.bg.luminance() < 0.5f
-    // Lighter shade of the dark theme / darker shade of the light theme.
-    val tone = if (dark) Color.White else Color.Black
-    val strength = if (dark) 0.09f else 0.055f
-    Canvas(modifier.fillMaxWidth().height(TopShadeHeight)) {
-        drawRect(
-            Brush.verticalGradient(
-                0f to tone.copy(alpha = strength),
-                0.45f to tone.copy(alpha = strength * 0.45f),
-                1f to Color.Transparent,
-            ),
-        )
-        // A wide, soft bloom near the top so the edge reads as blurred rather than a flat band.
-        val c = Offset(size.width * 0.5f, 0f)
-        drawCircle(
-            Brush.radialGradient(listOf(tone.copy(alpha = strength * 0.6f), Color.Transparent), c, size.width * 0.75f),
-            radius = size.width * 0.75f,
-            center = c,
-        )
+    val glow by animateColorAsState(color, tween(450), label = "ambient")
+    val strength = if (dark) 0.42f else 0.30f
+    Canvas(
+        modifier
+            .fillMaxWidth()
+            .height(TopShadeHeight)
+            .then(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Modifier.blur(48.dp, BlurredEdgeTreatment.Unbounded) else Modifier),
+    ) {
+        val r = size.width * 0.62f
+        val c = Offset(size.width * 0.28f, size.height * 0.08f)
+        drawCircle(Brush.radialGradient(listOf(glow.copy(alpha = strength), glow.copy(alpha = strength * 0.4f), Color.Transparent), c, r), r, c)
+        // A smaller, offset hue for depth.
+        val c2 = Offset(size.width * 0.88f, size.height * 0.02f)
+        val r2 = size.width * 0.42f
+        drawCircle(Brush.radialGradient(listOf(glow.copy(alpha = strength * 0.55f), Color.Transparent), c2, r2), r2, c2)
     }
 }

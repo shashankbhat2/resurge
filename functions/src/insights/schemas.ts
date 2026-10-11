@@ -45,13 +45,14 @@ export const WeeklyInsight = z.object({
   wins: z.array(z.string().max(240)).max(3),
   areas: z.array(z.object({ area: z.enum(["sleep", "activity", "heart"]), trend: Trend, note: z.string().max(240) })).max(3),
   focus: z.array(z.string().max(240)).max(2),
+  habits: z.string().max(400),
 });
 export type WeeklyInsight = z.infer<typeof WeeklyInsight>;
 
 export const WEEKLY_INSIGHT_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["headline", "summary", "wins", "areas", "focus"],
+  required: ["headline", "summary", "wins", "areas", "focus", "habits"],
   properties: {
     headline: { type: "string" },
     summary: { type: "string" },
@@ -70,5 +71,6 @@ export const WEEKLY_INSIGHT_JSON_SCHEMA = {
       },
     },
     focus: { type: "array", items: { type: "string" } },
+    habits: { type: "string" },
   },
 } as const;

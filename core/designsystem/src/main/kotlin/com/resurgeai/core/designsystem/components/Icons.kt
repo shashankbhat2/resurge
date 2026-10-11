@@ -31,6 +31,7 @@ object ResurgeIcons {
     @DrawableRes val Fitness = Tabler.drawable.tabler_ic_barbell_outline
     @DrawableRes val FitnessFilled = TablerFilled.drawable.tabler_ic_barbell_filled
     @DrawableRes val Scan = Tabler.drawable.tabler_ic_scan_outline
+    @DrawableRes val Habits = Tabler.drawable.tabler_ic_restore_outline
 
     // General
     @DrawableRes val Check = Tabler.drawable.tabler_ic_check_outline
@@ -45,6 +46,16 @@ object ResurgeIcons {
     @DrawableRes val Sparkles = Tabler.drawable.tabler_ic_sparkles_outline
     @DrawableRes val Target = Tabler.drawable.tabler_ic_target_outline
     @DrawableRes val Devices = Tabler.drawable.tabler_ic_devices_outline
+    @DrawableRes val Close = Tabler.drawable.tabler_ic_x_outline
+    @DrawableRes val Plus = Tabler.drawable.tabler_ic_plus_outline
+    @DrawableRes val Pencil = Tabler.drawable.tabler_ic_pencil_outline
+    @DrawableRes val Archive = Tabler.drawable.tabler_ic_trash_outline
+    @DrawableRes val Undo = Tabler.drawable.tabler_ic_arrow_back_up_outline
+    @DrawableRes val Bell = Tabler.drawable.tabler_ic_bell_outline
+
+    // Streaks: filled flame = logged done, outline = not done / unlogged, snowflake = freeze used.
+    @DrawableRes val FlameFilled = TablerFilled.drawable.tabler_ic_flame_filled
+    @DrawableRes val Snowflake = Tabler.drawable.tabler_ic_snowflake_outline
 
     // Metrics
     @DrawableRes val Flame = Tabler.drawable.tabler_ic_flame_outline

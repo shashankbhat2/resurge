@@ -41,6 +41,7 @@ dependencies {
     implementation(project(":core:healthconnect"))
     implementation(project(":feature:auth"))
     implementation(project(":feature:coach"))
+    implementation(project(":feature:habits"))
     implementation(project(":feature:dashboard"))
     implementation(project(":feature:profile"))
 

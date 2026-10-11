@@ -6,6 +6,8 @@ import com.resurgeai.core.data.auth.AuthRepository
 import com.resurgeai.core.data.prefs.PreferencesRepository
 import com.resurgeai.core.data.session.SessionRepository
 import com.resurgeai.core.healthconnect.HealthConnectManager
+import com.resurgeai.core.data.user.UserRepository
+import com.resurgeai.core.model.HabitSettings
 import com.resurgeai.core.model.SessionState
 import com.resurgeai.core.model.ThemePreference
 import com.resurgeai.core.model.TimeFormat
@@ -31,6 +33,7 @@ class ProfileViewModel @Inject constructor(
     private val preferencesRepository: PreferencesRepository,
     private val authRepository: AuthRepository,
     private val healthConnect: HealthConnectManager,
+    private val userRepository: UserRepository,
 ) : ViewModel() {
     fun healthConnectSettingsIntent() = healthConnect.settingsIntent()
 
@@ -48,6 +51,12 @@ class ProfileViewModel @Inject constructor(
 
     fun setTimeFormat(format: TimeFormat) {
         viewModelScope.launch { preferencesRepository.setTimeFormat(format) }
+    }
+
+    /** Saves reset / reminder settings; the app reschedules the local reminder when they change. */
+    fun setHabitSettings(settings: HabitSettings) {
+        val uid = state.value.profile?.uid ?: return
+        viewModelScope.launch { runCatching { userRepository.updateHabitSettings(uid, settings) } }
     }
 
     fun signOut() {

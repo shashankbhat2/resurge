@@ -55,4 +55,33 @@ export function formatInsightList(items: StoredInsight[]): string {
     .join("\n");
 }
 
+export interface HabitSummary {
+  name: string;
+  currentStreak: number;
+  bestStreak: number;
+  /** Habit day (yyyy-MM-dd) -> "done" | "missed" over the requested window. */
+  log: Record<string, string>;
+}
+
+/** Active habits with cached streaks (written by the app) and their recent check-ins. */
+export async function loadHabits(uid: string, from: string): Promise<HabitSummary[]> {
+  const [habits, days] = await Promise.all([
+    userDoc(uid).collection("habits").where("archived", "==", false).get(),
+    userDoc(uid).collection("habitDays").where("date", ">=", from).get(),
+  ]);
+  return habits.docs.map((h) => {
+    const log: Record<string, string> = {};
+    for (const d of days.docs) {
+      const status = (d.get("entries") ?? {})[h.id];
+      if (typeof status === "string") log[d.id] = status;
+    }
+    return {
+      name: String(h.get("name") ?? ""),
+      currentStreak: Number(h.get("currentStreak") ?? 0),
+      bestStreak: Number(h.get("bestStreak") ?? 0),
+      log,
+    };
+  });
+}
+
 export { db };

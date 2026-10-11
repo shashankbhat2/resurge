@@ -25,5 +25,6 @@ include(
     ":feature:auth",
     ":feature:coach",
     ":feature:dashboard",
+    ":feature:habits",
     ":feature:profile",
 )

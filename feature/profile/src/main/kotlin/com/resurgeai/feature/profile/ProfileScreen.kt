@@ -47,6 +47,9 @@ import com.resurgeai.core.model.Goal
 import com.resurgeai.core.model.Targets
 import com.resurgeai.core.model.ThemePreference
 import com.resurgeai.core.model.TimeFormat
+import com.resurgeai.core.model.HabitSettings
+import com.resurgeai.core.designsystem.components.Switch
+import com.resurgeai.core.designsystem.components.TimeStepper
 import com.resurgeai.core.model.UserProfile
 
 @Composable
@@ -62,6 +65,7 @@ fun ProfileRoute(
         onBack = onBack,
         onThemeChange = viewModel::setTheme,
         onTimeFormatChange = viewModel::setTimeFormat,
+        onHabitSettingsChange = viewModel::setHabitSettings,
         onSignOut = viewModel::signOut,
         onOpenHealthConnect = { runCatching { context.startActivity(viewModel.healthConnectSettingsIntent()) } },
         onOpenCatalog = onOpenCatalog,
@@ -75,6 +79,7 @@ fun ProfileScreen(
     onThemeChange: (ThemePreference) -> Unit,
     onTimeFormatChange: (TimeFormat) -> Unit,
     onSignOut: () -> Unit,
+    onHabitSettingsChange: (HabitSettings) -> Unit = {},
     onOpenHealthConnect: () -> Unit = {},
     onOpenCatalog: (() -> Unit)? = null,
 ) {
@@ -139,6 +144,41 @@ fun ProfileScreen(
                 onSelect = onTimeFormatChange,
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            state.profile?.habitSettings?.let { habit ->
+                SectionLabel("Habits")
+                Card(Modifier.fillMaxWidth()) {
+                    Text("New day starts at", style = Resurge.type.label, color = Resurge.colors.textMuted)
+                    Spacer(Modifier.height(12.dp))
+                    TimeStepper(
+                        time = habit.resetTime,
+                        onTimeChange = { onHabitSettingsChange(habit.copy(resetTime = it)) },
+                        caption = "Habits reset daily at this time",
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+                Card(Modifier.fillMaxWidth()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Evening reminder", style = Resurge.type.label)
+                            Text("Only if habits are still unlogged", style = Resurge.type.caption, color = Resurge.colors.textMuted)
+                        }
+                        Switch(
+                            checked = habit.reminderEnabled,
+                            onCheckedChange = { onHabitSettingsChange(habit.copy(reminderEnabled = it)) },
+                            accessibilityLabel = "Evening habit reminder",
+                        )
+                    }
+                    if (habit.reminderEnabled) {
+                        Spacer(Modifier.height(16.dp))
+                        TimeStepper(
+                            time = habit.reminderTime,
+                            onTimeChange = { onHabitSettingsChange(habit.copy(reminderTime = it)) },
+                            caption = "Reminder time",
+                        )
+                    }
+                }
+            }
 
             SectionLabel("Data")
             Card(Modifier.fillMaxWidth(), contentPadding = PaddingValues(0.dp)) {

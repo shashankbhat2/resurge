@@ -43,3 +43,19 @@ describe("format", () => {
       .toBe("Goals: sleep better, move more. Daily targets: 2200 kcal eaten, 2500 ml water.");
   });
 });
+
+import { formatHabits } from "../src/lib/format";
+
+describe("formatHabits", () => {
+  it("marks done, missed and unlogged days", () => {
+    const text = formatHabits(
+      [{ name: "Walk 10k", currentStreak: 2, bestStreak: 5, log: { "2026-10-04": "done", "2026-10-05": "missed", "2026-10-07": "done" } }],
+      ["2026-10-04", "2026-10-05", "2026-10-06", "2026-10-07"],
+    );
+    expect(text.split("\n")[1]).toBe("Walk 10k | 2 | 5 | ✓✗·✓");
+  });
+
+  it("says when there are no habits", () => {
+    expect(formatHabits([], [])).toBe("No habits set up.");
+  });
+});

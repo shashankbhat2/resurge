@@ -63,7 +63,11 @@ import com.resurgeai.feature.dashboard.detail.MetricDetailRoute as MetricDetailS
 import com.resurgeai.feature.dashboard.sources.MetricSourcesRoute as MetricSourcesScreenRoute
 import com.resurgeai.feature.coach.CoachRoute as CoachScreen
 import com.resurgeai.feature.coach.CoachTab
+import com.resurgeai.feature.habits.HabitDetailRoute as HabitDetailScreen
+import com.resurgeai.feature.habits.HabitEditorRoute as HabitEditorScreen
+import com.resurgeai.feature.habits.HabitsRoute as HabitsScreenRoute
 import com.resurgeai.feature.profile.ProfileRoute
+import androidx.navigation.toRoute
 import kotlinx.serialization.Serializable
 
 // Root graph: the tab shell plus full-screen destinations that cover it (incl. the bottom bar).
@@ -73,6 +77,11 @@ import kotlinx.serialization.Serializable
 @Serializable data object CatalogRoute
 @Serializable data object SettingsRoute
 
+@Serializable data class HabitDetailRoute(val id: String)
+
+/** Add a habit (id = null) or edit one. */
+@Serializable data class HabitEditorRoute(val id: String? = null)
+
 /** Full-screen coach; [tab] is "insights" or "chat". */
 @Serializable data class CoachScreenRoute(val tab: String)
 
@@ -80,6 +89,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object TodayRoute
 @Serializable data object FitnessRoute
 @Serializable data object FoodRoute
+@Serializable data object HabitsRoute
 
 private enum class Tab(
     val route: Any,
@@ -92,6 +102,7 @@ private enum class Tab(
     Today(TodayRoute, "Today", ResurgeIcons.Today, ResurgeIcons.TodayFilled, null),
     Fitness(FitnessRoute, "Fitness", ResurgeIcons.Fitness, ResurgeIcons.FitnessFilled, "Fitness"),
     Food(FoodRoute, "Food", ResurgeIcons.Food, ResurgeIcons.FoodFilled, "Food"),
+    Habits(HabitsRoute, "Habits", ResurgeIcons.Habits, ResurgeIcons.Habits, "Habits"),
 }
 
 private const val PUSH_MS = 280
@@ -112,7 +123,7 @@ private val popExit: AnimatedContentTransitionScope<NavBackStackEntry>.() -> Exi
 }
 
 @Composable
-fun MainScreen(profile: UserProfile, openInsightsSignal: Int = 0) {
+fun MainScreen(profile: UserProfile, openInsightsSignal: Int = 0, openHabitsSignal: Int = 0) {
     val rootNav = rememberNavController()
     // A tapped insight notification opens Coach on the Insights tab.
     LaunchedEffect(openInsightsSignal) {
@@ -133,7 +144,24 @@ fun MainScreen(profile: UserProfile, openInsightsSignal: Int = 0) {
                 onOpenMetric = { metric -> rootNav.navigate(MetricDetailRoute(metric.name)) },
                 onOpenSettings = { rootNav.navigate(SettingsRoute) },
                 onOpenCoach = { tab -> rootNav.navigate(CoachScreenRoute(tab.name.lowercase())) },
+                onOpenHabit = { id -> rootNav.navigate(HabitDetailRoute(id)) },
+                onAddHabit = { rootNav.navigate(HabitEditorRoute()) },
+                openHabitsSignal = openHabitsSignal,
+                onReturnToTabs = { rootNav.popBackStack(TabsRoute, inclusive = false) },
             )
+        }
+        composable<HabitDetailRoute> { entry ->
+            val id = entry.toRoute<HabitDetailRoute>().id
+            FullScreen {
+                HabitDetailScreen(
+                    habitId = id,
+                    onBack = { rootNav.popBackStack() },
+                    onEdit = { rootNav.navigate(HabitEditorRoute(it)) },
+                )
+            }
+        }
+        composable<HabitEditorRoute> { entry ->
+            FullScreen { HabitEditorScreen(habitId = entry.toRoute<HabitEditorRoute>().id, onDone = { rootNav.popBackStack() }) }
         }
         composable<CoachScreenRoute> {
             FullScreen { CoachScreen(onBack = { rootNav.popBackStack() }) }
@@ -188,8 +216,19 @@ private fun TabsShell(
     onOpenMetric: (HealthMetric) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenCoach: (CoachTab) -> Unit,
+    onOpenHabit: (String) -> Unit,
+    onAddHabit: () -> Unit,
+    openHabitsSignal: Int,
+    onReturnToTabs: () -> Unit,
 ) {
     val tabsNav = rememberNavController()
+    // The habit reminder notification opens the Habits tab.
+    LaunchedEffect(openHabitsSignal) {
+        if (openHabitsSignal > 0) {
+            onReturnToTabs()
+            tabsNav.switchTab(HabitsRoute)
+        }
+    }
     val backStackEntry by tabsNav.currentBackStackEntryAsState()
     val currentTab = Tab.entries.firstOrNull { tab ->
         backStackEntry?.destination?.hierarchy?.any { it.hasRoute(tab.route::class) } == true
@@ -199,7 +238,13 @@ private fun TabsShell(
     val bottomInset = FloatingNavBarHeight + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val topInset = MainHeaderHeight + WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     Box(Modifier.fillMaxSize()) {
-        TopShade()
+        val glow = when (currentTab) {
+            Tab.Today -> Resurge.colors.accent
+            Tab.Fitness -> Resurge.colors.activity
+            Tab.Food -> Resurge.colors.energy
+            Tab.Habits -> Resurge.colors.heart
+        }
+        TopShade(glow)
         CompositionLocalProvider(LocalFloatingBarInset provides bottomInset, LocalHeaderInset provides topInset) {
             NavHost(
                 navController = tabsNav,
@@ -218,11 +263,13 @@ private fun TabsShell(
                 composable<FoodRoute> {
                     ComingSoon("Scan meals, track calories and log water.", "Phase 3")
                 }
+                composable<HabitsRoute> { HabitsScreenRoute(onOpenHabit = onOpenHabit, onAddHabit = onAddHabit) }
             }
         }
         MainHeader(
             title = currentTab.title,
             modifier = Modifier.align(Alignment.TopCenter),
+            glow = glow,
             // Today greets the user in the header, left of the profile photo.
             leading = if (currentTab == Tab.Today) {
                 { Text(greeting(profile), style = Resurge.type.brand, maxLines = 1, overflow = TextOverflow.Ellipsis) }
@@ -245,7 +292,7 @@ private fun TabsShell(
             selected = currentTab,
             onSelect = { tab -> tabsNav.switchTab(tab.route) },
             // Detached Coach button opens the full-screen coach on its Chat tab.
-            action = NavItem(Unit, "Coach", ResurgeIcons.CoachFilled),
+            action = NavItem(Unit, "Coach", ResurgeIcons.Coach),
             onAction = { onOpenCoach(CoachTab.CHAT) },
             modifier = Modifier.align(Alignment.BottomCenter),
         )

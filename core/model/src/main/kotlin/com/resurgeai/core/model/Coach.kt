@@ -25,6 +25,8 @@ data class WeeklyDetails(
     val focus: List<String>,
     val weekStart: String?,
     val weekEnd: String?,
+    /** A note on the week's habits and streaks (empty when none are set up). */
+    val habits: String = "",
 )
 
 /** An insight written by the backend (per finished activity/sleep, or the Saturday weekly review). */

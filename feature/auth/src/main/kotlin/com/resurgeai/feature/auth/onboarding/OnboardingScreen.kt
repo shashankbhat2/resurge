@@ -39,7 +39,10 @@ import com.resurgeai.core.designsystem.components.ButtonVariant
 import com.resurgeai.core.designsystem.components.Card
 import com.resurgeai.core.designsystem.components.ChoiceCard
 import com.resurgeai.core.designsystem.components.IconBadge
+import com.resurgeai.core.designsystem.components.HabitVisuals
 import com.resurgeai.core.designsystem.components.IconButton
+import com.resurgeai.core.designsystem.components.InputField
+import com.resurgeai.core.designsystem.components.TimeStepper
 import com.resurgeai.core.designsystem.components.NumberStepper
 import com.resurgeai.core.designsystem.components.ResurgeIcons
 import com.resurgeai.core.designsystem.components.Screen
@@ -48,6 +51,11 @@ import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.designsystem.theme.ResurgeTheme
 import com.resurgeai.core.healthconnect.HealthConnectAvailability
 import com.resurgeai.core.model.Goal
+import com.resurgeai.core.model.HabitDraft
+import com.resurgeai.core.model.HabitSettings
+import java.time.LocalTime
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import com.resurgeai.core.model.UserProfile
 
 @Composable
@@ -74,6 +82,9 @@ fun OnboardingRoute(
         onToggleGoal = viewModel::toggleGoal,
         onCaloriesChange = viewModel::setCalories,
         onWaterChange = viewModel::setWater,
+        onToggleHabit = viewModel::toggleHabit,
+        onAddHabit = viewModel::addCustomHabit,
+        onResetTimeChange = viewModel::setResetTime,
         onBack = viewModel::back,
         onNext = { viewModel.next(profile.uid) },
     )
@@ -89,6 +100,9 @@ fun OnboardingScreen(
     onBack: () -> Unit,
     onNext: () -> Unit,
     onConnectHealth: () -> Unit = {},
+    onToggleHabit: (HabitDraft) -> Unit = {},
+    onAddHabit: (String) -> Unit = {},
+    onResetTimeChange: (LocalTime) -> Unit = {},
 ) {
     Screen {
         Column(
@@ -132,6 +146,7 @@ fun OnboardingScreen(
                     when (step) {
                         OnboardingStep.Goals -> GoalsStep(firstName, state.goals, onToggleGoal)
                         OnboardingStep.Targets -> TargetsStep(state, onCaloriesChange, onWaterChange)
+                        OnboardingStep.Habits -> HabitsStep(state, onToggleHabit, onAddHabit, onResetTimeChange)
                         OnboardingStep.Health -> HealthStep(state, onConnectHealth)
                         OnboardingStep.Ready -> ReadyStep(state)
                     }
@@ -154,6 +169,7 @@ fun OnboardingScreen(
                     text = when (state.step) {
                         OnboardingStep.Goals -> "Continue"
                         OnboardingStep.Targets -> "Continue"
+                        OnboardingStep.Habits -> if (state.habits.isEmpty()) "Pick at least one habit" else "Continue"
                         OnboardingStep.Health -> if (state.healthConnected) "Continue" else "Skip for now"
                         OnboardingStep.Ready -> "Start using Resurge"
                     },
@@ -229,6 +245,59 @@ private fun TargetsStep(
             step = 250,
             range = 1000..5000,
             unit = "ml per day",
+        )
+    }
+}
+
+@Composable
+private fun HabitsStep(
+    state: OnboardingUiState,
+    onToggle: (HabitDraft) -> Unit,
+    onAdd: (String) -> Unit,
+    onResetTimeChange: (LocalTime) -> Unit,
+) {
+    StepHeader(
+        title = "Build your daily habits",
+        subtitle = "Pick at least one. Each day you'll swipe through them: right for done, left for not done.",
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        (state.suggestions + state.customHabits).forEach { habit ->
+            val selected = state.habits.any { it.name == habit.name }
+            ChoiceCard(
+                title = habit.name,
+                description = null,
+                selected = selected,
+                onClick = { onToggle(habit) },
+                icon = HabitVisuals.icon(habit.icon),
+                iconTint = HabitVisuals.color(habit.color),
+            )
+        }
+    }
+    Spacer(Modifier.height(14.dp))
+    val custom = rememberTextFieldState()
+    val submit = {
+        onAdd(custom.text.toString())
+        custom.clearText()
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        InputField(custom, placeholder = "Add your own habit", modifier = Modifier.weight(1f), onDone = submit)
+        Spacer(Modifier.width(10.dp))
+        IconButton(ResurgeIcons.Plus, contentDescription = "Add habit", onClick = submit, enabled = state.canAddHabit)
+    }
+    Text(
+        "${state.habits.size} of ${HabitSettings.MAX_ACTIVE} selected",
+        style = Resurge.type.caption,
+        color = Resurge.colors.textSubtle,
+        modifier = Modifier.padding(top = 8.dp, start = 4.dp),
+    )
+    Spacer(Modifier.height(24.dp))
+    Card {
+        TargetLabel(ResurgeIcons.Habits, Resurge.colors.accent, "New day starts at")
+        Spacer(Modifier.height(16.dp))
+        TimeStepper(
+            time = state.habitSettings.resetTime,
+            onTimeChange = onResetTimeChange,
+            caption = "Habits reset daily at this time",
         )
     }
 }
@@ -310,6 +379,8 @@ private fun ReadyStep(state: OnboardingUiState) {
         SummaryRow("Calories", "%,d kcal / day".format(state.targets.calories))
         Spacer(Modifier.height(12.dp))
         SummaryRow("Water", "%,d ml / day".format(state.targets.waterMl))
+        Spacer(Modifier.height(12.dp))
+        SummaryRow("Habits", state.habits.joinToString { it.name })
     }
 }
 

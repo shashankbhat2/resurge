@@ -1,20 +1,11 @@
 package com.resurgeai.core.designsystem.components
 
 import androidx.annotation.DrawableRes
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -30,7 +21,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -69,9 +59,8 @@ private val BarGap = 12.dp
 val FloatingNavBarHeight: Dp = BarHeight + BarGap
 
 /**
- * Floating pill navigation: dark rounded bar, the active tab drawn as an inverted circle with a
- * filled icon, inactive tabs as outline icons. An optional [action] (e.g. Scan) sits at the end
- * in the accent colour.
+ * Floating pill navigation across the width: the active tab is a highlighted pill with icon + label,
+ * inactive tabs are outline icons, and an optional [action] (Coach) is the last item, in the accent.
  */
 @Composable
 fun <T> FloatingNavBar(
@@ -82,54 +71,42 @@ fun <T> FloatingNavBar(
     action: NavItem<Unit>? = null,
     onAction: () -> Unit = {},
 ) {
+    // One pill across the width: tabs, then the action (e.g. Coach) as the last item.
     Row(
         modifier = modifier
             .windowInsetsPadding(WindowInsets.navigationBars)
-            .padding(start = 20.dp, end = 20.dp, bottom = BarGap)
-            .fillMaxWidth(),
+            .padding(start = 16.dp, end = 16.dp, bottom = BarGap)
+            .fillMaxWidth()
+            .height(BarHeight)
+            .clip(Resurge.shape.pill)
+            .background(Resurge.colors.navBar)
+            .border(1.dp, Resurge.colors.border, Resurge.shape.pill)
+            .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        // Tabs pill
-        Row(
-            modifier = Modifier
-                .weight(1f)
-                .height(BarHeight)
-                .clip(Resurge.shape.pill)
-                .background(Resurge.colors.navBar)
-                .border(1.dp, Resurge.colors.border, Resurge.shape.pill)
-                .padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            items.forEach { item ->
-                val isSelected = item.key == selected
-                NavCircle(
-                    icon = if (isSelected) item.selectedIcon else item.icon,
-                    label = item.label,
-                    background = if (isSelected) Resurge.colors.navHighlight else Color.Transparent,
-                    tint = if (isSelected) Resurge.colors.onNavHighlight else Resurge.colors.navInactive,
-                    role = Role.Tab,
-                    selected = isSelected,
-                    onClick = { onSelect(item.key) },
-                )
-            }
+        items.forEach { item ->
+            val isSelected = item.key == selected
+            NavCircle(
+                icon = if (isSelected) item.selectedIcon else item.icon,
+                label = item.label,
+                background = if (isSelected) Resurge.colors.navHighlight else Color.Transparent,
+                tint = if (isSelected) Resurge.colors.onNavHighlight else Resurge.colors.navInactive,
+                role = Role.Tab,
+                selected = isSelected,
+                onClick = { onSelect(item.key) },
+            )
         }
-        // Detached action button (e.g. Scan), same height as the pill.
         action?.let {
-            Spacer(Modifier.width(10.dp))
-            UnstyledButton(
-                onClick = onAction,
+            NavCircle(
+                icon = it.icon,
+                label = it.label,
+                background = Color.Transparent,
+                tint = Resurge.colors.navHighlight,
                 role = Role.Button,
-                modifier = Modifier
-                    .size(BarHeight)
-                    .clip(Resurge.shape.pill)
-                    .background(Resurge.colors.navBar)
-                    .border(1.dp, Resurge.colors.border, Resurge.shape.pill)
-                    .semantics { contentDescription = it.label },
-                indication = LocalIndication.current,
-            ) {
-                Icon(it.icon, contentDescription = null, tint = Resurge.colors.navHighlight, size = 24.dp)
-            }
+                selected = false,
+                onClick = onAction,
+            )
         }
     }
 }
@@ -145,8 +122,8 @@ private fun NavCircle(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val bg by animateColorAsState(background, tween(180), label = "nav-bg")
-    val fg by animateColorAsState(tint, tween(180), label = "nav-fg")
+    val bg = background
+    val fg = tint
     UnstyledButton(
         onClick = onClick,
         role = role,
@@ -155,7 +132,6 @@ private fun NavCircle(
             .widthIn(min = ItemSize)
             .clip(Resurge.shape.pill)
             .background(bg)
-            .animateContentSize(tween(220))
             .semantics {
                 contentDescription = label
                 this.selected = selected
@@ -165,11 +141,7 @@ private fun NavCircle(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, contentDescription = null, tint = fg, size = 22.dp)
-            AnimatedVisibility(
-                visible = selected,
-                enter = fadeIn(tween(180)) + expandHorizontally(tween(220)),
-                exit = fadeOut(tween(120)) + shrinkHorizontally(tween(220)),
-            ) {
+            if (selected) {
                 Row {
                     Spacer(Modifier.width(8.dp))
                     Text(label, style = Resurge.type.label, color = fg, maxLines = 1)
@@ -227,6 +199,7 @@ fun MainHeader(
     modifier: Modifier = Modifier,
     leading: (@Composable () -> Unit)? = null,
     trailing: @Composable () -> Unit = {},
+    glow: Color = Resurge.colors.accent,
 ) {
     val bg = Resurge.colors.bg
     // Same alpha ramp for the background and for the header's copy of the shade: wherever the
@@ -249,7 +222,7 @@ fun MainHeader(
                         blendMode = BlendMode.DstIn,
                     )
                 },
-        ) { TopShade() }
+        ) { TopShade(glow) }
         Row(
             Modifier
                 .fillMaxWidth()

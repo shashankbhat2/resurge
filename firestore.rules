@@ -16,7 +16,8 @@ service cloud.firestore {
     // Fields the client may write on its own profile document.
     function validProfile() {
       let allowed = ['displayName', 'email', 'photoUrl', 'goals', 'targets',
-                     'onboardingComplete', 'onboardedAt', 'updatedAt', 'timezone'];
+                     'onboardingComplete', 'onboardedAt', 'updatedAt', 'timezone',
+                     'habitResetTime', 'habitReminder'];
       return request.resource.data.keys().hasOnly(allowed)
         && (!('goals' in request.resource.data) || request.resource.data.goals is list)
         && (!('timezone' in request.resource.data) || (request.resource.data.timezone is string
@@ -29,7 +30,44 @@ service cloud.firestore {
               && request.resource.data.targets.waterMl >= 500
               && request.resource.data.targets.waterMl <= 8000))
         && (!('onboardingComplete' in request.resource.data)
-              || request.resource.data.onboardingComplete is bool);
+              || request.resource.data.onboardingComplete is bool)
+        && (!('habitResetTime' in request.resource.data) || isClock(request.resource.data.habitResetTime))
+        && (!('habitReminder' in request.resource.data) || (
+              request.resource.data.habitReminder.keys().hasOnly(['enabled', 'time'])
+              && request.resource.data.habitReminder.enabled is bool
+              && isClock(request.resource.data.habitReminder.time)));
+    }
+
+    function isClock(t) {
+      return t is string && t.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$');
+    }
+
+    function validHabit() {
+      let h = request.resource.data;
+      return h.keys().hasOnly(['name', 'icon', 'color', 'order', 'archived', 'createdDate',
+                               'currentStreak', 'bestStreak', 'createdAt', 'updatedAt'])
+        && h.name is string && h.name.size() > 0 && h.name.size() <= 60
+        && h.icon is string && h.icon.size() <= 32
+        && h.color is string && h.color.size() <= 32
+        && h.order is int && h.archived is bool
+        && h.createdDate is string && h.createdDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && (!('currentStreak' in h) || h.currentStreak is int)
+        && (!('bestStreak' in h) || h.bestStreak is int);
+    }
+
+    // Check-ins may only be written for habit days close to now (today / yesterday's grace,
+    // with slack for timezones and reset times): from 3 days ago to 2 days ahead.
+    function validHabitDay(date) {
+      let d = request.resource.data;
+      let parts = date.split('-');
+      let day = timestamp.date(int(parts[0]), int(parts[1]), int(parts[2]));
+      return date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && d.keys().hasOnly(['date', 'entries', 'updatedAt'])
+        && d.date == date
+        && d.entries is map && d.entries.size() <= 40
+        && d.entries.values().hasOnly(['done', 'missed'])
+        && day > request.time - duration.value(3, 'd')
+        && day < request.time + duration.value(2, 'd');
     }
 
     // A finished workout / night of sleep posted by the app. Create-only: the analyzeEvent
@@ -56,6 +94,18 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
+      match /habits/{habitId} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validHabit();
+        allow delete: if false; // habits are archived, never deleted, so history stays intact
+      }
+
+      match /habitDays/{date} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validHabitDay(date);
+        allow delete: if false;
+      }
+
       // FCM registration tokens (doc id = token).
       match /devices/{token} {
         allow read, delete: if isOwner(uid);
@@ -75,7 +125,7 @@ service cloud.firestore {
       // Everything else under the user (daily summaries, meals, water) — owner only.
       match /{collection}/{doc=**} {
         allow read, write: if isOwner(uid)
-          && !(collection in ['events', 'devices', 'insights', 'usage', 'coachThreads']);
+          && !(collection in ['events', 'devices', 'insights', 'usage', 'coachThreads', 'habits', 'habitDays']);
       }
     }
 

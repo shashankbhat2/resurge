@@ -8,6 +8,7 @@ data class UserProfile(
     val goals: Set<Goal>,
     val targets: Targets,
     val onboardingComplete: Boolean,
+    val habitSettings: HabitSettings = HabitSettings(),
 ) {
     val firstName: String?
         get() = displayName?.substringBefore(' ')?.takeIf { it.isNotBlank() }

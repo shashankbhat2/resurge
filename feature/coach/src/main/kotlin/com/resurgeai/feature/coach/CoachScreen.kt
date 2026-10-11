@@ -273,6 +273,7 @@ private fun WeeklyCard(insight: CoachInsight) {
                 }
             }
             if (weekly.wins.isNotEmpty()) BulletSection("Wins", weekly.wins)
+            if (weekly.habits.isNotBlank()) BulletSection("Habits", listOf(weekly.habits))
             if (weekly.focus.isNotEmpty()) BulletSection("Next week", weekly.focus)
         }
     }

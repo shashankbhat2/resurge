@@ -79,6 +79,17 @@ export function formatEvent(e: ActivityEvent): string {
   return `${e.localDate} ${e.type}`;
 }
 
+/** One line per habit: streaks and a compact per-day record (✓ done, ✗ not done, · unlogged). */
+export function formatHabits(habits: { name: string; currentStreak: number; bestStreak: number; log: Record<string, string> }[], dates: string[]): string {
+  if (habits.length === 0) return "No habits set up.";
+  const header = `habit | current streak | best | ${dates[0]}→${dates[dates.length - 1]} (✓ done, ✗ not done, · unlogged)`;
+  const lines = habits.map((h) => {
+    const marks = dates.map((d) => (h.log[d] === "done" ? "✓" : h.log[d] === "missed" ? "✗" : "·")).join("");
+    return `${h.name} | ${h.currentStreak} | ${h.bestStreak} | ${marks}`;
+  });
+  return [header, ...lines].join("\n");
+}
+
 export function formatEvents(events: ActivityEvent[]): string {
   if (events.length === 0) return "None.";
   return [...events].sort((a, b) => a.startMs - b.startMs).map((e) => `- ${formatEvent(e)}`).join("\n");

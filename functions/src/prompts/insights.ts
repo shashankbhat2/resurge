@@ -21,6 +21,7 @@ Write a weekly review:
 - wins: 1-3 specific things that went well, with numbers.
 - areas: a trend for each of sleep, activity and heart (up / down / steady) with a one-sentence note grounded in the data.
 - focus: 1-2 concrete, realistic goals for next week.
+- habits: 1-2 sentences on the daily habits (streaks kept or broken, consistency), linked to the health data where there's a real connection. Empty string if no habits are set up.
 Be honest about gaps in the data (days without sync, no wearable at night, etc.).
 
 ${STYLE}

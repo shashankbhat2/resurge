@@ -1,6 +1,7 @@
 package com.resurgeai.core.designsystem.components
 
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -15,19 +16,34 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.maxLength
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
+import com.composeunstyled.TextInput
+import com.composeunstyled.Thumb
+import com.composeunstyled.Track
 import com.composeunstyled.UnstyledButton
+import com.composeunstyled.UnstyledSwitch
+import com.composeunstyled.UnstyledTextField
 import com.resurgeai.core.designsystem.theme.Resurge
+import com.resurgeai.core.designsystem.theme.clockFormatter
+import java.time.LocalTime
 
 data class SegmentOption<T>(val value: T, val label: String, @DrawableRes val icon: Int? = null)
 
@@ -182,5 +198,88 @@ fun StepIndicator(current: Int, total: Int, modifier: Modifier = Modifier) {
                     .background(if (index <= current) Resurge.colors.strong else Resurge.colors.border),
             )
         }
+    }
+}
+
+/** On/off switch built on Compose Unstyled's ToggleSwitch. */
+@Composable
+fun Switch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    accessibilityLabel: String? = null,
+) {
+    UnstyledSwitch(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        modifier = modifier,
+        accessibilityLabel = accessibilityLabel,
+    ) {
+        Track(
+            Modifier
+                .width(52.dp)
+                .height(32.dp)
+                .clip(Resurge.shape.pill)
+                .background(if (checked) Resurge.colors.accent else Resurge.colors.surfaceMuted)
+                .border(1.dp, if (checked) Resurge.colors.accent else Resurge.colors.border, Resurge.shape.pill)
+                .padding(4.dp),
+        ) {
+            Thumb(
+                Modifier
+                    .size(24.dp)
+                    .clip(Resurge.shape.pill)
+                    .background(if (checked) Resurge.colors.onAccent else Resurge.colors.textSubtle),
+                animationSpec = tween(150),
+            )
+        }
+    }
+}
+
+/** Clock time with − / + buttons in [stepMinutes] steps; wraps around midnight. */
+@Composable
+fun TimeStepper(
+    time: LocalTime,
+    onTimeChange: (LocalTime) -> Unit,
+    caption: String,
+    modifier: Modifier = Modifier,
+    stepMinutes: Long = 30,
+) {
+    Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        StepButton("−", enabled = true) { onTimeChange(time.minusMinutes(stepMinutes)) }
+        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(time.format(clockFormatter()), style = Resurge.type.display, textAlign = TextAlign.Center)
+            Text(caption, style = Resurge.type.caption, color = Resurge.colors.textMuted)
+        }
+        StepButton("+", enabled = true) { onTimeChange(time.plusMinutes(stepMinutes)) }
+    }
+}
+
+/** Single-line text input in a rounded field. */
+@Composable
+fun InputField(
+    state: TextFieldState,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+    maxLength: Int = 60,
+    onDone: (() -> Unit)? = null,
+) {
+    UnstyledTextField(
+        state = state,
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(Resurge.shape.md)
+            .background(Resurge.colors.surfaceMuted)
+            .border(1.dp, Resurge.colors.border, Resurge.shape.md)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        textStyle = Resurge.type.body,
+        textColor = Resurge.colors.text,
+        cursorBrush = SolidColor(Resurge.colors.accent),
+        lineLimits = TextFieldLineLimits.SingleLine,
+        inputTransformation = InputTransformation.maxLength(maxLength),
+        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+        onKeyboardAction = { onDone?.invoke() },
+        accessibilityLabel = placeholder,
+    ) {
+        TextInput(placeholder = { Text(placeholder, style = Resurge.type.body, color = Resurge.colors.textSubtle) })
     }
 }

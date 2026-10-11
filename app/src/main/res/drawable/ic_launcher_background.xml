@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Matches the gradient in assets/resurge.png; shows wherever a launcher mask reaches past the artwork's rounded corners. -->
+<!-- Matches the flat background in assets/resurge_new.png. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <gradient
-        android:angle="270"
-        android:endColor="#1F1C5E"
-        android:startColor="#544AF9" />
+    <solid android:color="#6F66FB" />
 </shape>

@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import com.resurgeai.app.notifications.HabitReminder
 import com.resurgeai.app.notifications.ResurgeMessagingService
 import com.resurgeai.core.data.di.WebClientId
 import dagger.Module
@@ -22,6 +23,7 @@ class ResurgeApplication : Application(), Configuration.Provider {
         super.onCreate()
         installAppCheck()
         ResurgeMessagingService.createChannel(this)
+        HabitReminder.createChannel(this)
     }
 
     override val workManagerConfiguration: Configuration

@@ -29,6 +29,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composeunstyled.theme.ColorScheme
 import com.resurgeai.app.main.MainScreen
+import com.resurgeai.app.notifications.HabitReminder
 import com.resurgeai.app.notifications.ResurgeMessagingService
 import com.resurgeai.core.designsystem.components.Screen
 import com.resurgeai.core.designsystem.theme.LocalUse24HourClock
@@ -78,11 +79,13 @@ class MainActivity : ComponentActivity() {
             ResurgeTheme(colorScheme = if (dark) ColorScheme.Dark else ColorScheme.Light) {
                 CompositionLocalProvider(LocalUse24HourClock provides use24Hour) {
                     val openInsights by viewModel.openInsights.collectAsStateWithLifecycle()
+                    val openHabits by viewModel.openHabits.collectAsStateWithLifecycle()
                     val askNotifications by viewModel.askNotifications.collectAsStateWithLifecycle()
                     Screen {
                         AppRoot(
                             session = session,
                             openInsightsSignal = openInsights,
+                            openHabitsSignal = openHabits,
                             askNotifications = askNotifications,
                             onNotificationPromptShown = viewModel::onNotificationPromptShown,
                         )
@@ -99,10 +102,12 @@ class MainActivity : ComponentActivity() {
 
     /** Notification taps carry open=insights (both our own and system-shown FCM notifications). */
     private fun handleOpenIntent(intent: Intent?) {
-        if (intent?.getStringExtra(ResurgeMessagingService.EXTRA_OPEN) == ResurgeMessagingService.OPEN_INSIGHTS) {
-            viewModel.requestOpenInsights()
-            intent.removeExtra(ResurgeMessagingService.EXTRA_OPEN)
+        when (intent?.getStringExtra(ResurgeMessagingService.EXTRA_OPEN)) {
+            ResurgeMessagingService.OPEN_INSIGHTS -> viewModel.requestOpenInsights()
+            HabitReminder.OPEN_HABITS -> viewModel.requestOpenHabits()
+            else -> return
         }
+        intent.removeExtra(ResurgeMessagingService.EXTRA_OPEN)
     }
 }
 
@@ -125,6 +130,7 @@ private fun NotificationPermissionPrompt(ask: Boolean, onShown: () -> Unit) {
 private fun AppRoot(
     session: SessionState,
     openInsightsSignal: Int,
+    openHabitsSignal: Int,
     askNotifications: Boolean,
     onNotificationPromptShown: () -> Unit,
 ) {
@@ -141,7 +147,7 @@ private fun AppRoot(
             is SessionState.NeedsOnboarding -> OnboardingRoute(profile = state.profile)
             is SessionState.Ready -> {
                 NotificationPermissionPrompt(askNotifications, onNotificationPromptShown)
-                MainScreen(profile = state.profile, openInsightsSignal = openInsightsSignal)
+                MainScreen(profile = state.profile, openInsightsSignal = openInsightsSignal, openHabitsSignal = openHabitsSignal)
             }
         }
     }

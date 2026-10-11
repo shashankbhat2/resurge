@@ -13,14 +13,21 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.map
+import android.content.Context
+import com.resurgeai.app.notifications.HabitReminder
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class AppViewModel @Inject constructor(
-    sessionRepository: SessionRepository,
+    private val sessionRepository: SessionRepository,
     private val preferencesRepository: PreferencesRepository,
+    @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
     val session: StateFlow<SessionState> = sessionRepository.session
         .stateIn(viewModelScope, SharingStarted.Eagerly, SessionState.Loading)
@@ -37,12 +44,29 @@ class AppViewModel @Inject constructor(
 
     fun requestOpenInsights() = _openInsights.update { it + 1 }
 
+    /** Bumped when the habit reminder asks to open the Habits tab. */
+    private val _openHabits = MutableStateFlow(0)
+    val openHabits: StateFlow<Int> = _openHabits.asStateFlow()
+
+    fun requestOpenHabits() = _openHabits.update { it + 1 }
+
     /** True until we've asked for the notification permission once. */
     private val _askNotifications = MutableStateFlow(false)
     val askNotifications: StateFlow<Boolean> = _askNotifications.asStateFlow()
 
     init {
         viewModelScope.launch { _askNotifications.value = !preferencesRepository.notificationPromptShown() }
+        // Keep the local habit reminder in step with the user's habit settings.
+        viewModelScope.launch {
+            sessionRepository.session
+                .filterIsInstance<SessionState.Ready>()
+                .map { it.profile.habitSettings }
+                .distinctUntilChanged()
+                .collect { settings ->
+                    preferencesRepository.saveHabitSettingsMirror(settings)
+                    HabitReminder.schedule(appContext, settings)
+                }
+        }
     }
 
     fun onNotificationPromptShown() {

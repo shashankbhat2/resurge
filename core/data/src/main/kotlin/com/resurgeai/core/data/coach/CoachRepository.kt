@@ -163,6 +163,7 @@ class CoachRepository @Inject constructor(
                 focus = (d.get("focus") as? List<String>).orEmpty(),
                 weekStart = d.getString("weekStart"),
                 weekEnd = d.getString("weekEnd"),
+                habits = d.getString("habits").orEmpty(),
             )
         } else null
         return CoachInsight(

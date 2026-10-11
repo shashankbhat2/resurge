@@ -2,11 +2,9 @@ package com.resurgeai.feature.dashboard
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -35,17 +33,12 @@ import com.resurgeai.core.designsystem.components.SkeletonCircle
 import com.resurgeai.core.designsystem.components.SkeletonGroup
 import com.resurgeai.core.designsystem.components.SkeletonLine
 import com.resurgeai.core.designsystem.theme.Resurge
-import com.resurgeai.core.designsystem.theme.clockFormatter
 import com.resurgeai.core.model.DailyHealth
 import com.resurgeai.core.model.HealthMetric
 import com.resurgeai.core.model.SleepStage
 import java.time.Duration
 import com.resurgeai.core.model.CoachInsight
 import androidx.compose.ui.text.style.TextOverflow
-import java.time.format.DateTimeFormatter
-import java.time.ZoneId
-import java.time.LocalDate
-import java.time.Instant
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -63,8 +56,8 @@ internal object DashboardGoals {
 // --- Insight ---
 
 /**
- * Latest coach insight: first row is the AI icon and when it was written, second row the text.
- * Before the first insight exists, explains what will trigger one. Tapping opens Coach › Insights.
+ * Latest coach insight, text only. Before the first insight exists, explains what will trigger one.
+ * Tapping opens Coach › Insights.
  */
 @Composable
 internal fun CoachInsight(insight: CoachInsight?, onClick: () -> Unit) {
@@ -75,39 +68,17 @@ internal fun CoachInsight(insight: CoachInsight?, onClick: () -> Unit) {
         contentAlignment = Alignment.TopStart,
     ) {
         // Inset inside the rounded press area so the corners never clip the text.
-        Column(Modifier.padding(INSIGHT_INSET)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(ResurgeIcons.CoachFilled, contentDescription = "Coach insight", tint = Resurge.colors.accent, size = 18.dp)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    insight?.let { insightTime(it.createdAt) } ?: "Coach",
-                    style = Resurge.type.label,
-                    color = Resurge.colors.textMuted,
-                )
-            }
-            Spacer(Modifier.height(12.dp))
-            Text(
-                insight?.body ?: "Your first insight arrives after your next workout or night of sleep.",
-                style = Resurge.type.body.copy(fontSize = 17.sp, lineHeight = 27.sp),
-                color = if (insight != null) Resurge.colors.text else Resurge.colors.textMuted,
-                maxLines = 6,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+        Text(
+            insight?.body ?: "Your first insight arrives after your next workout or night of sleep.",
+            style = Resurge.type.body.copy(fontSize = 17.sp, lineHeight = 27.sp),
+            color = if (insight != null) Resurge.colors.text else Resurge.colors.textMuted,
+            maxLines = 6,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(INSIGHT_INSET),
+        )
     }
 }
 
-/** "Today, 7:12 am" / "Yesterday, 18:30" / "Thu 8 Oct, 08:15", following the clock setting. */
-@Composable
-private fun insightTime(at: Instant): String {
-    val local = at.atZone(ZoneId.systemDefault())
-    val day = when (local.toLocalDate()) {
-        LocalDate.now() -> "Today"
-        LocalDate.now().minusDays(1) -> "Yesterday"
-        else -> local.format(DateTimeFormatter.ofPattern("EEE d MMM"))
-    }
-    return "$day, ${local.format(clockFormatter())}"
-}
 
 // --- Sections ---
 

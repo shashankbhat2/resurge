@@ -6,11 +6,13 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import com.resurgeai.core.model.HabitSettings
 import com.resurgeai.core.model.ThemePreference
 import com.resurgeai.core.model.TimeFormat
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import java.time.LocalTime
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -60,6 +62,28 @@ class PreferencesRepository @Inject constructor(
         }
     }
 
+    /**
+     * Local copy of the habit settings, so the reminder alarm can be rescheduled after a reboot
+     * without network or a signed-in Firestore read.
+     */
+    suspend fun saveHabitSettingsMirror(settings: HabitSettings) {
+        dataStore.edit {
+            it[HABIT_RESET] = settings.resetTime.toString()
+            it[HABIT_REMINDER_ON] = settings.reminderEnabled
+            it[HABIT_REMINDER_TIME] = settings.reminderTime.toString()
+        }
+    }
+
+    suspend fun habitSettingsMirror(): HabitSettings? {
+        val prefs = dataStore.data.first()
+        val reset = prefs[HABIT_RESET] ?: return null
+        return HabitSettings(
+            resetTime = LocalTime.parse(reset),
+            reminderEnabled = prefs[HABIT_REMINDER_ON] ?: true,
+            reminderTime = prefs[HABIT_REMINDER_TIME]?.let(LocalTime::parse) ?: HabitSettings.DEFAULT_REMINDER,
+        )
+    }
+
     /** Whether we've already asked for the notification permission (ask once). */
     suspend fun notificationPromptShown(): Boolean = dataStore.data.first()[NOTIFICATION_PROMPT] == true
 
@@ -70,6 +94,9 @@ class PreferencesRepository @Inject constructor(
     private companion object {
         const val MAX_POSTED = 300
         val NOTIFICATION_PROMPT = booleanPreferencesKey("notification_prompt_shown")
+        val HABIT_RESET = stringPreferencesKey("habit_reset")
+        val HABIT_REMINDER_ON = booleanPreferencesKey("habit_reminder_on")
+        val HABIT_REMINDER_TIME = stringPreferencesKey("habit_reminder_time")
         val THEME = stringPreferencesKey("theme")
         val TIME_FORMAT = stringPreferencesKey("time_format")
     }
