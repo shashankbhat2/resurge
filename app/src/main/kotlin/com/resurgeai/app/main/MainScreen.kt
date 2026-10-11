@@ -19,6 +19,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.UnstyledButton
 import com.resurgeai.core.designsystem.components.Avatar
+import com.resurgeai.core.designsystem.components.CoachMascot
+import com.resurgeai.core.model.CoachStyle
+import androidx.compose.foundation.layout.size
 import com.resurgeai.core.designsystem.components.LocalHeaderInset
 import com.resurgeai.core.designsystem.components.MainHeader
 import com.resurgeai.core.designsystem.components.MainHeaderHeight
@@ -295,9 +298,18 @@ private fun TabsShell(
             items = Tab.entries.map { NavItem(it, it.label, it.icon, it.selectedIcon) },
             selected = currentTab,
             onSelect = { tab -> tabsNav.switchTab(tab.route) },
-            // Detached Coach button opens the full-screen coach on its Chat tab.
-            action = NavItem(Unit, "Coach", ResurgeIcons.Coach),
-            onAction = onOpenCoach,
+            // Coach sits in the middle of the bar, shown as the selected persona's mascot.
+            center = {
+                UnstyledButton(
+                    onClick = onOpenCoach,
+                    role = Role.Button,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(Resurge.shape.pill)
+                        .semantics { contentDescription = "Coach" },
+                    indication = LocalIndication.current,
+                ) { CoachMascot(commander = profile.coachStyle == CoachStyle.COMMANDER, size = 30.dp) }
+            },
             modifier = Modifier.align(Alignment.BottomCenter),
         )
     }

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from assets/friend_blob.svg -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="31.4dp"
+    android:height="30.8dp"
+    android:viewportWidth="314"
+    android:viewportHeight="308">
+    <path android:fillColor="#FF6F66FB" android:pathData="M161.043 0C73.7035 0 0 78.4932 0 168.032C0 259.477 68.1806 307.815 157.768 307.815C252.048 307.815 313.631 250.484 313.631 165.491V158.795C313.631 71.8951 243.74 0 161.043 0Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M89.5368 188.804C109.587 188.804 125.841 171.43 125.841 149.997C125.841 128.565 109.587 111.19 89.5368 111.19C69.4864 111.19 53.2324 128.565 53.2324 149.997C53.2324 171.43 69.4864 188.804 89.5368 188.804Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M223.943 188.804C243.993 188.804 260.247 171.43 260.247 149.997C260.247 128.565 243.993 111.19 223.943 111.19C203.893 111.19 187.639 128.565 187.639 149.997C187.639 171.43 203.893 188.804 223.943 188.804Z" />
+</vector>

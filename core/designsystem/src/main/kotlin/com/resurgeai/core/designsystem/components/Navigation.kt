@@ -60,7 +60,7 @@ val FloatingNavBarHeight: Dp = BarHeight + BarGap
 
 /**
  * Floating pill navigation across the width: the active tab is a highlighted pill with icon + label,
- * inactive tabs are outline icons, and an optional [action] (Coach) is the last item, in the accent.
+ * inactive tabs are outline icons, and an optional [center] item (the Coach) sits in the middle.
  */
 @Composable
 fun <T> FloatingNavBar(
@@ -68,10 +68,10 @@ fun <T> FloatingNavBar(
     selected: T,
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
-    action: NavItem<Unit>? = null,
-    onAction: () -> Unit = {},
+    /** Optional centre item (e.g. the Coach), placed between the first and second half of [items]. */
+    center: (@Composable () -> Unit)? = null,
 ) {
-    // One pill across the width: tabs, then the action (e.g. Coach) as the last item.
+    // One pill across the width: tabs with the centre item in the middle.
     Row(
         modifier = modifier
             .windowInsetsPadding(WindowInsets.navigationBars)
@@ -85,7 +85,9 @@ fun <T> FloatingNavBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        items.forEach { item ->
+        val half = (items.size + 1) / 2
+        items.forEachIndexed { index, item ->
+            if (index == half) center?.invoke()
             val isSelected = item.key == selected
             NavCircle(
                 icon = if (isSelected) item.selectedIcon else item.icon,
@@ -97,17 +99,7 @@ fun <T> FloatingNavBar(
                 onClick = { onSelect(item.key) },
             )
         }
-        action?.let {
-            NavCircle(
-                icon = it.icon,
-                label = it.label,
-                background = Color.Transparent,
-                tint = Resurge.colors.navHighlight,
-                role = Role.Button,
-                selected = false,
-                onClick = onAction,
-            )
-        }
+        if (half >= items.size) center?.invoke()
     }
 }
 

@@ -1,6 +1,8 @@
 package com.resurgeai.feature.coach
 
 import com.resurgeai.core.data.coach.CoachRepository
+import com.resurgeai.core.data.session.SessionRepository
+import com.resurgeai.core.model.SessionState
 import com.resurgeai.core.model.ChatEvent
 import com.resurgeai.core.model.CoachModel
 import com.resurgeai.core.model.CoachThread
@@ -41,7 +43,9 @@ class CoachViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun vm() = CoachViewModel(repo)
+    private val session = mockk<SessionRepository> { every { session } returns flowOf(SessionState.Loading) }
+
+    private fun vm() = CoachViewModel(repo, session)
 
     @Test
     fun `sending streams text, then hands over to the saved turns`() = runTest {

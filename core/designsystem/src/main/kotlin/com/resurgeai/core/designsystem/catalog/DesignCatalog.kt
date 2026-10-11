@@ -32,6 +32,7 @@ import com.resurgeai.core.designsystem.components.Button
 import com.resurgeai.core.designsystem.components.ButtonVariant
 import com.resurgeai.core.designsystem.components.Card
 import com.resurgeai.core.designsystem.components.ChoiceCard
+import com.resurgeai.core.designsystem.components.CoachMascot
 import com.resurgeai.core.designsystem.components.Divider
 import com.resurgeai.core.designsystem.components.DotOnAxis
 import com.resurgeai.core.designsystem.components.MagnitudeBar
@@ -263,10 +264,11 @@ private fun MiscSection() {
             NavItem(0, "Today", ResurgeIcons.Today, ResurgeIcons.TodayFilled),
             NavItem(1, "Fitness", ResurgeIcons.Fitness, ResurgeIcons.FitnessFilled),
             NavItem(2, "Food", ResurgeIcons.Food, ResurgeIcons.FoodFilled),
+            NavItem(3, "Habits", ResurgeIcons.Habits, ResurgeIcons.Habits),
         ),
         selected = 0,
         onSelect = {},
-        action = NavItem(Unit, "Coach", ResurgeIcons.CoachFilled),
+        center = { CoachMascot(commander = false, size = 30.dp) },
     )
     Spacer(Modifier.height(12.dp))
     Card {

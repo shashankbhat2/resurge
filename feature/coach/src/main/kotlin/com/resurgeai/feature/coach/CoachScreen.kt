@@ -58,6 +58,8 @@ import com.composeunstyled.TextInput
 import com.composeunstyled.UnstyledButton
 import com.composeunstyled.UnstyledTextField
 import com.resurgeai.core.designsystem.components.Card
+import com.resurgeai.core.designsystem.components.CoachMascot
+import com.resurgeai.core.model.CoachStyle
 import com.resurgeai.core.designsystem.components.Divider
 import com.resurgeai.core.designsystem.components.Icon
 import com.resurgeai.core.designsystem.components.IconButton
@@ -128,7 +130,11 @@ fun CoachScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(ResurgeIcons.ArrowLeft, contentDescription = "Back", onClick = onBack)
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(10.dp))
+                if (!state.showHistory) {
+                    CoachMascot(commander = state.coachStyle == CoachStyle.COMMANDER, size = 28.dp, heading = true)
+                    Spacer(Modifier.width(8.dp))
+                }
                 Text(if (state.showHistory) "Conversations" else "Coach", style = Resurge.type.title, modifier = Modifier.weight(1f))
                 ChipButton(if (state.showHistory) "Close" else "History", onToggleHistory)
                 Spacer(Modifier.width(8.dp))
@@ -137,7 +143,7 @@ fun CoachScreen(
             Box(Modifier.weight(1f)) {
                 when {
                     state.showHistory -> ThreadList(state.threads, state.threadId, onOpenThread)
-                    state.visibleTurns.isEmpty() && state.pending == null -> EmptyChat { input.edit { replace(0, length, it) } }
+                    state.visibleTurns.isEmpty() && state.pending == null -> EmptyChat(state.coachStyle) { input.edit { replace(0, length, it) } }
                     else -> Messages(state)
                 }
             }
@@ -281,7 +287,7 @@ private fun String.cleanMarkdown(): String = lines().joinToString("\n") { line -
 }
 
 @Composable
-private fun EmptyChat(onSuggestion: (String) -> Unit) {
+private fun EmptyChat(style: CoachStyle, onSuggestion: (String) -> Unit) {
     Column(
         Modifier
             .fillMaxSize()
@@ -289,8 +295,8 @@ private fun EmptyChat(onSuggestion: (String) -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(ResurgeIcons.CoachFilled, contentDescription = null, tint = Resurge.colors.accent, size = 32.dp)
-        Spacer(Modifier.height(16.dp))
+        CoachMascot(commander = style == CoachStyle.COMMANDER, size = 88.dp, heading = true)
+        Spacer(Modifier.height(20.dp))
         Text("Ask your coach", style = Resurge.type.brand)
         Spacer(Modifier.height(8.dp))
         Text(

@@ -75,6 +75,8 @@ class CoachScreenshotTest {
 
     @Test fun chatEmptyDark() = capture("chat_empty_dark", CoachUiState(), ColorScheme.Dark)
 
+    @Test fun chatEmptyCommander() = capture("chat_empty_commander", CoachUiState(coachStyle = com.resurgeai.core.model.CoachStyle.COMMANDER))
+
     @Test fun chatLight() = capture(
         "chat_light",
         CoachUiState(

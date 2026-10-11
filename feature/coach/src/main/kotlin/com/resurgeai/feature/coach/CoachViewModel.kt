@@ -3,6 +3,10 @@ package com.resurgeai.feature.coach
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.resurgeai.core.data.coach.CoachRepository
+import com.resurgeai.core.data.session.SessionRepository
+import com.resurgeai.core.model.CoachStyle
+import com.resurgeai.core.model.SessionState
+import kotlinx.coroutines.flow.filterIsInstance
 import com.resurgeai.core.model.ChatEvent
 import com.resurgeai.core.model.CoachModel
 import com.resurgeai.core.model.CoachThread
@@ -38,6 +42,8 @@ data class CoachUiState(
     val pending: PendingReply? = null,
     val model: CoachModel = CoachModel.FAST,
     val showHistory: Boolean = false,
+    /** Selected persona; picks the coach mascot. */
+    val coachStyle: CoachStyle = CoachStyle.FRIEND,
     val error: String? = null,
 ) {
     val sending: Boolean get() = pending != null && !pending.done
@@ -54,6 +60,7 @@ data class CoachUiState(
 @HiltViewModel
 class CoachViewModel @Inject constructor(
     private val repository: CoachRepository,
+    sessionRepository: SessionRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(CoachUiState())
     val state: StateFlow<CoachUiState> = _state.asStateFlow()
@@ -62,6 +69,11 @@ class CoachViewModel @Inject constructor(
     private var sendJob: Job? = null
 
     init {
+        viewModelScope.launch {
+            sessionRepository.session.filterIsInstance<SessionState.Ready>().collect { s ->
+                _state.update { it.copy(coachStyle = s.profile.coachStyle) }
+            }
+        }
         viewModelScope.launch {
             repository.threads().catch { emit(emptyList()) }.collect { list ->
                 _state.update { s ->
