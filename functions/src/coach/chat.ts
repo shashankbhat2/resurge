@@ -9,6 +9,7 @@ import { LIMITS, MODELS, type ModelChoice } from "../lib/models";
 import { consumeOrThrow, recordUsage } from "../lib/quota";
 import { isValidTimeZone, localParts } from "../lib/time";
 import { COACH_SYSTEM } from "../prompts/coach";
+import { parseStyle, withPersona } from "../prompts/shared";
 import { buildSnapshot } from "./snapshot";
 import { COACH_TOOLS, runTool } from "./tools";
 
@@ -126,7 +127,7 @@ export const coachChat = onCall(
           ...FALLBACK,
           model: spec.id,
           max_tokens: 16000,
-          system: [{ type: "text", text: COACH_SYSTEM, cache_control: { type: "ephemeral" } }],
+          system: [{ type: "text", text: withPersona(COACH_SYSTEM, parseStyle(user.coachStyle)), cache_control: { type: "ephemeral" } }],
           cache_control: { type: "ephemeral" }, // also cache the conversation so far
           tools: round < MAX_TOOL_ROUNDS ? COACH_TOOLS : [],
           thinking: { type: "adaptive" },

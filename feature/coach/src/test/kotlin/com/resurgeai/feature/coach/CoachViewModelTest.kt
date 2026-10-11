@@ -1,6 +1,5 @@
 package com.resurgeai.feature.coach
 
-import androidx.lifecycle.SavedStateHandle
 import com.resurgeai.core.data.coach.CoachRepository
 import com.resurgeai.core.model.ChatEvent
 import com.resurgeai.core.model.CoachModel
@@ -31,7 +30,6 @@ class CoachViewModelTest {
     private val turns = MutableStateFlow<List<CoachTurn>>(emptyList())
     private val stream = MutableSharedFlow<ChatEvent>()
     private val repo = mockk<CoachRepository>(relaxed = true) {
-        every { insights(any()) } returns flowOf(emptyList())
         every { threads(any()) } returns flowOf(emptyList())
         every { turns(any()) } returns turns
         every { send(any(), any(), any()) } returns stream
@@ -43,22 +41,14 @@ class CoachViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun vm(tab: String? = null) = CoachViewModel(SavedStateHandle(mapOf(CoachViewModel.ARG_TAB to tab)), repo)
-
-    @Test
-    fun `opens on the requested tab`() {
-        assertEquals(CoachTab.CHAT, vm("chat").state.value.tab)
-        assertEquals(CoachTab.INSIGHTS, vm("insights").state.value.tab)
-        assertEquals(CoachTab.INSIGHTS, vm(null).state.value.tab)
-    }
+    private fun vm() = CoachViewModel(repo)
 
     @Test
     fun `sending streams text, then hands over to the saved turns`() = runTest {
-        val vm = vm("insights")
+        val vm = vm()
         vm.selectModel(CoachModel.SMART)
         vm.send("  Why am I tired?  ")
         verify { repo.send(null, "Why am I tired?", CoachModel.SMART) }
-        assertEquals(CoachTab.CHAT, vm.state.value.tab)
         assertEquals("Why am I tired?", vm.state.value.pending?.userText)
 
         stream.emit(ChatEvent.Thread("t1"))
@@ -79,7 +69,7 @@ class CoachViewModelTest {
 
     @Test
     fun `failures surface an error and clear the pending reply`() = runTest {
-        val vm = vm("chat")
+        val vm = vm()
         vm.send("Hi")
         stream.emit(ChatEvent.Failed("Daily limit reached."))
         assertNull(vm.state.value.pending)
@@ -96,6 +86,6 @@ class CoachViewModelTest {
     @Test
     fun `opens the most recent thread on load`() {
         every { repo.threads(any()) } returns flowOf(listOf(CoachThread("recent", "Sleep", null, null)))
-        assertEquals("recent", vm("chat").state.value.threadId)
+        assertEquals("recent", vm().state.value.threadId)
     }
 }

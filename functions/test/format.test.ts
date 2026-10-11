@@ -59,3 +59,13 @@ describe("formatHabits", () => {
     expect(formatHabits([], [])).toBe("No habits set up.");
   });
 });
+
+import { parseStyle, withPersona } from "../src/prompts/shared";
+
+describe("persona", () => {
+  it("defaults to friend and appends the persona block", () => {
+    expect(parseStyle(undefined)).toBe("friend");
+    expect(parseStyle("commander")).toBe("commander");
+    expect(withPersona("BASE", "commander")).toMatch(/^BASE\n\nPersona — Commander/);
+  });
+});

@@ -31,12 +31,12 @@ val TopShadeHeight: Dp = 380.dp
 fun TopShade(color: Color = Resurge.colors.accent, modifier: Modifier = Modifier) {
     val dark = Resurge.colors.bg.luminance() < 0.5f
     val glow by animateColorAsState(color, tween(450), label = "ambient")
-    val strength = if (dark) 0.42f else 0.30f
+    val strength = if (dark) 0.24f else 0.15f
     Canvas(
         modifier
             .fillMaxWidth()
             .height(TopShadeHeight)
-            .then(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Modifier.blur(48.dp, BlurredEdgeTreatment.Unbounded) else Modifier),
+            .then(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Modifier.blur(72.dp, BlurredEdgeTreatment.Unbounded) else Modifier),
     ) {
         val r = size.width * 0.62f
         val c = Offset(size.width * 0.28f, size.height * 0.08f)

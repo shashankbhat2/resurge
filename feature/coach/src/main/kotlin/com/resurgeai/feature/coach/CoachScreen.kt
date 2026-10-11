@@ -92,7 +92,6 @@ fun CoachRoute(
     CoachScreen(
         state = state,
         onBack = onBack,
-        onTabChange = viewModel::selectTab,
         onSend = viewModel::send,
         onModelChange = viewModel::selectModel,
         onToggleHistory = viewModel::toggleHistory,
@@ -103,14 +102,13 @@ fun CoachRoute(
 }
 
 /**
- * Full-screen coach (no navbar, no main header): Insights feed and Chat as two tabs, with a
- * floating composer (Fast / Smart switch) pinned above the keyboard.
+ * Full-screen coach (no navbar or main header): back, "Coach", and History / New on the right;
+ * the conversation (or the thread list) below; a floating composer with the Fast / Smart switch.
  */
 @Composable
 fun CoachScreen(
     state: CoachUiState,
     onBack: () -> Unit,
-    onTabChange: (CoachTab) -> Unit,
     onSend: (String) -> Unit,
     onModelChange: (CoachModel) -> Unit = {},
     onToggleHistory: () -> Unit = {},
@@ -126,33 +124,21 @@ fun CoachScreen(
                 Modifier
                     .fillMaxWidth()
                     .windowInsetsPadding(WindowInsets.statusBars)
-                    .padding(start = 12.dp, end = 20.dp, top = 8.dp, bottom = 8.dp),
+                    .padding(start = 12.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(ResurgeIcons.ArrowLeft, contentDescription = "Back", onClick = onBack)
                 Spacer(Modifier.width(12.dp))
-                SegmentedControl(
-                    options = CoachTab.entries.map { SegmentOption(it, it.label) },
-                    selected = state.tab,
-                    onSelect = onTabChange,
-                    modifier = Modifier.weight(1f),
-                )
+                Text(if (state.showHistory) "Conversations" else "Coach", style = Resurge.type.title, modifier = Modifier.weight(1f))
+                ChipButton(if (state.showHistory) "Close" else "History", onToggleHistory)
+                Spacer(Modifier.width(8.dp))
+                ChipButton("New", onNewChat)
             }
-            AnimatedContent(
-                targetState = state.tab,
-                transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(120)) },
-                modifier = Modifier.weight(1f),
-                label = "coach-tab",
-            ) { tab ->
-                when (tab) {
-                    CoachTab.INSIGHTS -> InsightsFeed(state)
-                    CoachTab.CHAT -> ChatPane(
-                        state = state,
-                        onToggleHistory = onToggleHistory,
-                        onOpenThread = onOpenThread,
-                        onNewChat = onNewChat,
-                        onSuggestion = { input.edit { replace(0, length, it) } },
-                    )
+            Box(Modifier.weight(1f)) {
+                when {
+                    state.showHistory -> ThreadList(state.threads, state.threadId, onOpenThread)
+                    state.visibleTurns.isEmpty() && state.pending == null -> EmptyChat { input.edit { replace(0, length, it) } }
+                    else -> Messages(state)
                 }
             }
         }
@@ -172,199 +158,7 @@ fun CoachScreen(
     }
 }
 
-// --- Insights ---
-
-@Composable
-private fun InsightsFeed(state: CoachUiState) {
-    when {
-        !state.insightsLoaded -> InsightsSkeleton()
-        state.insights.isEmpty() -> EmptyState(
-            title = "No insights yet",
-            body = "Finish a workout or a night of sleep and your coach will write about it. Every Saturday evening you'll also get a review of your week.",
-        )
-        else -> LazyColumn(
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = ComposerSpace + 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            items(state.insights, key = { it.id }) {
-                if (it.kind == InsightKind.WEEKLY) WeeklyCard(it) else InsightCard(it)
-            }
-        }
-    }
-}
-
-@Composable
-private fun InsightCard(insight: CoachInsight) {
-    val tint = categoryColor(insight.category, insight.kind)
-    Card(Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(8.dp).clip(Resurge.shape.pill).background(tint))
-            Spacer(Modifier.width(8.dp))
-            Text(
-                categoryLabel(insight.category, insight.kind),
-                style = Resurge.type.label,
-                color = Resurge.colors.textMuted,
-                modifier = Modifier.weight(1f),
-            )
-            Text(whenLabel(insight.createdAt), style = Resurge.type.caption, color = Resurge.colors.textSubtle)
-        }
-        Spacer(Modifier.height(14.dp))
-        Text(insight.title, style = Resurge.type.headline)
-        Spacer(Modifier.height(8.dp))
-        Text(insight.body, style = Resurge.type.body, color = Resurge.colors.textMuted)
-        if (insight.highlights.isNotEmpty()) {
-            Spacer(Modifier.height(14.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                insight.highlights.forEach { h ->
-                    Column(
-                        Modifier
-                            .clip(Resurge.shape.md)
-                            .background(Resurge.colors.surfaceMuted)
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                    ) {
-                        Text(h.value, style = Resurge.type.label, maxLines = 1)
-                        Text(h.label, style = Resurge.type.caption, color = Resurge.colors.textMuted, maxLines = 1)
-                    }
-                }
-            }
-        }
-        insight.suggestion?.let {
-            Spacer(Modifier.height(14.dp))
-            Row(verticalAlignment = Alignment.Top) {
-                Icon(ResurgeIcons.CoachFilled, contentDescription = null, tint = Resurge.colors.accent, size = 16.dp, modifier = Modifier.padding(top = 2.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(it, style = Resurge.type.label)
-            }
-        }
-    }
-}
-
-@Composable
-private fun WeeklyCard(insight: CoachInsight) {
-    val weekly = insight.weekly
-    Card(Modifier.fillMaxWidth(), inverse = true) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(ResurgeIcons.CoachFilled, contentDescription = null, tint = Resurge.colors.accent, size = 16.dp)
-            Spacer(Modifier.width(8.dp))
-            Text("Weekly review", style = Resurge.type.label, color = Resurge.colors.onInverseMuted, modifier = Modifier.weight(1f))
-            Text(whenLabel(insight.createdAt), style = Resurge.type.caption, color = Resurge.colors.onInverseMuted)
-        }
-        Spacer(Modifier.height(14.dp))
-        Text(insight.title, style = Resurge.type.title, color = Resurge.colors.onInverse)
-        if (weekly != null) {
-            Spacer(Modifier.height(10.dp))
-            Text(weekly.summary, style = Resurge.type.body, color = Resurge.colors.onInverseMuted)
-            if (weekly.areas.isNotEmpty()) {
-                Spacer(Modifier.height(16.dp))
-                weekly.areas.forEach { area ->
-                    Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.Top) {
-                        Text(
-                            when (area.trend) { "up" -> "↑"; "down" -> "↓"; else -> "→" },
-                            style = Resurge.type.label,
-                            color = Resurge.colors.onInverse,
-                            modifier = Modifier.width(20.dp),
-                        )
-                        Text(
-                            "${area.area.replaceFirstChar { it.uppercase() }} · ${area.note}",
-                            style = Resurge.type.label,
-                            color = Resurge.colors.onInverse,
-                        )
-                    }
-                }
-            }
-            if (weekly.wins.isNotEmpty()) BulletSection("Wins", weekly.wins)
-            if (weekly.habits.isNotBlank()) BulletSection("Habits", listOf(weekly.habits))
-            if (weekly.focus.isNotEmpty()) BulletSection("Next week", weekly.focus)
-        }
-    }
-}
-
-@Composable
-private fun BulletSection(title: String, items: List<String>) {
-    Spacer(Modifier.height(16.dp))
-    Text(title.uppercase(), style = Resurge.type.caption, color = Resurge.colors.onInverseMuted)
-    Spacer(Modifier.height(6.dp))
-    items.forEach { Text("•  $it", style = Resurge.type.body, color = Resurge.colors.onInverse, modifier = Modifier.padding(vertical = 2.dp)) }
-}
-
-@Composable
-private fun InsightsSkeleton() {
-    SkeletonGroup {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            repeat(3) {
-                Card(Modifier.fillMaxWidth()) {
-                    SkeletonLine(90.dp)
-                    Spacer(Modifier.height(14.dp))
-                    SkeletonLine(200.dp, 18.dp)
-                    Spacer(Modifier.height(10.dp))
-                    SkeletonLine(280.dp)
-                    Spacer(Modifier.height(6.dp))
-                    SkeletonLine(240.dp)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun categoryColor(category: String?, kind: InsightKind): Color = when {
-    kind == InsightKind.SLEEP || category == "SLEEP" -> Resurge.colors.sleep
-    category == "HEART" -> Resurge.colors.heart
-    category == "NUTRITION" -> Resurge.colors.energy
-    category == "RECOVERY" -> Resurge.colors.water
-    else -> Resurge.colors.activity
-}
-
-private fun categoryLabel(category: String?, kind: InsightKind): String = when {
-    kind == InsightKind.SLEEP -> "Sleep"
-    category != null -> category.lowercase().replaceFirstChar { it.uppercase() }
-    else -> "Activity"
-}
-
-@Composable
-private fun whenLabel(at: Instant): String {
-    val local = at.atZone(ZoneId.systemDefault())
-    val day = when (local.toLocalDate()) {
-        LocalDate.now() -> "Today"
-        LocalDate.now().minusDays(1) -> "Yesterday"
-        else -> local.format(DateTimeFormatter.ofPattern("EEE d MMM"))
-    }
-    return "$day, ${local.format(clockFormatter())}"
-}
-
 // --- Chat ---
-
-@Composable
-private fun ChatPane(
-    state: CoachUiState,
-    onToggleHistory: () -> Unit,
-    onOpenThread: (String) -> Unit,
-    onNewChat: () -> Unit,
-    onSuggestion: (String) -> Unit,
-) {
-    Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(start = 20.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            val title = if (state.showHistory) "Conversations"
-            else state.threads.firstOrNull { it.id == state.threadId }?.title ?: "New conversation"
-            Text(title, style = Resurge.type.label, color = Resurge.colors.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            ChipButton(if (state.showHistory) "Close" else "History", onToggleHistory)
-            Spacer(Modifier.width(8.dp))
-            ChipButton("New chat", onNewChat)
-        }
-        Box(Modifier.weight(1f)) {
-            when {
-                state.showHistory -> ThreadList(state.threads, state.threadId, onOpenThread)
-                state.visibleTurns.isEmpty() && state.pending == null -> EmptyChat(onSuggestion)
-                else -> Messages(state)
-            }
-        }
-    }
-}
 
 @Composable
 private fun ChipButton(label: String, onClick: () -> Unit) {
@@ -382,7 +176,7 @@ private fun ChipButton(label: String, onClick: () -> Unit) {
 @Composable
 private fun ThreadList(threads: List<CoachThread>, current: String?, onOpen: (String) -> Unit) {
     if (threads.isEmpty()) {
-        EmptyState("No conversations yet", "Ask your coach anything about your sleep, training or heart.")
+        EmptyState("No conversations yet", "Ask your coach anything about your sleep, training or heart.", ComposerSpace)
         return
     }
     LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = ComposerSpace + 24.dp)) {
@@ -519,23 +313,6 @@ private fun EmptyChat(onSuggestion: (String) -> Unit) {
                 ) { Text(suggestion, style = Resurge.type.label) }
             }
         }
-    }
-}
-
-@Composable
-private fun EmptyState(title: String, body: String) {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .padding(start = 32.dp, end = 32.dp, bottom = ComposerSpace),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Icon(ResurgeIcons.CoachFilled, contentDescription = null, tint = Resurge.colors.accent, size = 28.dp)
-        Spacer(Modifier.height(14.dp))
-        Text(title, style = Resurge.type.headline)
-        Spacer(Modifier.height(6.dp))
-        Text(body, style = Resurge.type.body, color = Resurge.colors.textMuted, textAlign = TextAlign.Center)
     }
 }
 

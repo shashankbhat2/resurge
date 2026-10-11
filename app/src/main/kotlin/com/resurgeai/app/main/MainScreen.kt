@@ -62,11 +62,14 @@ import com.resurgeai.feature.dashboard.TodayRoute as TodayScreenRoute
 import com.resurgeai.feature.dashboard.detail.MetricDetailRoute as MetricDetailScreenRoute
 import com.resurgeai.feature.dashboard.sources.MetricSourcesRoute as MetricSourcesScreenRoute
 import com.resurgeai.feature.coach.CoachRoute as CoachScreen
-import com.resurgeai.feature.coach.CoachTab
+import com.resurgeai.feature.coach.InsightsRoute as InsightsScreen
 import com.resurgeai.feature.habits.HabitDetailRoute as HabitDetailScreen
 import com.resurgeai.feature.habits.HabitEditorRoute as HabitEditorScreen
 import com.resurgeai.feature.habits.HabitsRoute as HabitsScreenRoute
-import com.resurgeai.feature.profile.ProfileRoute
+import com.resurgeai.feature.profile.SettingsSheet
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.navigation.toRoute
 import kotlinx.serialization.Serializable
 
@@ -75,15 +78,17 @@ import kotlinx.serialization.Serializable
 @Serializable data class MetricDetailRoute(val metric: String)
 @Serializable data class MetricSourcesRoute(val metric: String)
 @Serializable data object CatalogRoute
-@Serializable data object SettingsRoute
 
 @Serializable data class HabitDetailRoute(val id: String)
 
 /** Add a habit (id = null) or edit one. */
 @Serializable data class HabitEditorRoute(val id: String? = null)
 
-/** Full-screen coach; [tab] is "insights" or "chat". */
-@Serializable data class CoachScreenRoute(val tab: String)
+/** Full-screen coach chat. */
+@Serializable data object CoachScreenRoute
+
+/** Standalone list of past insights. */
+@Serializable data object InsightsScreenRoute
 
 // Tab graph, nested inside the shell.
 @Serializable data object TodayRoute
@@ -127,7 +132,7 @@ fun MainScreen(profile: UserProfile, openInsightsSignal: Int = 0, openHabitsSign
     val rootNav = rememberNavController()
     // A tapped insight notification opens Coach on the Insights tab.
     LaunchedEffect(openInsightsSignal) {
-        if (openInsightsSignal > 0) rootNav.navigate(CoachScreenRoute(CoachTab.INSIGHTS.name.lowercase())) { launchSingleTop = true }
+        if (openInsightsSignal > 0) rootNav.navigate(InsightsScreenRoute) { launchSingleTop = true }
     }
     NavHost(
         navController = rootNav,
@@ -142,8 +147,11 @@ fun MainScreen(profile: UserProfile, openInsightsSignal: Int = 0, openHabitsSign
             TabsShell(
                 profile = profile,
                 onOpenMetric = { metric -> rootNav.navigate(MetricDetailRoute(metric.name)) },
-                onOpenSettings = { rootNav.navigate(SettingsRoute) },
-                onOpenCoach = { tab -> rootNav.navigate(CoachScreenRoute(tab.name.lowercase())) },
+                onOpenCatalog = if (BuildConfig.DEBUG) {
+                    { rootNav.navigate(CatalogRoute) }
+                } else null,
+                onOpenCoach = { rootNav.navigate(CoachScreenRoute) },
+                onOpenInsights = { rootNav.navigate(InsightsScreenRoute) },
                 onOpenHabit = { id -> rootNav.navigate(HabitDetailRoute(id)) },
                 onAddHabit = { rootNav.navigate(HabitEditorRoute()) },
                 openHabitsSignal = openHabitsSignal,
@@ -166,15 +174,8 @@ fun MainScreen(profile: UserProfile, openInsightsSignal: Int = 0, openHabitsSign
         composable<CoachScreenRoute> {
             FullScreen { CoachScreen(onBack = { rootNav.popBackStack() }) }
         }
-        composable<SettingsRoute> {
-            FullScreen {
-                ProfileRoute(
-                    onBack = { rootNav.popBackStack() },
-                    onOpenCatalog = if (BuildConfig.DEBUG) {
-                        { rootNav.navigate(CatalogRoute) }
-                    } else null,
-                )
-            }
+        composable<InsightsScreenRoute> {
+            FullScreen { InsightsScreen(onBack = { rootNav.popBackStack() }) }
         }
         composable<MetricDetailRoute> {
             FullScreen {
@@ -214,14 +215,17 @@ private fun FullScreen(content: @Composable () -> Unit) {
 private fun TabsShell(
     profile: UserProfile,
     onOpenMetric: (HealthMetric) -> Unit,
-    onOpenSettings: () -> Unit,
-    onOpenCoach: (CoachTab) -> Unit,
+    onOpenCatalog: (() -> Unit)?,
+    onOpenCoach: () -> Unit,
+    onOpenInsights: () -> Unit,
     onOpenHabit: (String) -> Unit,
     onAddHabit: () -> Unit,
     openHabitsSignal: Int,
     onReturnToTabs: () -> Unit,
 ) {
     val tabsNav = rememberNavController()
+    var showSettings by remember { mutableStateOf(false) }
+    SettingsSheet(visible = showSettings, onDismiss = { showSettings = false }, onOpenCatalog = onOpenCatalog)
     // The habit reminder notification opens the Habits tab.
     LaunchedEffect(openHabitsSignal) {
         if (openHabitsSignal > 0) {
@@ -255,7 +259,7 @@ private fun TabsShell(
                 popExitTransition = { ExitTransition.None },
             ) {
                 composable<TodayRoute> {
-                    TodayScreenRoute(onOpenMetric = onOpenMetric, onOpenInsights = { onOpenCoach(CoachTab.INSIGHTS) })
+                    TodayScreenRoute(onOpenMetric = onOpenMetric, onOpenInsights = onOpenInsights)
                 }
                 composable<FitnessRoute> {
                     ComingSoon("Workouts, training load and activity trends from your wearable.", "a later phase")
@@ -276,7 +280,7 @@ private fun TabsShell(
             } else null,
             trailing = {
                 UnstyledButton(
-                    onClick = onOpenSettings,
+                    onClick = { showSettings = true },
                     role = Role.Button,
                     modifier = Modifier
                         .clip(Resurge.shape.pill)
@@ -293,7 +297,7 @@ private fun TabsShell(
             onSelect = { tab -> tabsNav.switchTab(tab.route) },
             // Detached Coach button opens the full-screen coach on its Chat tab.
             action = NavItem(Unit, "Coach", ResurgeIcons.Coach),
-            onAction = { onOpenCoach(CoachTab.CHAT) },
+            onAction = onOpenCoach,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
     }

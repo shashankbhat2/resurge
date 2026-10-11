@@ -1,11 +1,9 @@
 package com.resurgeai.feature.coach
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.resurgeai.core.data.coach.CoachRepository
 import com.resurgeai.core.model.ChatEvent
-import com.resurgeai.core.model.CoachInsight
 import com.resurgeai.core.model.CoachModel
 import com.resurgeai.core.model.CoachThread
 import com.resurgeai.core.model.CoachTurn
@@ -23,8 +21,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-enum class CoachTab(val label: String) { INSIGHTS("Insights"), CHAT("Chat") }
-
 /** A reply being generated: the user's message (until it's saved) and the text streamed so far. */
 data class PendingReply(
     val userText: String,
@@ -36,9 +32,6 @@ data class PendingReply(
 )
 
 data class CoachUiState(
-    val tab: CoachTab = CoachTab.INSIGHTS,
-    val insights: List<CoachInsight> = emptyList(),
-    val insightsLoaded: Boolean = false,
     val threads: List<CoachThread> = emptyList(),
     val threadId: String? = null,
     val turns: List<CoachTurn> = emptyList(),
@@ -60,25 +53,15 @@ data class CoachUiState(
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class CoachViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
     private val repository: CoachRepository,
 ) : ViewModel() {
-    private val initialTab = savedStateHandle.get<String>(ARG_TAB)
-        ?.let { arg -> CoachTab.entries.firstOrNull { it.name.equals(arg, ignoreCase = true) } }
-        ?: CoachTab.INSIGHTS
-
-    private val _state = MutableStateFlow(CoachUiState(tab = initialTab))
+    private val _state = MutableStateFlow(CoachUiState())
     val state: StateFlow<CoachUiState> = _state.asStateFlow()
 
     private val threadId = MutableStateFlow<String?>(null)
     private var sendJob: Job? = null
 
     init {
-        viewModelScope.launch {
-            repository.insights()
-                .catch { _state.update { it.copy(insightsLoaded = true) } }
-                .collect { list -> _state.update { it.copy(insights = list, insightsLoaded = true) } }
-        }
         viewModelScope.launch {
             repository.threads().catch { emit(emptyList()) }.collect { list ->
                 _state.update { s ->
@@ -99,8 +82,6 @@ class CoachViewModel @Inject constructor(
         viewModelScope.launch { threadId.collect { id -> _state.update { it.copy(threadId = id) } } }
     }
 
-    fun selectTab(tab: CoachTab) = _state.update { it.copy(tab = tab, showHistory = false) }
-
     fun selectModel(model: CoachModel) = _state.update { it.copy(model = model) }
 
     fun toggleHistory() = _state.update { it.copy(showHistory = !it.showHistory) }
@@ -108,25 +89,24 @@ class CoachViewModel @Inject constructor(
     fun openThread(id: String) {
         if (_state.value.sending) return
         threadId.value = id
-        _state.update { it.copy(showHistory = false, pending = null, error = null, tab = CoachTab.CHAT) }
+        _state.update { it.copy(showHistory = false, pending = null, error = null) }
     }
 
     fun newChat() {
         if (_state.value.sending) return
         threadId.value = null
-        _state.update { it.copy(showHistory = false, pending = null, error = null, tab = CoachTab.CHAT, turns = emptyList()) }
+        _state.update { it.copy(showHistory = false, pending = null, error = null, turns = emptyList()) }
     }
 
     fun dismissError() = _state.update { it.copy(error = null) }
 
-    /** Sends a message (from either tab — Insights jumps to Chat) and streams the reply. */
+    /** Sends a message and streams the reply. */
     fun send(text: String) {
         val trimmed = text.trim()
         if (trimmed.isEmpty() || _state.value.sending) return
         val current = _state.value
         _state.update {
             it.copy(
-                tab = CoachTab.CHAT,
                 showHistory = false,
                 error = null,
                 pending = PendingReply(userText = trimmed, baseline = current.turns.size),
@@ -153,10 +133,5 @@ class CoachViewModel @Inject constructor(
         val saved = turns.drop(p.baseline)
         val complete = p.done && saved.any { it.role == TurnRole.USER } && saved.any { it.role == TurnRole.COACH }
         return if (complete) copy(pending = null) else this
-    }
-
-    companion object {
-        /** Must match the property name in the navigation route. */
-        const val ARG_TAB = "tab"
     }
 }

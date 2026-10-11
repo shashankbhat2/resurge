@@ -10,6 +10,7 @@ import { notifyInsight } from "../lib/push";
 import { recordUsage } from "../lib/quota";
 import { addDays, isSaturdayHour, isValidTimeZone, localParts, weekWindow } from "../lib/time";
 import { WEEKLY_INSIGHT_SYSTEM } from "../prompts/insights";
+import { parseStyle, withPersona } from "../prompts/shared";
 import { generateStructured } from "./generate";
 import { WEEKLY_INSIGHT_JSON_SCHEMA, WeeklyInsight } from "./schemas";
 
@@ -83,7 +84,7 @@ export async function writeWeekly(uid: string, saturday: string): Promise<void> 
 
   const { value, usage } = await generateStructured({
     model: WEEKLY_INSIGHT_MODEL,
-    system: WEEKLY_INSIGHT_SYSTEM,
+    system: withPersona(WEEKLY_INSIGHT_SYSTEM, parseStyle(profile.coachStyle)),
     context,
     jsonSchema: WEEKLY_INSIGHT_JSON_SCHEMA,
     schema: WeeklyInsight,

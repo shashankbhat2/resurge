@@ -11,6 +11,7 @@ import { recordUsage, tryConsume } from "../lib/quota";
 import { addDays } from "../lib/time";
 import type { ActivityEvent } from "../lib/types";
 import { ACTIVITY_INSIGHT_SYSTEM } from "../prompts/insights";
+import { parseStyle, withPersona } from "../prompts/shared";
 import { generateStructured } from "./generate";
 import { ACTIVITY_INSIGHT_JSON_SCHEMA, ActivityInsight } from "./schemas";
 
@@ -49,10 +50,13 @@ export const analyzeEvent = onDocumentCreated(
         activity.type === "workout" ? await findRecentWorkoutInsight(uid, activity.startMs) : null;
       const eventIds = [...(recentWorkoutInsight?.eventIds ?? []), eventId];
 
-      const context = await buildContext(uid, activity, recentWorkoutInsight?.eventIds ?? []);
+      const [context, profile] = await Promise.all([
+        buildContext(uid, activity, recentWorkoutInsight?.eventIds ?? []),
+        loadProfile(uid),
+      ]);
       const { value, usage } = await generateStructured({
         model: ACTIVITY_INSIGHT_MODEL,
-        system: ACTIVITY_INSIGHT_SYSTEM,
+        system: withPersona(ACTIVITY_INSIGHT_SYSTEM, parseStyle(profile.coachStyle)),
         context,
         jsonSchema: ACTIVITY_INSIGHT_JSON_SCHEMA,
         schema: ActivityInsight,

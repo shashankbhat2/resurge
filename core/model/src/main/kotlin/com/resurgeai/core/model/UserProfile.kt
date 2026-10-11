@@ -9,6 +9,7 @@ data class UserProfile(
     val targets: Targets,
     val onboardingComplete: Boolean,
     val habitSettings: HabitSettings = HabitSettings(),
+    val coachStyle: CoachStyle = CoachStyle.FRIEND,
 ) {
     val firstName: String?
         get() = displayName?.substringBefore(' ')?.takeIf { it.isNotBlank() }
@@ -21,6 +22,16 @@ data class Targets(
     companion object {
         const val DEFAULT_CALORIES = 2000
         const val DEFAULT_WATER_ML = 2500
+    }
+}
+
+/** "Coaching style" in Settings: how the coach talks in chat and insights. */
+enum class CoachStyle(val wire: String, val label: String, val description: String) {
+    FRIEND("friend", "Friend", "Warm, encouraging and patient"),
+    COMMANDER("commander", "Commander", "Direct, no-nonsense and demanding");
+
+    companion object {
+        fun fromWire(value: String?): CoachStyle = entries.firstOrNull { it.wire == value } ?: FRIEND
     }
 }
 

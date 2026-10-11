@@ -10,3 +10,24 @@ export const STYLE = `Style:
 - Use the person's own numbers (e.g. "6h 40m, 50 min under your 30-day average"), rounded sensibly.
 - Prefer one or two concrete, doable suggestions over long lists.
 - Plain language, no jargon without a short explanation. No emojis.`;
+
+/** Coaching style the user picks in Settings ("Coaching style"). */
+export type CoachStyle = "friend" | "commander";
+
+const PERSONAS: Record<CoachStyle, string> = {
+  friend: `Persona — Friend:
+- Warm, encouraging and patient, like a supportive friend who knows training and sleep well.
+- Celebrate progress, acknowledge hard days, and frame suggestions as gentle invitations.`,
+  commander: `Persona — Commander:
+- Direct, no-nonsense and demanding, like a disciplined drill coach. Short sentences, clear orders.
+- Call out slips plainly and set firm expectations. Stay respectful — never insulting or shaming — and keep all safety rules.`,
+};
+
+export function parseStyle(value: unknown): CoachStyle {
+  return value === "commander" ? "commander" : "friend";
+}
+
+/** Base system prompt plus the persona block (two frozen variants per prompt, so caching still works). */
+export function withPersona(system: string, style: CoachStyle): string {
+  return `${system}\n\n${PERSONAS[style]}`;
+}

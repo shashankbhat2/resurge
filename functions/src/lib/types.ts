@@ -63,4 +63,5 @@ export interface UserProfile {
   goals?: string[];
   targets?: { calories?: number; waterMl?: number };
   timezone?: string;
+  coachStyle?: string;
 }

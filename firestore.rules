@@ -17,7 +17,7 @@ service cloud.firestore {
     function validProfile() {
       let allowed = ['displayName', 'email', 'photoUrl', 'goals', 'targets',
                      'onboardingComplete', 'onboardedAt', 'updatedAt', 'timezone',
-                     'habitResetTime', 'habitReminder'];
+                     'habitResetTime', 'habitReminder', 'coachStyle'];
       return request.resource.data.keys().hasOnly(allowed)
         && (!('goals' in request.resource.data) || request.resource.data.goals is list)
         && (!('timezone' in request.resource.data) || (request.resource.data.timezone is string
@@ -31,6 +31,7 @@ service cloud.firestore {
               && request.resource.data.targets.waterMl <= 8000))
         && (!('onboardingComplete' in request.resource.data)
               || request.resource.data.onboardingComplete is bool)
+        && (!('coachStyle' in request.resource.data) || request.resource.data.coachStyle in ['friend', 'commander'])
         && (!('habitResetTime' in request.resource.data) || isClock(request.resource.data.habitResetTime))
         && (!('habitReminder' in request.resource.data) || (
               request.resource.data.habitReminder.keys().hasOnly(['enabled', 'time'])

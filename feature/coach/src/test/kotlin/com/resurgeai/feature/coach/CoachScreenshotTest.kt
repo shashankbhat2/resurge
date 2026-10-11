@@ -55,22 +55,29 @@ class CoachScreenshotTest {
         compose.mainClock.autoAdvance = false
         compose.setContent {
             ResurgeTheme(colorScheme = scheme) {
-                Screen { CoachScreen(state, onBack = {}, onTabChange = {}, onSend = {}) }
+                Screen { CoachScreen(state, onBack = {}, onSend = {}) }
             }
         }
         compose.mainClock.advanceTimeBy(500)
         compose.onRoot().captureRoboImage("src/test/screenshots/coach_$name.png")
     }
 
-    @Test fun insightsLight() = capture("insights_light", CoachUiState(tab = CoachTab.INSIGHTS, insights = insights, insightsLoaded = true))
+    private fun captureInsights(name: String, state: InsightsUiState, scheme: ColorScheme = ColorScheme.Light) {
+        compose.mainClock.autoAdvance = false
+        compose.setContent { ResurgeTheme(colorScheme = scheme) { Screen { InsightsScreen(state, onBack = {}) } } }
+        compose.mainClock.advanceTimeBy(500)
+        compose.onRoot().captureRoboImage("src/test/screenshots/insights_$name.png")
+    }
 
-    @Test fun insightsEmptyDark() = capture("insights_empty_dark", CoachUiState(tab = CoachTab.INSIGHTS, insightsLoaded = true), ColorScheme.Dark)
+    @Test fun insightsLight() = captureInsights("light", InsightsUiState(insights, loaded = true))
+
+    @Test fun insightsEmptyDark() = captureInsights("empty_dark", InsightsUiState(loaded = true), ColorScheme.Dark)
+
+    @Test fun chatEmptyDark() = capture("chat_empty_dark", CoachUiState(), ColorScheme.Dark)
 
     @Test fun chatLight() = capture(
         "chat_light",
         CoachUiState(
-            tab = CoachTab.CHAT,
-            insightsLoaded = true,
             model = CoachModel.SMART,
             turns = listOf(
                 CoachTurn("0", TurnRole.USER, "Why am I so tired today?", null, false),

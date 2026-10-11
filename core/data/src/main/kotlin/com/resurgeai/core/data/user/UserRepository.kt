@@ -6,6 +6,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.resurgeai.core.data.auth.AuthUser
 import com.resurgeai.core.data.habits.HabitsRepository
+import com.resurgeai.core.model.CoachStyle
 import com.resurgeai.core.model.Goal
 import com.resurgeai.core.model.HabitDraft
 import com.resurgeai.core.model.HabitSettings
@@ -88,6 +89,10 @@ class UserRepository @Inject constructor(
         batch.commit().await()
     }
 
+    suspend fun updateCoachStyle(uid: String, style: CoachStyle) {
+        doc(uid).update(mapOf("coachStyle" to style.wire, "updatedAt" to FieldValue.serverTimestamp())).await()
+    }
+
     suspend fun updateHabitSettings(uid: String, settings: HabitSettings) {
         doc(uid).update(
             mapOf(
@@ -131,6 +136,7 @@ class UserRepository @Inject constructor(
             ),
             onboardingComplete = getBoolean("onboardingComplete") ?: false,
             habitSettings = habitSettings(),
+            coachStyle = CoachStyle.fromWire(getString("coachStyle")),
         )
     }
 
