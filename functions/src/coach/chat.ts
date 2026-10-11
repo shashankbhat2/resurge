@@ -3,7 +3,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
-import { ANTHROPIC_API_KEY, FALLBACK, anthropic, textOf, usageOf } from "../lib/anthropic";
+import { ANTHROPIC_API_KEY, anthropic, fallbackFor, textOf, usageOf } from "../lib/anthropic";
 import { userDoc } from "../lib/firebase";
 import { LIMITS, MODELS, type ModelChoice } from "../lib/models";
 import { consumeOrThrow, recordUsage } from "../lib/quota";
@@ -124,7 +124,7 @@ export const coachChat = onCall(
     try {
       for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
         const stream = anthropic().beta.messages.stream({
-          ...FALLBACK,
+          ...fallbackFor(spec.id),
           model: spec.id,
           max_tokens: 16000,
           system: [{ type: "text", text: withPersona(COACH_SYSTEM, parseStyle(user.coachStyle)), cache_control: { type: "ephemeral" } }],

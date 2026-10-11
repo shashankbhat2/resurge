@@ -1,6 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { z } from "zod";
-import { FALLBACK, anthropic, textOf, usageOf, type UsageSummary } from "../lib/anthropic";
+import { anthropic, fallbackFor, textOf, usageOf, type UsageSummary } from "../lib/anthropic";
 import type { ModelSpec } from "../lib/models";
 
 export class InsightGenerationError extends Error {}
@@ -18,7 +18,7 @@ export async function generateStructured<T>(args: {
   maxTokens?: number;
 }): Promise<{ value: T; usage: UsageSummary }> {
   const message = await anthropic().beta.messages.create({
-    ...FALLBACK,
+    ...fallbackFor(args.model.id),
     model: args.model.id,
     max_tokens: args.maxTokens ?? 8000,
     system: [{ type: "text", text: args.system, cache_control: { type: "ephemeral" } }],
