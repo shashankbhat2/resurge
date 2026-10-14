@@ -36,6 +36,7 @@ import com.resurgeai.core.healthconnect.HealthPermissions
 import com.resurgeai.core.model.DailyHealth
 import com.resurgeai.core.model.HealthMetric
 import com.resurgeai.core.model.SessionState
+import com.resurgeai.core.model.Targets
 import com.resurgeai.core.model.UserProfile
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -91,6 +92,7 @@ data class DashboardUiState(
         sleep = today?.asleepDuration,
         steps = today?.steps,
         mealsToday = meals.count { it.date == (today?.date ?: LocalDate.now()) },
+        targets = profile?.targets ?: Targets(),
     )
 
     /** Everything the tide counts has loaded, so a full tide is real (not a half-loaded screen). */

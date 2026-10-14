@@ -40,7 +40,9 @@ describe("format", () => {
 
   it("humanises goals", () => {
     expect(formatProfile({ goals: ["SLEEP_BETTER", "MOVE_MORE"], targets: { calories: 2200, waterMl: 2500 } }))
-      .toBe("Goals: sleep better, move more. Daily targets: 2200 kcal eaten, 2500 ml water.");
+      .toBe("Goals: sleep better, move more. Daily targets: 2200 kcal eaten, 2500 ml water, 7h00 asleep, 10000 steps.");
+    expect(formatProfile({ goals: [], targets: { calories: 1800, waterMl: 2000, sleepMinutes: 390, steps: 8000 } }))
+      .toBe("Goals: none set. Daily targets: 1800 kcal eaten, 2000 ml water, 6h30 asleep, 8000 steps.");
   });
 });
 

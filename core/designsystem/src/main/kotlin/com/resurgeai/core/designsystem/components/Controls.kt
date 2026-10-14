@@ -1,5 +1,6 @@
 package com.resurgeai.core.designsystem.components
 
+import androidx.compose.ui.semantics.contentDescription
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
@@ -138,7 +139,7 @@ private fun CheckMark(checked: Boolean) {
     }
 }
 
-/** Numeric value with − / + buttons, for targets like calories and water. */
+/** Numeric value with − / + buttons, for targets like calories and water. [format] renders the value. */
 @Composable
 fun NumberStepper(
     value: Int,
@@ -147,6 +148,7 @@ fun NumberStepper(
     range: IntRange,
     unit: String,
     modifier: Modifier = Modifier,
+    format: (Int) -> String = { "%,d".format(it) },
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -157,10 +159,63 @@ fun NumberStepper(
             modifier = Modifier.weight(1f),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("%,d".format(value), style = Resurge.type.display, textAlign = TextAlign.Center)
+            Text(format(value), style = Resurge.type.display, textAlign = TextAlign.Center)
             Text(unit, style = Resurge.type.caption, color = Resurge.colors.textMuted)
         }
         StepButton("+", enabled = value + step <= range.last) { onValueChange((value + step).coerceIn(range)) }
+    }
+}
+
+/**
+ * One target as a compact row: [icon] and [label] with a short [hint] on the left, and a small
+ * − value + on the right. For settings lists where several targets sit together.
+ */
+@Composable
+fun StepperRow(
+    label: String,
+    hint: String,
+    @DrawableRes icon: Int,
+    iconTint: Color,
+    value: Int,
+    onValueChange: (Int) -> Unit,
+    step: Int,
+    range: IntRange,
+    format: (Int) -> String,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, contentDescription = null, tint = iconTint, size = 22.dp)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(label, style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight, fontSize = Resurge.type.body.fontSize), maxLines = 1)
+            Text(hint, style = Resurge.type.caption, color = Resurge.colors.textSubtle, maxLines = 1)
+        }
+        Spacer(Modifier.width(8.dp))
+        SmallStep("−", "Decrease $label", enabled = value - step >= range.first) { onValueChange((value - step).coerceIn(range)) }
+        Text(
+            format(value),
+            style = Resurge.type.headline.copy(fontFeatureSettings = "tnum"),
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            modifier = Modifier.width(76.dp),
+        )
+        SmallStep("+", "Increase $label", enabled = value + step <= range.last) { onValueChange((value + step).coerceIn(range)) }
+    }
+}
+
+@Composable
+private fun SmallStep(symbol: String, description: String, enabled: Boolean, onClick: () -> Unit) {
+    UnstyledButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier
+            .size(36.dp)
+            .clip(Resurge.shape.pill)
+            .background(Resurge.colors.surfaceMuted)
+            .semantics { contentDescription = description },
+        indication = LocalIndication.current,
+    ) {
+        Text(symbol, style = Resurge.type.headline, color = if (enabled) Resurge.colors.text else Resurge.colors.textSubtle)
     }
 }
 

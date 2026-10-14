@@ -126,7 +126,7 @@ class UserRepository @Inject constructor(
         ).await()
     }
 
-    private fun Targets.toMap() = mapOf("calories" to calories, "waterMl" to waterMl)
+    private fun Targets.toMap() = mapOf("calories" to calories, "waterMl" to waterMl, "sleepMinutes" to sleepMinutes, "steps" to steps)
 
     private fun DocumentSnapshot.toProfile(): UserProfile {
         @Suppress("UNCHECKED_CAST")
@@ -145,6 +145,8 @@ class UserRepository @Inject constructor(
             targets = Targets(
                 calories = (targets?.get("calories") as? Number)?.toInt() ?: Targets.DEFAULT_CALORIES,
                 waterMl = (targets?.get("waterMl") as? Number)?.toInt() ?: Targets.DEFAULT_WATER_ML,
+                sleepMinutes = (targets?.get("sleepMinutes") as? Number)?.toInt() ?: Targets.DEFAULT_SLEEP_MINUTES,
+                steps = (targets?.get("steps") as? Number)?.toInt() ?: Targets.DEFAULT_STEPS,
             ),
             onboardingComplete = getBoolean("onboardingComplete") ?: false,
             habitSettings = habitSettings(),

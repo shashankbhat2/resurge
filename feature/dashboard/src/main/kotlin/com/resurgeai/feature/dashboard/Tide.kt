@@ -4,6 +4,7 @@ import com.resurgeai.core.model.DayState
 import com.resurgeai.core.model.Habit
 import com.resurgeai.core.model.HabitStats
 import com.resurgeai.core.model.HabitStreaks
+import com.resurgeai.core.model.Targets
 import java.time.Duration
 import java.time.LocalDate
 
@@ -33,19 +34,38 @@ data class Ascent(
     val fullDaysThisWeek: Int,
     /** Last week earned a chevron and this week has just started, so it's shown as new. */
     val fresh: Boolean,
-)
+    /** Every week won so far, across seasons. */
+    val weeksWon: Int = 0,
+) {
+    val metThisWeek: Boolean get() = fullDaysThisWeek >= TideMath.STRONG_WEEK_DAYS
+}
+
+/** How one habit day reads on the streak calendar. */
+enum class FullDay {
+    /** Every habit done. */
+    FULL,
+    /** Full, with at least one miss covered by that habit's weekly freeze. */
+    FORGIVEN,
+    MISSED,
+    /** Today, or yesterday still in its grace period. */
+    OPEN,
+    /** Before the first habit existed (or after today). */
+    NONE,
+}
+
+/** One Sunday–Saturday week toward the weekly goal. */
+data class WeekResult(val start: LocalDate, val fullDays: Int, val won: Boolean)
 
 /**
  * Tide, rise count and Ascent rules (pure, unit-tested).
  *
- * Today's tide counts each active habit, the sleep and step goals (when Health Connect is
- * readable) and logging at least [MEALS_GOAL] meals. Past days only keep habit check-ins, so the
+ * Today's tide counts each active habit, the user's sleep and step goals ([Targets], when Health
+ * Connect is readable) and logging at least [MEALS_GOAL] meals. Past days only keep habit check-ins, so the
  * rise count and the Ascent count "full days": days on which every habit that existed was done or
  * covered by an anchor (streak freeze). Today never breaks a run and yesterday is in its grace
  * period, as in [HabitStreaks].
  */
 object TideMath {
-    val SLEEP_GOAL: Duration = Duration.ofHours(7)
     const val MEALS_GOAL = 2
     const val STRONG_WEEK_DAYS = 5
     const val CHEVRONS_PER_SEASON = 3
@@ -56,13 +76,15 @@ object TideMath {
         sleep: Duration?,
         steps: Long?,
         mealsToday: Int,
-        stepGoal: Long = DashboardGoals.STEPS.toLong(),
+        targets: Targets = Targets(),
     ): Tide = Tide(
         buildList {
             habits.forEach { add(TideSegment("habit_${it.habit.id}", it.habit.name, it.done)) }
             if (health) {
-                val slept = sleep != null && sleep >= SLEEP_GOAL
-                add(TideSegment("sleep", if (slept) "Slept ${Formatters.duration(sleep!!)}" else "Sleep ${SLEEP_GOAL.toHours()}h", slept))
+                val sleepGoal = Duration.ofMinutes(targets.sleepMinutes.toLong())
+                val slept = sleep != null && sleep >= sleepGoal
+                add(TideSegment("sleep", if (slept) "Slept ${Formatters.duration(sleep!!)}" else "Sleep ${Targets.formatSleep(targets.sleepMinutes)}", slept))
+                val stepGoal = targets.steps.toLong()
                 val walked = steps != null && steps >= stepGoal
                 add(TideSegment("steps", if (walked) "${Formatters.count(steps!!)} steps" else "${Formatters.count(stepGoal)} steps", walked))
             }
@@ -75,6 +97,46 @@ object TideMath {
     fun fullDay(habits: List<TodayHabit>, date: LocalDate): Boolean {
         val existing = habits.filter { !it.habit.createdDate.isAfter(date) }
         return existing.isNotEmpty() && existing.all { it.stats.days[date] == DayState.DONE || it.stats.days[date] == DayState.FROZEN }
+    }
+
+    fun dayStatus(habits: List<TodayHabit>, date: LocalDate, today: LocalDate): FullDay {
+        if (date.isAfter(today)) return FullDay.NONE
+        val existing = habits.filter { !it.habit.createdDate.isAfter(date) }
+        if (existing.isEmpty()) return FullDay.NONE
+        val states = existing.map { it.stats.days[date] }
+        return when {
+            states.all { it == DayState.DONE } -> FullDay.FULL
+            states.all { it == DayState.DONE || it == DayState.FROZEN } -> FullDay.FORGIVEN
+            date == today || (date == today.minusDays(1) && states.any { it == DayState.PENDING }) -> FullDay.OPEN
+            else -> FullDay.MISSED
+        }
+    }
+
+    /** Longest run of full days ever (today counts only once it's full). */
+    fun bestStreak(habits: List<TodayHabit>, today: LocalDate): Int {
+        if (habits.isEmpty()) return 0
+        var date = habits.minOf { it.habit.createdDate }
+        var run = 0
+        var best = 0
+        while (!date.isAfter(today)) {
+            when (dayStatus(habits, date, today)) {
+                FullDay.FULL, FullDay.FORGIVEN -> { run++; best = maxOf(best, run) }
+                FullDay.MISSED -> run = 0
+                FullDay.OPEN, FullDay.NONE -> Unit
+            }
+            date = date.plusDays(1)
+        }
+        return maxOf(best, riseCount(habits, today))
+    }
+
+    /** The last [count] weeks, oldest first, ending with this (unfinished) week. */
+    fun recentWeeks(habits: List<TodayHabit>, today: LocalDate, count: Int = 6): List<WeekResult> {
+        val thisWeek = HabitStreaks.weekStart(today)
+        return (count - 1 downTo 0).map { back ->
+            val start = thisWeek.minusWeeks(back.toLong())
+            val full = (0L until 7L).map { start.plusDays(it) }.count { !it.isAfter(today) && fullDay(habits, it) }
+            WeekResult(start, full, won = full >= STRONG_WEEK_DAYS)
+        }
     }
 
     fun riseCount(habits: List<TodayHabit>, today: LocalDate): Int {
@@ -112,6 +174,7 @@ object TideMath {
             season = earned / CHEVRONS_PER_SEASON + 1,
             fullDaysThisWeek = fullThisWeek,
             fresh = lastWeekEarned && today == thisWeek && earned % CHEVRONS_PER_SEASON != 0,
+            weeksWon = earned,
         )
     }
 }

@@ -12,6 +12,7 @@ import com.resurgeai.core.model.DailyHealth
 import com.resurgeai.core.model.ExerciseSession
 import com.resurgeai.core.model.Goal
 import com.resurgeai.core.model.Habit
+import com.resurgeai.core.model.HabitSettings
 import com.resurgeai.core.model.HabitStatus
 import com.resurgeai.core.model.HabitStreaks
 import com.resurgeai.core.model.HealthMetric
@@ -160,6 +161,19 @@ class TodayScreenshotTest {
             }
         }
         compose.onRoot().captureRoboImage("src/test/screenshots/today_high_tide_$name.png")
+    }
+
+    @Test fun streakSheet() = captureDetail("streak", ColorScheme.Light) { StreakSheet(state.habits!!, day, HabitSettings(), onDone = {}) }
+
+    @Test fun weekSheetDark() = captureDetail("week_dark", ColorScheme.Dark) { WeekSheet(state.habits!!, day, onDone = {}) }
+
+    private fun captureDetail(name: String, scheme: ColorScheme, sheet: @androidx.compose.runtime.Composable () -> Unit) {
+        compose.setContent {
+            ResurgeTheme(colorScheme = scheme) {
+                Screen { androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.padding(12.dp)) { sheet() } }
+            }
+        }
+        compose.onRoot().captureRoboImage("src/test/screenshots/today_sheet_$name.png")
     }
 
     @Test fun loadingLight() = capture("loading_light", ColorScheme.Light, state.copy(today = null))

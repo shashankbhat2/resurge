@@ -20,6 +20,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import com.composeunstyled.Text
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -143,5 +147,25 @@ fun IconBadge(
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, contentDescription = null, tint = tint, size = size * 0.5f)
+    }
+}
+
+/**
+ * A gentle, non-blocking note under a choice the person can still make (e.g. a low sleep goal):
+ * `glowTint` ground, an info icon in `glowInk`, body text in `text`.
+ */
+@Composable
+fun SoftNote(text: String, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(Resurge.shape.sm)
+            .background(Resurge.colors.glowTint)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(ResurgeIcons.AlertCircle, contentDescription = null, tint = Resurge.colors.glowInk, size = 18.dp)
+        Spacer(Modifier.width(8.dp))
+        Text(text, style = Resurge.type.caption.copy(lineHeight = Resurge.type.label.lineHeight), color = Resurge.colors.text)
     }
 }

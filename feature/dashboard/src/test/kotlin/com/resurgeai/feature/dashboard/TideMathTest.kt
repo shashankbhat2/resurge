@@ -5,6 +5,7 @@ import com.resurgeai.core.model.HabitStatus
 import com.resurgeai.core.model.HabitStatus.DONE
 import com.resurgeai.core.model.HabitStatus.MISSED
 import com.resurgeai.core.model.HabitStreaks
+import com.resurgeai.core.model.Targets
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -34,6 +35,16 @@ class TideMathTest {
         assertEquals(60, tide.percent)
         assertEquals(2, tide.left)
         assertFalse(tide.high)
+    }
+
+    @Test
+    fun `sleep and step goals come from the user's targets`() {
+        val targets = Targets(sleepMinutes = 6 * 60, steps = 6_000)
+        val tide = TideMath.tide(emptyList(), health = true, sleep = Duration.ofMinutes(6 * 60 + 20), steps = 6_500, mealsToday = 0, targets = targets)
+        assertTrue(tide.segments.first { it.key == "sleep" }.done)
+        assertTrue(tide.segments.first { it.key == "steps" }.done)
+        val missed = TideMath.tide(emptyList(), health = true, sleep = Duration.ofMinutes(5 * 60), steps = 5_000, mealsToday = 0, targets = targets)
+        assertEquals(listOf("Sleep 6h", "6,000 steps"), missed.segments.filter { it.key != "meals" }.map { it.label })
     }
 
     @Test
@@ -120,5 +131,34 @@ class TideMathTest {
         val ascent = TideMath.ascent(listOf(habit("a", start, log)), today)
         assertEquals(0, ascent.chevrons)
         assertEquals(2, ascent.season)
+    }
+
+    @Test
+    fun `calendar days read as full, forgiven, missed, open or before habits`() {
+        // Done 9–10, missed 11 (freeze covers it), done 12, missed 13 explicitly (no freeze left).
+        val habits = listOf(habit("a", d(9), done(d(9), d(10), d(12)) + (d(11) to MISSED) + (d(13) to MISSED)))
+        assertEquals(FullDay.NONE, TideMath.dayStatus(habits, d(8), today))
+        assertEquals(FullDay.FULL, TideMath.dayStatus(habits, d(10), today))
+        assertEquals(FullDay.FORGIVEN, TideMath.dayStatus(habits, d(11), today))
+        assertEquals(FullDay.MISSED, TideMath.dayStatus(habits, d(13), today))
+        assertEquals(FullDay.OPEN, TideMath.dayStatus(habits, today, today))
+    }
+
+    @Test
+    fun `best streak is the longest run, even when it has ended`() {
+        // Done 1–6; the 7th is covered by the week's freeze (a run of 7); the 8th ends it; then done 12–13.
+        val habits = listOf(habit("a", d(1), done(d(1), d(2), d(3), d(4), d(5), d(6), d(12), d(13)) + (d(7) to MISSED) + (d(8) to MISSED)))
+        assertEquals(2, TideMath.riseCount(habits, today))
+        assertEquals(7, TideMath.bestStreak(habits, today))
+    }
+
+    @Test
+    fun `recent weeks count full days and mark weeks won`() {
+        val habits = listOf(habit("a", d(4), done(d(4), d(5), d(6), d(7), d(8), d(11), d(12))))
+        val weeks = TideMath.recentWeeks(habits, today, count = 2)
+        assertEquals(listOf(d(4), d(11)), weeks.map { it.start })
+        // Last week: 4–8 done and the 9th covered by its freeze.
+        assertEquals(listOf(6, 2), weeks.map { it.fullDays })
+        assertEquals(listOf(true, false), weeks.map { it.won })
     }
 }

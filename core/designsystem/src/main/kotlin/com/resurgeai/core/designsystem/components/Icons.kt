@@ -57,6 +57,13 @@ object ResurgeIcons {
     @DrawableRes val FlameFilled = TablerFilled.drawable.tabler_ic_flame_filled
     @DrawableRes val Snowflake = Tabler.drawable.tabler_ic_snowflake_outline
 
+    // Rise count (days in a row): a medal, filled on the badge, outline on habit tiles.
+    @DrawableRes val Medal = TablerFilled.drawable.tabler_ic_award_filled
+    @DrawableRes val MedalOutline = Tabler.drawable.tabler_ic_award_outline
+
+    // Weekly goal (full days this week).
+    @DrawableRes val Trophy = Tabler.drawable.tabler_ic_trophy_outline
+
     // Metrics
     @DrawableRes val Flame = Tabler.drawable.tabler_ic_flame_outline
     @DrawableRes val Droplet = Tabler.drawable.tabler_ic_droplet_outline

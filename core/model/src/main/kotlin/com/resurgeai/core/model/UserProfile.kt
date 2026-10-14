@@ -20,10 +20,33 @@ data class UserProfile(
 data class Targets(
     val calories: Int = DEFAULT_CALORIES,
     val waterMl: Int = DEFAULT_WATER_ML,
+    /** Time asleep per night. */
+    val sleepMinutes: Int = DEFAULT_SLEEP_MINUTES,
+    val steps: Int = DEFAULT_STEPS,
 ) {
     companion object {
         const val DEFAULT_CALORIES = 2000
         const val DEFAULT_WATER_ML = 2500
+        const val DEFAULT_SLEEP_MINUTES = 7 * 60
+        const val DEFAULT_STEPS = 10_000
+
+        /** Settings ranges; sleep moves in half hours. */
+        val SLEEP_RANGE = 4 * 60..11 * 60
+        const val SLEEP_STEP = 30
+        val STEPS_RANGE = 2_000..30_000
+        const val STEPS_STEP = 500
+
+        /** Below this, setting a sleep goal shows a gentle note (most adults need 7–9 hours). */
+        const val RECOMMENDED_MIN_SLEEP_MINUTES = 7 * 60
+
+        /** A gentle note for a sleep goal under what most adults need, or null. Never blocks the choice. */
+        fun sleepGoalNote(minutes: Int): String? =
+            if (minutes < RECOMMENDED_MIN_SLEEP_MINUTES) {
+                "Most adults need 7 to 9 hours. A lower goal is fine as a first step, and you can raise it later."
+            } else null
+
+        /** "7h", "6h 30m". */
+        fun formatSleep(minutes: Int): String = if (minutes % 60 == 0) "${minutes / 60}h" else "${minutes / 60}h ${minutes % 60}m"
     }
 }
 

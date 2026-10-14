@@ -1,5 +1,9 @@
 package com.resurgeai.app.main
 
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.animation.AnimatedContentTransitionScope
@@ -70,7 +74,7 @@ import com.resurgeai.feature.coach.InsightsRoute as InsightsScreen
 import com.resurgeai.feature.habits.HabitDetailRoute as HabitDetailScreen
 import com.resurgeai.feature.habits.HabitEditorRoute as HabitEditorScreen
 import com.resurgeai.feature.habits.HabitsRoute as HabitsScreenRoute
-import com.resurgeai.feature.profile.SettingsSheet
+import com.resurgeai.feature.profile.SettingsScreen
 import com.resurgeai.core.designsystem.components.IconButton
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
@@ -111,6 +115,9 @@ import kotlinx.serialization.Serializable
 
 /** Review a fresh estimate (mealId null) or edit a logged meal. */
 @Serializable data class MealReviewRoute(val mealId: String? = null)
+
+/** Settings, opened from the profile photo. */
+@Serializable data object SettingsRoute
 
 /** Standalone list of past insights. */
 @Serializable data object InsightsScreenRoute
@@ -180,9 +187,7 @@ fun MainScreen(profile: UserProfile, openInsightsSignal: Int = 0, openHabitsSign
             TabsShell(
                 profile = profile,
                 onOpenMetric = { metric -> rootNav.navigate(MetricDetailRoute(metric.name)) },
-                onOpenCatalog = if (BuildConfig.DEBUG) {
-                    { rootNav.navigate(CatalogRoute) }
-                } else null,
+                onOpenSettings = { rootNav.navigate(SettingsRoute) },
                 onOpenCoach = { rootNav.navigate(CoachScreenRoute(newChat = true)) },
                 onOpenInsights = { rootNav.navigate(InsightsScreenRoute) },
                 onOpenHabit = { id -> rootNav.navigate(HabitDetailRoute(id)) },
@@ -256,6 +261,16 @@ fun MainScreen(profile: UserProfile, openInsightsSignal: Int = 0, openHabitsSign
         composable<MealReviewRoute> {
             FullScreen { MealReviewScreen(onDone = { rootNav.popBackStack() }) }
         }
+        composable<SettingsRoute> {
+            FullScreen {
+                SettingsScreen(
+                    onBack = { rootNav.popBackStack() },
+                    onOpenCatalog = if (BuildConfig.DEBUG) {
+                        { rootNav.navigate(CatalogRoute) }
+                    } else null,
+                )
+            }
+        }
         composable<InsightsScreenRoute> {
             FullScreen { InsightsScreen(onBack = { rootNav.popBackStack() }) }
         }
@@ -297,7 +312,7 @@ private fun FullScreen(content: @Composable () -> Unit) {
 private fun TabsShell(
     profile: UserProfile,
     onOpenMetric: (HealthMetric) -> Unit,
-    onOpenCatalog: (() -> Unit)?,
+    onOpenSettings: () -> Unit,
     onOpenCoach: () -> Unit,
     onOpenInsights: () -> Unit,
     onOpenHabit: (String) -> Unit,
@@ -312,8 +327,6 @@ private fun TabsShell(
     onReturnToTabs: () -> Unit,
 ) {
     val tabsNav = rememberNavController()
-    var showSettings by remember { mutableStateOf(false) }
-    SettingsSheet(visible = showSettings, onDismiss = { showSettings = false }, onOpenCatalog = onOpenCatalog)
     // The habit reminder notification opens the Habits tab.
     LaunchedEffect(openHabitsSignal) {
         if (openHabitsSignal > 0) {
@@ -354,6 +367,7 @@ private fun TabsShell(
                         onOpenWorkout = onOpenWorkout,
                         onOpenHabit = onOpenHabit,
                         onAddHabit = onAddHabit,
+                        onOpenHabits = { tabsNav.switchTab(HabitsRoute) },
                     )
                 }
                 composable<FitnessRoute> { FitnessScreenRoute(onOpenWorkout = onOpenWorkout, onLogWorkout = onLogWorkout) }
@@ -383,10 +397,16 @@ private fun TabsShell(
                     )
                     Spacer(Modifier.width(10.dp))
                 }
+                // The photo shrinks a little while pressed, on top of the press tint, so the tap reads on a photo.
+                val avatarPress = remember { MutableInteractionSource() }
+                val pressed by avatarPress.collectIsPressedAsState()
+                val scale by animateFloatAsState(if (pressed) 0.88f else 1f, tween(120), label = "avatarPress")
                 UnstyledButton(
-                    onClick = { showSettings = true },
+                    onClick = onOpenSettings,
                     role = Role.Button,
+                    interactionSource = avatarPress,
                     modifier = Modifier
+                        .graphicsLayer { scaleX = scale; scaleY = scale }
                         .clip(Resurge.shape.pill)
                         .semantics { contentDescription = "Settings" },
                     indication = LocalIndication.current,

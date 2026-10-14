@@ -81,6 +81,10 @@ class OnboardingViewModel @Inject constructor(
 
     fun setWater(value: Int) = _state.update { it.copy(targets = it.targets.copy(waterMl = value)) }
 
+    fun setSleep(minutes: Int) = _state.update { it.copy(targets = it.targets.copy(sleepMinutes = minutes)) }
+
+    fun setSteps(value: Int) = _state.update { it.copy(targets = it.targets.copy(steps = value)) }
+
     fun toggleHabit(habit: HabitDraft) = _state.update { s ->
         when {
             s.habits.any { it.name == habit.name } -> s.copy(habits = s.habits.filterNot { it.name == habit.name })

@@ -31,37 +31,31 @@ import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.designsystem.theme.clockFormatter
 import com.resurgeai.core.model.DailyHealth
 import com.resurgeai.core.model.HealthMetric
+import com.resurgeai.core.model.Targets
 import java.time.Duration
 import java.time.ZoneId
 import java.util.Locale
-
-/** Default daily goals until they're user-configurable. */
-internal object DashboardGoals {
-    const val STEPS = 10_000.0
-    val SLEEP: Duration = Duration.ofHours(8)
-
-    /** Heart-rate dial scale (bpm). */
-    const val HR_MIN = 40f
-    const val HR_MAX = 200f
-}
 
 /**
  * Today's health numbers as compact tiles, two per row: the value Health Connect reports for today
  * and a one-line note saying what the number is. Tapping a tile opens its detail.
  */
 @Composable
-internal fun HealthTiles(day: DailyHealth, onOpen: (HealthMetric) -> Unit) {
+internal fun HealthTiles(day: DailyHealth, targets: Targets, onOpen: (HealthMetric) -> Unit) {
     val zone = ZoneId.systemDefault()
     val clock = clockFormatter()
     val night = day.sleep.takeIf { it.isNotEmpty() }
     val hr = day.heartRate
-    val stepGoal = DashboardGoals.STEPS.toLong()
+    val stepGoal = targets.steps.toLong()
+    val sleepGoal = Duration.ofMinutes(targets.sleepMinutes.toLong())
     val rows = buildList {
         add(
             HealthRow(
                 HealthMetric.SLEEP, "Sleep", ResurgeIcons.Bed, Resurge.colors.sleep,
                 value = day.asleepDuration?.let(Formatters::duration),
                 note = night?.let {
+                    val asleep = day.asleepDuration
+                    if (asleep != null && asleep >= sleepGoal) return@let "Goal ${Targets.formatSleep(targets.sleepMinutes)} met"
                     val bed = it.minOf { s -> s.start }.atZone(zone).toLocalTime().format(clock)
                     val wake = it.maxOf { s -> s.end }.atZone(zone).toLocalTime().format(clock)
                     "$bed – $wake"
@@ -130,19 +124,20 @@ private fun HealthTile(row: HealthRow, modifier: Modifier, onClick: () -> Unit) 
         indication = LocalIndication.current,
         contentAlignment = Alignment.TopStart,
     ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(row.icon, contentDescription = null, tint = row.color, size = 16.dp)
                 Spacer(Modifier.width(6.dp))
                 Text(row.label, style = Resurge.type.caption, color = Resurge.colors.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(10.dp))
             Text(
                 row.value ?: "—",
                 style = Resurge.type.metric.copy(fontSize = 22.sp, lineHeight = 28.sp),
                 color = if (row.value != null) Resurge.colors.text else Resurge.colors.textSubtle,
                 maxLines = 1,
             )
+            Spacer(Modifier.height(6.dp))
             Text(row.note, style = Resurge.type.caption, color = Resurge.colors.textSubtle, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }

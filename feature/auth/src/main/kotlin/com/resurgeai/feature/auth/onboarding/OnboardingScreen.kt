@@ -1,5 +1,7 @@
 package com.resurgeai.feature.auth.onboarding
 
+import com.resurgeai.core.model.Targets
+import com.resurgeai.core.designsystem.components.SoftNote
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.AnimatedContent
@@ -82,6 +84,8 @@ fun OnboardingRoute(
         onToggleGoal = viewModel::toggleGoal,
         onCaloriesChange = viewModel::setCalories,
         onWaterChange = viewModel::setWater,
+        onSleepChange = viewModel::setSleep,
+        onStepsChange = viewModel::setSteps,
         onToggleHabit = viewModel::toggleHabit,
         onAddHabit = viewModel::addCustomHabit,
         onResetTimeChange = viewModel::setResetTime,
@@ -98,6 +102,8 @@ fun OnboardingScreen(
     onCaloriesChange: (Int) -> Unit,
     onWaterChange: (Int) -> Unit,
     onBack: () -> Unit,
+    onSleepChange: (Int) -> Unit = {},
+    onStepsChange: (Int) -> Unit = {},
     onNext: () -> Unit,
     onConnectHealth: () -> Unit = {},
     onToggleHabit: (HabitDraft) -> Unit = {},
@@ -145,7 +151,7 @@ fun OnboardingScreen(
                 ) {
                     when (step) {
                         OnboardingStep.Goals -> GoalsStep(firstName, state.goals, onToggleGoal)
-                        OnboardingStep.Targets -> TargetsStep(state, onCaloriesChange, onWaterChange)
+                        OnboardingStep.Targets -> TargetsStep(state, onCaloriesChange, onWaterChange, onSleepChange, onStepsChange)
                         OnboardingStep.Habits -> HabitsStep(state, onToggleHabit, onAddHabit, onResetTimeChange)
                         OnboardingStep.Health -> HealthStep(state, onConnectHealth)
                         OnboardingStep.Ready -> ReadyStep(state)
@@ -219,6 +225,8 @@ private fun TargetsStep(
     state: OnboardingUiState,
     onCaloriesChange: (Int) -> Unit,
     onWaterChange: (Int) -> Unit,
+    onSleepChange: (Int) -> Unit,
+    onStepsChange: (Int) -> Unit,
 ) {
     StepHeader(
         title = "Set your daily targets",
@@ -245,6 +253,35 @@ private fun TargetsStep(
             step = 250,
             range = 1000..5000,
             unit = "ml per day",
+        )
+    }
+    Spacer(Modifier.height(12.dp))
+    Card {
+        TargetLabel(ResurgeIcons.Bed, Resurge.colors.sleep, "Sleep")
+        Spacer(Modifier.height(16.dp))
+        NumberStepper(
+            value = state.targets.sleepMinutes,
+            onValueChange = onSleepChange,
+            step = Targets.SLEEP_STEP,
+            range = Targets.SLEEP_RANGE,
+            unit = "asleep per night",
+            format = Targets::formatSleep,
+        )
+        Targets.sleepGoalNote(state.targets.sleepMinutes)?.let {
+            Spacer(Modifier.height(12.dp))
+            SoftNote(it)
+        }
+    }
+    Spacer(Modifier.height(12.dp))
+    Card {
+        TargetLabel(ResurgeIcons.Footprints, Resurge.colors.activity, "Steps")
+        Spacer(Modifier.height(16.dp))
+        NumberStepper(
+            value = state.targets.steps,
+            onValueChange = onStepsChange,
+            step = Targets.STEPS_STEP,
+            range = Targets.STEPS_RANGE,
+            unit = "steps per day",
         )
     }
 }
@@ -379,6 +416,10 @@ private fun ReadyStep(state: OnboardingUiState) {
         SummaryRow("Calories", "%,d kcal / day".format(state.targets.calories))
         Spacer(Modifier.height(12.dp))
         SummaryRow("Water", "%,d ml / day".format(state.targets.waterMl))
+        Spacer(Modifier.height(12.dp))
+        SummaryRow("Sleep", "${Targets.formatSleep(state.targets.sleepMinutes)} / night")
+        Spacer(Modifier.height(12.dp))
+        SummaryRow("Steps", "%,d / day".format(state.targets.steps))
         Spacer(Modifier.height(12.dp))
         SummaryRow("Habits", state.habits.joinToString { it.name })
     }

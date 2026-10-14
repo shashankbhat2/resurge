@@ -1,5 +1,6 @@
 package com.resurgeai.feature.dashboard
 
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.runtime.getValue
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateIntAsState
@@ -17,17 +18,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,15 +41,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.unit.sp
 import com.composeunstyled.Text
 import com.composeunstyled.UnstyledButton
-import com.resurgeai.core.designsystem.components.AscentMark
 import com.resurgeai.core.designsystem.components.Button
 import com.resurgeai.core.designsystem.components.Divider
 import com.resurgeai.core.designsystem.components.ButtonVariant
-import com.resurgeai.core.designsystem.components.ChevronGlyph
 import com.resurgeai.core.designsystem.components.CoachMascot
 import com.resurgeai.core.designsystem.components.HabitVisuals
 import com.resurgeai.core.designsystem.components.Icon
@@ -64,7 +58,6 @@ import com.resurgeai.core.designsystem.components.TideRing
 import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.model.CoachInsight
 import com.resurgeai.core.model.CoachStyle
-import com.resurgeai.core.model.HabitSettings
 import com.resurgeai.core.model.InsightKind
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -75,10 +68,16 @@ import java.util.Locale
 
 /**
  * Hero card: today's tide ring with what's left and what's done, and, when there are habits, a
- * footer with the rise count and this season's Ascent.
+ * footer with the streak and the weekly goal.
  */
 @Composable
-internal fun TideCard(tide: Tide, modifier: Modifier = Modifier, rise: Int? = null, ascent: Ascent? = null) {
+internal fun TideCard(
+    tide: Tide,
+    modifier: Modifier = Modifier,
+    rise: Int? = null,
+    ascent: Ascent? = null,
+    onOpenDetail: (TideDetail) -> Unit = {},
+) {
     Column(
         modifier
             .fillMaxWidth()
@@ -87,8 +86,8 @@ internal fun TideCard(tide: Tide, modifier: Modifier = Modifier, rise: Int? = nu
     ) {
         TideRow(tide)
         if (rise != null && ascent != null) {
-            Divider(Modifier.padding(horizontal = 20.dp))
-            RiseFooter(rise, ascent)
+            Divider()
+            TideFooter(rise, ascent, onOpenDetail)
         }
     }
 }
@@ -158,49 +157,103 @@ private fun TideLegendRow(segment: TideSegment) {
 
 private const val LEGEND_ROWS = 5
 
-/** Rise count beside this season's Ascent, as the tide card's footer. */
+/**
+ * The tide card's footer: two equal cells, end to end, split by a hairline. Left is the streak
+ * (days in a row with every habit done); right is the weekly goal (full days this week).
+ */
 @Composable
-private fun RiseFooter(rise: Int, ascent: Ascent) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (rise > 0) {
-            RiseBadge(rise)
-        } else {
-            Text("Do every habit today to start a rise", style = Resurge.type.label, color = Resurge.colors.textMuted, modifier = Modifier.weight(1f))
-        }
-        if (rise > 0) Spacer(Modifier.weight(1f))
-        Spacer(Modifier.width(12.dp))
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.semantics(mergeDescendants = true) {
-                contentDescription = "Ascent, season ${ascent.season}: ${ascent.chevrons} of 3 chevrons. " +
-                    "${ascent.fullDaysThisWeek} of ${TideMath.STRONG_WEEK_DAYS} full days this week."
+private fun TideFooter(streak: Int, week: Ascent, onOpen: (TideDetail) -> Unit) {
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+        FooterStat(
+            icon = ResurgeIcons.Medal,
+            iconTint = if (streak > 0) Resurge.colors.onGlow else Resurge.colors.textMuted,
+            iconBackground = if (streak > 0) Resurge.colors.glow else Resurge.colors.surfaceMuted,
+            value = when (streak) {
+                0 -> "Start today"
+                1 -> "1 day"
+                else -> "$streak days"
             },
-        ) {
-            Column(horizontalAlignment = Alignment.End) {
-                Text("Ascent", style = Resurge.type.label)
-                Text(
-                    "${ascent.fullDaysThisWeek.coerceAtMost(TideMath.STRONG_WEEK_DAYS)} of ${TideMath.STRONG_WEEK_DAYS} days this week",
-                    style = Resurge.type.caption.copy(fontFeatureSettings = "tnum"),
-                    color = Resurge.colors.textSubtle,
-                )
-            }
-            Spacer(Modifier.width(10.dp))
-            AscentMark(ascent.chevrons, Modifier.size(36.dp), fresh = ascent.fresh)
+            label = "Streak",
+            description = if (streak > 0) "Streak: $streak days in a row with every habit done" else "No streak yet. Do every habit today to start one.",
+            onClick = { onOpen(TideDetail.STREAK) },
+            modifier = Modifier.weight(1f),
+        )
+        Box(Modifier.width(1.dp).fillMaxHeight().background(Resurge.colors.border))
+        val days = week.fullDaysThisWeek.coerceAtMost(TideMath.STRONG_WEEK_DAYS)
+        FooterStat(
+            icon = ResurgeIcons.Trophy,
+            iconTint = if (week.metThisWeek) Resurge.colors.onGlow else Resurge.colors.brandInk,
+            iconBackground = if (week.metThisWeek) Resurge.colors.glow else Resurge.colors.accentMuted,
+            value = "$days of ${TideMath.STRONG_WEEK_DAYS} days",
+            label = when {
+                week.metThisWeek -> "Weekly goal met"
+                week.weeksWon > 0 -> "Weekly goal · ${week.weeksWon} won"
+                else -> "Weekly goal"
+            },
+            description = "Weekly goal: $days of ${TideMath.STRONG_WEEK_DAYS} days with every habit done this week" +
+                if (week.weeksWon > 0) ". ${week.weeksWon} weeks won so far." else ".",
+            onClick = { onOpen(TideDetail.WEEK) },
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun FooterStat(
+    icon: Int,
+    iconTint: Color,
+    iconBackground: Color,
+    value: String,
+    label: String,
+    description: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier
+            .fillMaxHeight()
+            // Not focusable, so the cell doesn't stay highlighted after its sheet closes.
+            .focusProperties { canFocus = false }
+            .clickable(onClickLabel = "Show details", onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .semantics(mergeDescendants = true) { contentDescription = description },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(36.dp).clip(Resurge.shape.pill).background(iconBackground), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = iconTint, size = 20.dp)
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                value,
+                style = Resurge.type.metric.copy(fontSize = 18.sp, lineHeight = 22.sp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(label, style = Resurge.type.caption, color = Resurge.colors.textSubtle, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
 
 // --- Habits ---
 
-/** Today's habits as a two-column grid of one-tap tiles. */
+/** Most habits shown on Today; the rest are a tap away on the Habits tab (all still count toward the tide). */
+internal const val TODAY_HABITS = 4
+
+/**
+ * Today's habits as a two-column grid of one-tap tiles: the first [TODAY_HABITS] in the user's
+ * order, then a link to the Habits tab when there are more.
+ */
 @Composable
 internal fun HabitGrid(
     habits: List<TodayHabit>,
     onToggle: (String) -> Unit,
     onOpen: (String) -> Unit,
     onAdd: () -> Unit,
+    onSeeAll: () -> Unit,
 ) {
-    val cells: List<TodayHabit?> = habits + if (habits.size % 2 == 1 && habits.size < HabitSettings.MAX_ACTIVE) listOf(null) else emptyList()
+    val shown = habits.take(TODAY_HABITS)
+    val cells: List<TodayHabit?> = shown + if (shown.size % 2 == 1) listOf(null) else emptyList()
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         cells.chunked(2).forEach { row ->
             Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -209,6 +262,26 @@ internal fun HabitGrid(
                     if (item != null) HabitTile(item, onToggle, onOpen, m) else AddHabitTile(onAdd, m)
                 }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+        if (habits.size > TODAY_HABITS) {
+            UnstyledButton(
+                onClick = onSeeAll,
+                modifier = Modifier.fillMaxWidth().clip(Resurge.shape.md).background(Resurge.colors.surface),
+                indication = LocalIndication.current,
+            ) {
+                Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    val more = habits.drop(TODAY_HABITS)
+                    Text(
+                        "See all ${habits.size} habits",
+                        style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight),
+                        color = Resurge.colors.brandInk,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text("${more.count { it.done }} of ${more.size} more done", style = Resurge.type.caption, color = Resurge.colors.textSubtle)
+                    Spacer(Modifier.width(6.dp))
+                    Icon(ResurgeIcons.ChevronRight, contentDescription = null, tint = Resurge.colors.textSubtle, size = 18.dp)
+                }
             }
         }
     }
@@ -269,7 +342,7 @@ private fun HabitTile(item: TodayHabit, onToggle: (String) -> Unit, onOpen: (Str
         Row(verticalAlignment = Alignment.CenterVertically) {
             val meta = if (item.done) content else Resurge.colors.textSubtle
             if (item.stats.current > 0) {
-                ChevronGlyph(meta, Modifier.size(14.dp), strokeWidth = 2.dp)
+                Icon(ResurgeIcons.MedalOutline, contentDescription = null, tint = meta, size = 14.dp)
                 Spacer(Modifier.width(4.dp))
                 Text(if (item.stats.current == 1) "1 day" else "${item.stats.current} days", style = Resurge.type.caption, color = meta)
             } else {
@@ -364,18 +437,7 @@ internal fun insightLabel(kind: InsightKind): String = when (kind) {
 internal fun HighTideDialog(state: DashboardUiState, onDismiss: () -> Unit) {
     val haptics = LocalHapticFeedback.current
     LaunchedEffect(Unit) { haptics.performHapticFeedback(HapticFeedbackType.Confirm) }
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .clickable(interactionSource = null, indication = null, onClick = onDismiss)
-                .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(12.dp),
-            contentAlignment = Alignment.BottomCenter,
-        ) {
-            HighTideSheet(state, onDismiss, Modifier.clickable(interactionSource = null, indication = null) {})
-        }
-    }
+    BottomSheetDialog(onDismiss) { HighTideSheet(state, onDismiss) }
 }
 
 @Composable

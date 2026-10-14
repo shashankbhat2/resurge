@@ -61,7 +61,7 @@ export interface ActivityEvent {
 export interface UserProfile {
   displayName?: string | null;
   goals?: string[];
-  targets?: { calories?: number; waterMl?: number };
+  targets?: { calories?: number; waterMl?: number; sleepMinutes?: number; steps?: number };
   timezone?: string;
   coachStyle?: string;
 }

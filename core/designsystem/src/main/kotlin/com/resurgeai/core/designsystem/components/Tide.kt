@@ -20,11 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -35,8 +31,8 @@ import com.resurgeai.core.designsystem.theme.Resurge
 import kotlin.math.min
 
 /*
- * Resurge Tide: the daily game layer. The tide ring is today's single score, the chevron (from the
- * logo) marks a rise count, and the Ascent stacks one chevron per strong week.
+ * Resurge Tide: the daily game layer. The tide ring is today's single score and a medal marks the
+ * streak (days in a row with every habit done).
  */
 
 /** Ease-out used for every rising value (tide fill, count-ups). */
@@ -85,32 +81,12 @@ fun TideRing(
     }
 }
 
-/** The Resurge up-chevron as a stroked glyph: the rise-count mark and the unit of the Ascent. */
-@Composable
-fun ChevronGlyph(color: Color, modifier: Modifier = Modifier.size(16.dp), strokeWidth: Dp = 2.5.dp) {
-    Canvas(modifier) {
-        drawChevron(color, Offset(size.width / 2, size.height * 0.28f), size.width * 0.36f, size.height * 0.36f, strokeWidth.toPx())
-    }
-}
-
-private fun DrawScope.drawChevron(color: Color, apex: Offset, halfWidth: Float, rise: Float, stroke: Float) {
-    val path = Path().apply {
-        moveTo(apex.x - halfWidth, apex.y + rise)
-        lineTo(apex.x, apex.y)
-        lineTo(apex.x + halfWidth, apex.y + rise)
-    }
-    drawPath(
-        path, color,
-        style = Stroke(stroke, cap = StrokeCap.Round, join = StrokeJoin.Round),
-    )
-}
-
 /**
- * Rise count: consecutive days, shown with the chevron on `glow`. Only for a run that exists;
+ * Streak: consecutive days, shown with a medal on `glow`. Only for a run that exists;
  * callers show their own "start" copy at zero.
  */
 @Composable
-fun RiseBadge(count: Int, modifier: Modifier = Modifier, label: String = "day rise") {
+fun RiseBadge(count: Int, modifier: Modifier = Modifier, label: String = "day streak") {
     Row(
         modifier
             .clip(Resurge.shape.pill)
@@ -123,35 +99,8 @@ fun RiseBadge(count: Int, modifier: Modifier = Modifier, label: String = "day ri
         Box(
             Modifier.size(32.dp).clip(Resurge.shape.pill).background(Resurge.colors.glow),
             contentAlignment = Alignment.Center,
-        ) { ChevronGlyph(Resurge.colors.onGlow, Modifier.size(18.dp), strokeWidth = 2.75.dp) }
+        ) { Icon(ResurgeIcons.Medal, contentDescription = null, tint = Resurge.colors.onGlow, size = 20.dp) }
         Text(count.toString(), style = Resurge.type.title.copy(fontFamily = Resurge.type.metric.fontFamily, fontFeatureSettings = "tnum"), color = Resurge.colors.glowInk)
         Text(label, style = Resurge.type.label, color = Resurge.colors.glowInk)
-    }
-}
-
-/**
- * The Ascent: three stacked chevrons that complete the Resurge mark. [earned] (0–3) are `brand`;
- * when [fresh], the newest earned one is `glow`;
- * chevrons still to earn are `ebb`, so the whole mark is always visible.
- */
-@Composable
-fun AscentMark(earned: Int, modifier: Modifier = Modifier, fresh: Boolean = false) {
-    val brand = Resurge.colors.accent
-    val glow = Resurge.colors.glow
-    val ebb = Resurge.colors.ebb
-    Canvas(modifier.aspectRatio(1f)) {
-        val w = size.width
-        val stroke = w * 0.115f
-        val half = w * 0.3f
-        val rise = w * 0.267f
-        // Bottom-up: chevron 0 is the lowest.
-        for (i in 0 until 3) {
-            val apexY = w * 0.633f - i * rise
-            val apex = Offset(w / 2, apexY)
-            when {
-                i < earned -> drawChevron(if (fresh && i == earned - 1) glow else brand, apex, half, rise, stroke)
-                else -> drawChevron(ebb, apex, half, rise, stroke)
-            }
-        }
     }
 }

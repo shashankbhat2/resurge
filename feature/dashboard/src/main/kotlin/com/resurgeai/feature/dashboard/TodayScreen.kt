@@ -1,5 +1,8 @@
 package com.resurgeai.feature.dashboard
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.annotation.DrawableRes
@@ -37,6 +40,7 @@ import com.resurgeai.core.healthconnect.HealthConnectAvailability
 import com.resurgeai.core.model.CoachStyle
 import com.resurgeai.core.model.HealthMetric
 import com.resurgeai.core.model.SourceKind
+import com.resurgeai.core.model.Targets
 import com.resurgeai.core.model.UnitSystem
 import java.time.LocalDate
 
@@ -48,6 +52,7 @@ fun TodayRoute(
     onOpenWorkout: (String) -> Unit = {},
     onOpenHabit: (String) -> Unit = {},
     onAddHabit: () -> Unit = {},
+    onOpenHabits: () -> Unit = {},
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -71,12 +76,13 @@ fun TodayRoute(
         onToggleHabit = viewModel::toggleHabit,
         onOpenHabit = onOpenHabit,
         onAddHabit = onAddHabit,
+        onOpenHabits = onOpenHabits,
         onDismissHighTide = viewModel::dismissHighTide,
     )
 }
 
 /**
- * Today, built around one daily tide: the tide card (with rise count and Ascent), one-tap habits,
+ * Today, built around one daily tide: the tide card (with streak and weekly goal), one-tap habits,
  * today's health numbers as compact tiles, then a feed of today's and yesterday's meals, workouts,
  * sleep and coach notes.
  */
@@ -93,6 +99,7 @@ fun TodayScreen(
     onToggleHabit: (String) -> Unit = {},
     onOpenHabit: (String) -> Unit = {},
     onAddHabit: () -> Unit = {},
+    onOpenHabits: () -> Unit = {},
     onDismissHighTide: () -> Unit = {},
     today: LocalDate = LocalDate.now(),
 ) {
@@ -106,6 +113,7 @@ fun TodayScreen(
         lead = null,
     )
     val habits = state.habits
+    var detail by rememberSaveable { mutableStateOf<TideDetail?>(null) }
     Column(
         Modifier
             .fillMaxSize()
@@ -114,7 +122,12 @@ fun TodayScreen(
     ) {
         Spacer(Modifier.height(LocalHeaderInset.current + 12.dp))
         val withHabits = !habits.isNullOrEmpty()
-        TideCard(state.tide, rise = state.riseCount.takeIf { withHabits }, ascent = state.ascent.takeIf { withHabits })
+        TideCard(
+            state.tide,
+            rise = state.riseCount.takeIf { withHabits },
+            ascent = state.ascent.takeIf { withHabits },
+            onOpenDetail = { detail = it },
+        )
 
         when {
             habits == null -> Unit
@@ -124,7 +137,7 @@ fun TodayScreen(
             }
             else -> {
                 TodaySection("Habits", trailing = "${habits.count { it.done }} of ${habits.size} done")
-                HabitGrid(habits, onToggle = onToggleHabit, onOpen = onOpenHabit, onAdd = onAddHabit)
+                HabitGrid(habits, onToggle = onToggleHabit, onOpen = onOpenHabit, onAdd = onAddHabit, onSeeAll = onOpenHabits)
             }
         }
 
@@ -166,7 +179,7 @@ fun TodayScreen(
         }
         val day = state.today
         if (state.healthReady) {
-            if (day != null) HealthTiles(day, onOpenMetric) else if (state.error == null) TodaySkeleton()
+            if (day != null) HealthTiles(day, state.profile?.targets ?: Targets(), onOpenMetric) else if (state.error == null) TodaySkeleton()
         }
 
         Feed(
@@ -185,6 +198,7 @@ fun TodayScreen(
     }
 
     if (state.showHighTide) HighTideDialog(state, onDismissHighTide)
+    detail?.let { TideDetailDialog(it, state) { detail = null } }
 }
 
 @DrawableRes

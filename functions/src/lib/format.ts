@@ -15,7 +15,10 @@ export function formatProfile(p: UserProfile): string {
   const goals = (p.goals ?? []).map((g) => g.toLowerCase().replace(/_/g, " ")).join(", ") || "none set";
   const kcal = p.targets?.calories ?? "-";
   const water = p.targets?.waterMl ?? "-";
-  return `Goals: ${goals}. Daily targets: ${kcal} kcal eaten, ${water} ml water.`;
+  // Same defaults as the app (Targets) when the user hasn't set these yet.
+  const sleep = hours(p.targets?.sleepMinutes ?? 7 * 60);
+  const steps = p.targets?.steps ?? 10000;
+  return `Goals: ${goals}. Daily targets: ${kcal} kcal eaten, ${water} ml water, ${sleep} asleep, ${steps} steps.`;
 }
 
 /** One line per day, oldest first. Columns are described in the header line. */

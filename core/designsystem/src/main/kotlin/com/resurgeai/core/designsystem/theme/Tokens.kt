@@ -36,7 +36,7 @@ object ColorTokens {
     val brandInk = ThemeToken<Color>("brand_ink")
     /** Leading edge of a rising tide. Decorative only. */
     val foam = ThemeToken<Color>("foam")
-    /** Earned moments only: rise count, high tide, a new Ascent chevron. */
+    /** Earned moments only: streak, high tide, a weekly goal met. */
     val glow = ThemeToken<Color>("glow")
     val onGlow = ThemeToken<Color>("on_glow")
     val glowInk = ThemeToken<Color>("glow_ink")
