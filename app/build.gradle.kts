@@ -58,6 +58,7 @@ android {
 
 dependencies {
     implementation(project(":core:designsystem"))
+    implementation(libs.haze)
     implementation(project(":core:data"))
     implementation(project(":core:healthconnect"))
     implementation(project(":feature:auth"))

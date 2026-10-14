@@ -83,7 +83,12 @@ data class DashboardUiState(
     val habits: List<TodayHabit>? = null,
     /** The day's one celebration: open once per habit day when the tide first reaches 100%. */
     val showHighTide: Boolean = false,
+    /** Insights dismissed on this device (also marked seen on the server). */
+    val dismissedInsights: Set<String> = emptySet(),
 ) {
+    /** The latest insight, pinned above the tide until it's seen. */
+    val pinnedInsight: CoachInsight? get() = latestInsight?.takeIf { !it.seen && it.id !in dismissedInsights }
+
     val healthReady: Boolean get() = availability == HealthConnectAvailability.AVAILABLE &&
         (permissions == PermissionState.PARTIAL || permissions == PermissionState.ALL)
 
@@ -119,7 +124,7 @@ class DashboardViewModel @Inject constructor(
     private val healthData: HealthDataSource,
     private val healthSync: HealthSyncRepository,
     private val activityEvents: ActivityEventSync,
-    coachRepository: CoachRepository,
+    private val coachRepository: CoachRepository,
     private val meals: MealsRepository,
     private val habitsRepository: HabitsRepository,
     private val preferences: PreferencesRepository,
@@ -148,6 +153,13 @@ class DashboardViewModel @Inject constructor(
         habitsRepository.setStatus(s.habitDay, habitId, if (item.done) null else HabitStatus.DONE)
     }
 
+    /** Marks the pinned insight seen: it leaves the top of Today and joins the feed. */
+    fun dismissInsight(id: String) {
+        _state.update { it.copy(dismissedInsights = it.dismissedInsights + id) }
+        coachRepository.markSeen(id)
+        viewModelScope.launch { preferences.dismissInsight(id) }
+    }
+
     fun dismissHighTide() {
         val day = _state.value.habitDay
         _state.update { it.copy(showHighTide = false) }
@@ -162,6 +174,9 @@ class DashboardViewModel @Inject constructor(
             sessionRepository.session.collect { session ->
                 _state.update { it.copy(profile = (session as? SessionState.Ready)?.profile) }
             }
+        }
+        viewModelScope.launch {
+            preferences.dismissedInsights.collect { ids -> _state.update { it.copy(dismissedInsights = it.dismissedInsights + ids) } }
         }
         viewModelScope.launch {
             coachRepository.insights(limit = 12)

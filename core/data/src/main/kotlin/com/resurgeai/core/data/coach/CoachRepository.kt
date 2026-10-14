@@ -1,5 +1,6 @@
 package com.resurgeai.core.data.coach
 
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
@@ -48,6 +49,11 @@ class CoachRepository @Inject constructor(
         return listen(ref.collection("insights").orderBy("createdAt", Query.Direction.DESCENDING).limit(limit)) { docs ->
             docs.mapNotNull(::toInsight)
         }
+    }
+
+    /** Marks an insight seen (dismissed from Today). The rules let the client change only `seen` and `seenAt`. */
+    fun markSeen(insightId: String) {
+        user()?.collection("insights")?.document(insightId)?.update(mapOf("seen" to true, "seenAt" to FieldValue.serverTimestamp()))
     }
 
     fun threads(limit: Long = 30): Flow<List<CoachThread>> {
@@ -176,6 +182,7 @@ class CoachRepository @Inject constructor(
             suggestion = d.getString("suggestion")?.takeIf { it.isNotBlank() },
             createdAt = createdAt,
             weekly = weekly,
+            seen = d.getBoolean("seen") ?: false,
         )
     }
 }

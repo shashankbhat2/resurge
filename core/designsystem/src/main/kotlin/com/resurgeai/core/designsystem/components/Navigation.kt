@@ -1,5 +1,6 @@
 package com.resurgeai.core.designsystem.components
 
+import androidx.compose.foundation.layout.Column
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
@@ -185,8 +186,8 @@ val MainHeaderHeight: Dp = 60.dp
 
 /**
  * Permanent header for the main tabs: [title] on the left (or any [leading] content, e.g. a greeting),
- * [trailing] (profile photo) on the right. Its background fades downward so content scrolls softly
- * underneath.
+ * [trailing] (profile photo) on the right. Below the bar it extends by [fade], over which its
+ * background fades to clear, so content scrolls softly underneath (pair it with a backdrop blur).
  */
 @Composable
 fun MainHeader(
@@ -194,27 +195,31 @@ fun MainHeader(
     modifier: Modifier = Modifier,
     leading: (@Composable () -> Unit)? = null,
     trailing: @Composable () -> Unit = {},
+    fade: Dp = 40.dp,
 ) {
     val bg = Resurge.colors.bg
-    val ramp = arrayOf(0f to 1f, 0.6f to 0.9f, 1f to 0f)
+    val ramp = arrayOf(0f to 0.92f, 0.55f to 0.75f, 1f to 0f)
     Box(
         modifier
             .fillMaxWidth()
             .background(Brush.verticalGradient(*ramp.map { (p, a) -> p to bg.copy(alpha = a) }.toTypedArray())),
     ) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.statusBars)
-                .height(MainHeaderHeight)
-                .padding(horizontal = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(Modifier.weight(1f)) {
-                if (leading != null) leading()
-                else Text(title.orEmpty(), style = Resurge.type.title, maxLines = 1)
+        Column {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .height(MainHeaderHeight)
+                    .padding(horizontal = 20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.weight(1f)) {
+                    if (leading != null) leading()
+                    else Text(title.orEmpty(), style = Resurge.type.title, maxLines = 1)
+                }
+                trailing()
             }
-            trailing()
+            Spacer(Modifier.height(fade))
         }
     }
 }

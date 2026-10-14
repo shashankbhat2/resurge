@@ -1,6 +1,5 @@
 package com.resurgeai.feature.dashboard
 
-import com.resurgeai.core.designsystem.components.ProgressFlame
 import com.resurgeai.core.designsystem.components.Overline
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -212,9 +211,9 @@ internal fun WeekSheet(habits: List<TodayHabit>, today: LocalDate, onDone: () ->
     SheetColumn {
         SheetHeader(
             icon = null,
-            iconTint = Resurge.colors.glow,
-            iconBackground = if (ascent.metThisWeek) Resurge.colors.glowTint else Resurge.colors.surfaceMuted,
-            iconContent = { ProgressFlame(full.coerceAtMost(goal) / goal.toFloat(), size = 28.dp) },
+            iconTint = Resurge.colors.onGlow,
+            iconBackground = Resurge.colors.glow,
+            iconContent = { WeeklyFlameIcon(full.coerceAtMost(goal) / goal.toFloat(), size = 28.dp) },
             title = "${full.coerceAtMost(goal)} of $goal days",
             subtitle = "Weekly goal · $goal full days, Sun to Sat",
         )

@@ -1,5 +1,8 @@
 package com.resurgeai.feature.dashboard
 
+import androidx.compose.runtime.key
+import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.remember
 import com.resurgeai.core.designsystem.components.SectionLabel
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -79,6 +82,7 @@ fun TodayRoute(
         onAddHabit = onAddHabit,
         onOpenHabits = onOpenHabits,
         onDismissHighTide = viewModel::dismissHighTide,
+        onDismissInsight = viewModel::dismissInsight,
     )
 }
 
@@ -102,6 +106,7 @@ fun TodayScreen(
     onAddHabit: () -> Unit = {},
     onOpenHabits: () -> Unit = {},
     onDismissHighTide: () -> Unit = {},
+    onDismissInsight: (String) -> Unit = {},
     today: LocalDate = LocalDate.now(),
 ) {
     val commander = state.profile?.coachStyle == CoachStyle.COMMANDER
@@ -111,7 +116,8 @@ fun TodayScreen(
         workouts = state.workouts,
         sleep = state.today?.sleep.orEmpty(),
         insights = state.insights,
-        lead = null,
+        // The pinned insight sits above the tide, so the feed leaves it out until it's seen.
+        lead = state.pinnedInsight,
     )
     val habits = state.habits
     var detail by rememberSaveable { mutableStateOf<TideDetail?>(null) }
@@ -123,12 +129,27 @@ fun TodayScreen(
     ) {
         Spacer(Modifier.height(LocalHeaderInset.current + 12.dp))
         val withHabits = !habits.isNullOrEmpty()
-        TideCard(
-            state.tide,
-            rise = state.riseCount.takeIf { withHabits },
-            ascent = state.ascent.takeIf { withHabits },
-            onOpenDetail = { detail = it },
-        )
+        // The latest unseen insight lies over the tide card, stopping short of its bottom so the tide's
+        // edge peeks out underneath like the next card in a stack; dismissing reveals it.
+        Box {
+            TideCard(
+                state.tide,
+                rise = state.riseCount.takeIf { withHabits },
+                ascent = state.ascent.takeIf { withHabits },
+                onOpenDetail = { detail = it },
+            )
+            state.pinnedInsight?.let { insight ->
+                key(insight.id) {
+                    PinnedInsight(
+                        insight,
+                        commander,
+                        onOpen = { onDismissInsight(insight.id); onOpenInsights() },
+                        onDismiss = { onDismissInsight(insight.id) },
+                        modifier = Modifier.matchParentSize().padding(bottom = 14.dp),
+                    )
+                }
+            }
+        }
 
         when {
             habits == null -> Unit

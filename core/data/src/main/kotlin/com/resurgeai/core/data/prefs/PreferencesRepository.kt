@@ -111,6 +111,16 @@ class PreferencesRepository @Inject constructor(
         dataStore.edit { it[NOTIFICATION_PROMPT] = true }
     }
 
+    /**
+     * Insights dismissed on this device. Kept locally too, so a dismissed card stays gone even
+     * before the `seen` write reaches the server (or if it's refused).
+     */
+    val dismissedInsights: Flow<Set<String>> = dataStore.data.map { it[DISMISSED_INSIGHTS].orEmpty() }
+
+    suspend fun dismissInsight(id: String) {
+        dataStore.edit { prefs -> prefs[DISMISSED_INSIGHTS] = (prefs[DISMISSED_INSIGHTS].orEmpty() + id).toList().takeLast(MAX_DISMISSED).toSet() }
+    }
+
     /** Habit day whose high-tide celebration was last shown (it plays once per habit day). */
     suspend fun highTideShownOn(): LocalDate? =
         dataStore.data.first()[HIGH_TIDE_SHOWN]?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
@@ -121,6 +131,8 @@ class PreferencesRepository @Inject constructor(
 
     private companion object {
         val HIGH_TIDE_SHOWN = stringPreferencesKey("high_tide_shown")
+        val DISMISSED_INSIGHTS = stringSetPreferencesKey("dismissed_insights")
+        const val MAX_DISMISSED = 100
         const val MAX_POSTED = 300
         val NOTIFICATION_PROMPT = booleanPreferencesKey("notification_prompt_shown")
         val HABIT_RESET = stringPreferencesKey("habit_reset")

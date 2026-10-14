@@ -1,5 +1,12 @@
 package com.resurgeai.app.main
 
+import androidx.compose.animation.core.LinearEasing
+import dev.chrisbanes.haze.HazeProgressive
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.HazeState
 import androidx.compose.ui.unit.sp
 import com.resurgeai.feature.dashboard.WeeklyGoalFlame
 import androidx.compose.ui.graphics.graphicsLayer
@@ -329,6 +336,7 @@ private fun TabsShell(
     onReturnToTabs: () -> Unit,
 ) {
     val tabsNav = rememberNavController()
+    val headerHaze = remember { HazeState() }
     // The habit reminder notification opens the Habits tab.
     LaunchedEffect(openHabitsSignal) {
         if (openHabitsSignal > 0) {
@@ -356,6 +364,7 @@ private fun TabsShell(
             NavHost(
                 navController = tabsNav,
                 startDestination = TodayRoute,
+                modifier = Modifier.hazeSource(headerHaze),
                 enterTransition = { fadeIn(tween(180, easing = easing)) },
                 exitTransition = { fadeOut(tween(180, easing = easing)) },
                 popEnterTransition = { EnterTransition.None },
@@ -379,7 +388,14 @@ private fun TabsShell(
         }
         MainHeader(
             title = currentTab.title,
-            modifier = Modifier.align(Alignment.TopCenter),
+            // Frosts whatever scrolls underneath: full blur at the top, none by the fade's end.
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .hazeEffect(headerHaze) {
+                    blurRadius = 20.dp
+                    // Blur tapers evenly to none at the fade's end, so there's no hard edge at the bottom.
+                    progressive = HazeProgressive.verticalGradient(easing = LinearEasing, startIntensity = 1f, endIntensity = 0f)
+                },
             // Today greets the user in the header, left of the profile photo.
             leading = if (currentTab == Tab.Today) {
                 { Text(greeting(profile), style = Resurge.type.brand.copy(fontSize = 20.sp, lineHeight = 26.sp), maxLines = 1, overflow = TextOverflow.Ellipsis) }

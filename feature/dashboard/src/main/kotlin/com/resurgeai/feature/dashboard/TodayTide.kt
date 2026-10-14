@@ -1,6 +1,18 @@
 package com.resurgeai.feature.dashboard
 
-import com.resurgeai.core.designsystem.components.ProgressFlame
+import androidx.compose.foundation.layout.fillMaxSize
+import kotlinx.coroutines.launch
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.shadow
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Animatable
 import com.resurgeai.core.designsystem.components.Overline
 import com.resurgeai.core.designsystem.components.StatDivider
 import com.resurgeai.core.designsystem.components.StatCell
@@ -183,10 +195,10 @@ private fun TideFooter(streak: Int, week: Ascent, onOpen: (TideDetail) -> Unit) 
         val days = week.fullDaysThisWeek.coerceAtMost(TideMath.STRONG_WEEK_DAYS)
         StatCell(
             icon = null,
-            iconTint = Resurge.colors.glow,
-            iconBackground = if (week.metThisWeek) Resurge.colors.glowTint else Resurge.colors.surfaceMuted,
-            // Fills from the bottom as full days add up toward the goal.
-            iconContent = { ProgressFlame(days / TideMath.STRONG_WEEK_DAYS.toFloat()) },
+            iconTint = Resurge.colors.onGlow,
+            iconBackground = Resurge.colors.glow,
+            // Same flame as beside the profile photo: fills from the bottom as full days add up.
+            iconContent = { WeeklyFlameIcon(days / TideMath.STRONG_WEEK_DAYS.toFloat(), size = 20.dp) },
             value = "$days/${TideMath.STRONG_WEEK_DAYS} days",
             label = when {
                 week.metThisWeek -> "Weekly goal met"
@@ -386,6 +398,82 @@ internal fun CoachNote(insight: CoachInsight?, commander: Boolean, onClick: () -
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+        }
+    }
+}
+
+/**
+ * The latest insight, laid over the tide card until it's seen: persona styling like [CoachNote],
+ * "New from your coach", the headline and note. Swipe it left or tap ✕ to mark it seen; it slides
+ * away and reveals the tide underneath. Tapping it opens Insights. [modifier] sizes it to the tide card.
+ */
+@Composable
+internal fun PinnedInsight(
+    insight: CoachInsight,
+    commander: Boolean,
+    onOpen: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val scope = rememberCoroutineScope()
+    val offset = remember(insight.id) { Animatable(0f) }
+    var width by remember { mutableFloatStateOf(1f) }
+    fun dismiss() = scope.launch {
+        offset.animateTo(-width * 1.1f, tween(220))
+        onDismiss()
+    }
+    UnstyledButton(
+        onClick = onOpen,
+        modifier = modifier
+            .onSizeChanged { width = it.width.toFloat().coerceAtLeast(1f) }
+            .graphicsLayer {
+                translationX = offset.value
+                alpha = 1f - (-offset.value / width).coerceIn(0f, 1f) * 0.6f
+            }
+            .draggable(
+                orientation = Orientation.Horizontal,
+                state = rememberDraggableState { delta ->
+                    // Left only; a rightward pull gives a little and springs back.
+                    scope.launch { offset.snapTo((offset.value + delta).coerceAtMost(24f)) }
+                },
+                onDragStopped = { velocity ->
+                    if (offset.value < -width * 0.3f || velocity < -1500f) dismiss()
+                    else offset.animateTo(0f, spring())
+                },
+            )
+            .shadow(8.dp, Resurge.shape.lg, ambientColor = Color.Black.copy(alpha = 0.15f), spotColor = Color.Black.copy(alpha = 0.15f))
+            .clip(Resurge.shape.lg)
+            .background(if (commander) Resurge.colors.surface else Resurge.colors.accentMuted),
+        indication = LocalIndication.current,
+        contentAlignment = Alignment.TopStart,
+    ) {
+        Column(Modifier.fillMaxSize().padding(start = 20.dp, top = 20.dp, bottom = 16.dp, end = 8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CoachMascot(commander = commander, size = 32.dp)
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    "New from your coach · ${insightLabel(insight.kind)}",
+                    style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight),
+                    color = if (commander) Resurge.colors.commander else Resurge.colors.brandInk,
+                    modifier = Modifier.weight(1f),
+                )
+                UnstyledButton(
+                    onClick = { dismiss() },
+                    modifier = Modifier.size(40.dp).clip(Resurge.shape.pill).semantics { contentDescription = "Dismiss, mark as seen" },
+                    indication = LocalIndication.current,
+                ) { Icon(ResurgeIcons.Close, contentDescription = null, tint = Resurge.colors.textSubtle, size = 18.dp) }
+            }
+            Spacer(Modifier.height(10.dp))
+            Column(Modifier.weight(1f).padding(end = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(insight.title, style = Resurge.type.headline, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(insight.body, style = Resurge.type.body, color = Resurge.colors.textMuted, overflow = TextOverflow.Ellipsis)
+            }
+            Text(
+                "Swipe left or tap ✕ to see today's tide. This note moves to your feed.",
+                style = Resurge.type.caption,
+                color = Resurge.colors.textSubtle,
+                modifier = Modifier.padding(top = 8.dp, end = 12.dp),
+            )
         }
     }
 }

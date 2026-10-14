@@ -184,8 +184,13 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['platform', 'updatedAt']);
       }
 
-      // Written only by Cloud Functions (Admin SDK); the owner can read.
-      match /insights/{doc} { allow read: if isOwner(uid); allow write: if false; }
+      // Written by Cloud Functions (Admin SDK); the owner can read, and can only mark one seen.
+      match /insights/{doc} {
+        allow read: if isOwner(uid);
+        allow update: if isOwner(uid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seen', 'seenAt'])
+          && request.resource.data.seen is bool;
+      }
       match /usage/{doc} { allow read: if isOwner(uid); allow write: if false; }
       match /coachThreads/{threadId} {
         allow read: if isOwner(uid);

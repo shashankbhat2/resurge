@@ -81,10 +81,19 @@ fun WeeklyGoalFlame(modifier: Modifier = Modifier, size: Dp = 38.dp, viewModel: 
             .semantics { contentDescription = "Weekly goal: ${state.fullDays} of ${TideMath.STRONG_WEEK_DAYS} full days" },
         contentAlignment = Alignment.Center,
     ) {
-        // Faint outline for the part of the week still to fill, so 4 of 5 doesn't read as full.
-        ProgressFlame(state.fraction, size = size * 0.55f, fill = Resurge.colors.onGlow, track = Resurge.colors.onGlow.copy(alpha = 0.35f))
+        WeeklyFlameIcon(state.fraction, size = size * 0.55f)
     }
     if (open) {
         BottomSheetDialog(onDismiss = { open = false }) { WeekSheet(state.habits, state.day, onDone = { open = false }) }
     }
+}
+
+/**
+ * The weekly goal's flame, drawn for a `glow` circle: dark fill rising with [fraction], and a faint
+ * outline for the part of the week still to fill (so 4 of 5 doesn't read as full). The header,
+ * the tide card and the weekly goal sheet all use it.
+ */
+@Composable
+internal fun WeeklyFlameIcon(fraction: Float, size: Dp) {
+    ProgressFlame(fraction, size = size, fill = Resurge.colors.onGlow, track = Resurge.colors.onGlow.copy(alpha = 0.35f))
 }

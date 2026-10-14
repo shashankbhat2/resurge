@@ -40,6 +40,8 @@ data class CoachInsight(
     val suggestion: String?,
     val createdAt: Instant,
     val weekly: WeeklyDetails?,
+    /** The user dismissed it from Today (or opened it from there). New insights start unseen. */
+    val seen: Boolean = false,
 )
 
 data class CoachThread(val id: String, val title: String, val updatedAt: Instant?, val preview: String?)

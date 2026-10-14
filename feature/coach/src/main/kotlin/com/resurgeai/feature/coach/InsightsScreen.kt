@@ -1,85 +1,53 @@
 package com.resurgeai.feature.coach
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.input.TextFieldLineLimits
-import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.foundation.text.input.clearText
-import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composeunstyled.Text
-import com.composeunstyled.TextInput
-import com.composeunstyled.UnstyledButton
-import com.composeunstyled.UnstyledTextField
-import com.resurgeai.core.designsystem.components.Card
+import com.resurgeai.core.designsystem.components.CoachMascot
 import com.resurgeai.core.designsystem.components.Divider
 import com.resurgeai.core.designsystem.components.Icon
-import com.resurgeai.core.designsystem.components.IconButton
+import com.resurgeai.core.designsystem.components.Overline
 import com.resurgeai.core.designsystem.components.ResurgeIcons
-import com.resurgeai.core.designsystem.components.SegmentOption
-import com.resurgeai.core.designsystem.components.SegmentedControl
+import com.resurgeai.core.designsystem.components.SectionLabel
 import com.resurgeai.core.designsystem.components.SkeletonGroup
 import com.resurgeai.core.designsystem.components.SkeletonLine
 import com.resurgeai.core.designsystem.components.TopBar
 import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.designsystem.theme.clockFormatter
 import com.resurgeai.core.model.CoachInsight
-import com.resurgeai.core.model.CoachModel
-import com.resurgeai.core.model.CoachThread
-import com.resurgeai.core.model.CoachTurn
+import com.resurgeai.core.model.CoachStyle
 import com.resurgeai.core.model.InsightKind
-import com.resurgeai.core.model.TurnRole
+import com.resurgeai.core.model.WeeklyArea
+import com.resurgeai.core.model.WeeklyDetails
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /** Standalone list of past insights (activity, sleep and weekly reviews), newest first. */
 @Composable
@@ -93,135 +61,213 @@ fun InsightsRoute(
 
 @Composable
 fun InsightsScreen(state: InsightsUiState, onBack: () -> Unit) {
-    Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
-            TopBar(title = "Insights", onBack = onBack)
-            Box(Modifier.weight(1f)) { InsightsFeed(state) }
-        }
+    Column(Modifier.fillMaxSize()) {
+        TopBar(title = "Insights", onBack = onBack)
+        Box(Modifier.weight(1f)) { InsightsFeed(state) }
     }
 }
 
 // --- Insights ---
 
+/** Insights grouped by day under section labels; a weekly review leads its day as the hero card. */
 @Composable
 internal fun InsightsFeed(state: InsightsUiState) {
+    val commander = state.coachStyle == CoachStyle.COMMANDER
     when {
         !state.loaded -> InsightsSkeleton()
         state.insights.isEmpty() -> EmptyState(
             title = "No insights yet",
             body = "Finish a workout or a night of sleep and your coach will write about it. Every Saturday evening you'll also get a review of your week.",
         )
-        else -> LazyColumn(
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            items(state.insights, key = { it.id }) {
-                if (it.kind == InsightKind.WEEKLY) WeeklyCard(it) else InsightCard(it)
+        else -> {
+            val zone = ZoneId.systemDefault()
+            val today = LocalDate.now(zone)
+            val days = state.insights.groupBy { it.createdAt.atZone(zone).toLocalDate() }.toList()
+            LazyColumn(
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                days.forEach { (date, insights) ->
+                    item(key = "h$date") {
+                        SectionLabel(
+                            when (date) {
+                                today -> "Today"
+                                today.minusDays(1) -> "Yesterday"
+                                else -> date.format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.getDefault()))
+                            },
+                            Modifier.padding(top = 4.dp),
+                            trailing = "${insights.size} ${if (insights.size == 1) "note" else "notes"}",
+                        )
+                    }
+                    items(insights.sortedByDescending { it.kind == InsightKind.WEEKLY }, key = { it.id }) {
+                        if (it.kind == InsightKind.WEEKLY) WeeklyReview(it, commander) else InsightCard(it, commander)
+                    }
+                }
             }
         }
     }
 }
 
+/**
+ * One insight about a workout or a night: what it's about (category, in its colour) and when, the
+ * headline, the note, the numbers it's based on, then the coach's suggestion in the persona's voice.
+ */
 @Composable
-internal fun InsightCard(insight: CoachInsight) {
+internal fun InsightCard(insight: CoachInsight, commander: Boolean = false) {
     val tint = categoryColor(insight.category, insight.kind)
-    Card(Modifier.fillMaxWidth()) {
+    Column(
+        Modifier.fillMaxWidth().clip(Resurge.shape.md).background(Resurge.colors.surface).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(8.dp).clip(Resurge.shape.pill).background(tint))
             Spacer(Modifier.width(8.dp))
-            Text(
-                categoryLabel(insight.category, insight.kind),
-                style = Resurge.type.label,
-                color = Resurge.colors.textMuted,
-                modifier = Modifier.weight(1f),
-            )
-            Text(whenLabel(insight.createdAt), style = Resurge.type.caption, color = Resurge.colors.textSubtle)
+            Text(categoryLabel(insight.category, insight.kind), style = Resurge.type.label, color = tint, modifier = Modifier.weight(1f))
+            Text(timeLabel(insight.createdAt), style = Resurge.type.caption, color = Resurge.colors.textSubtle)
         }
-        Spacer(Modifier.height(14.dp))
-        Text(insight.title, style = Resurge.type.headline)
-        Spacer(Modifier.height(8.dp))
-        Text(insight.body, style = Resurge.type.body, color = Resurge.colors.textMuted)
-        if (insight.highlights.isNotEmpty()) {
-            Spacer(Modifier.height(14.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                insight.highlights.forEach { h ->
-                    Column(
-                        Modifier
-                            .clip(Resurge.shape.md)
-                            .background(Resurge.colors.surfaceMuted)
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                    ) {
-                        Text(h.value, style = Resurge.type.label, maxLines = 1)
-                        Text(h.label, style = Resurge.type.caption, color = Resurge.colors.textMuted, maxLines = 1)
-                    }
-                }
-            }
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(insight.title, style = Resurge.type.headline)
+            Text(insight.body, style = Resurge.type.body, color = Resurge.colors.textMuted)
         }
-        insight.suggestion?.let {
-            Spacer(Modifier.height(14.dp))
-            Row(verticalAlignment = Alignment.Top) {
-                Icon(ResurgeIcons.CoachFilled, contentDescription = null, tint = Resurge.colors.accent, size = 16.dp, modifier = Modifier.padding(top = 2.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(it, style = Resurge.type.label)
+        if (insight.highlights.isNotEmpty()) Highlights(insight)
+        insight.suggestion?.let { Suggestion(it, commander) }
+    }
+}
+
+/** The numbers the note is based on, as up to three labelled values with hairlines between. */
+@Composable
+private fun Highlights(insight: CoachInsight) {
+    Row(Modifier.fillMaxWidth().clip(Resurge.shape.sm).background(Resurge.colors.surfaceMuted).padding(vertical = 10.dp)) {
+        insight.highlights.take(3).forEachIndexed { i, h ->
+            if (i > 0) Box(Modifier.width(1.dp).height(36.dp).background(Resurge.colors.border))
+            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                Text(h.value, style = Resurge.type.headline.copy(fontFeatureSettings = "tnum"), maxLines = 1)
+                Text(h.label, style = Resurge.type.caption, color = Resurge.colors.textSubtle, maxLines = 1)
             }
         }
     }
 }
 
+/** The coach's next step, with its blob: Friend on `brand-tint`, Commander on `surface-muted`. */
 @Composable
-internal fun WeeklyCard(insight: CoachInsight) {
+private fun Suggestion(text: String, commander: Boolean) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(Resurge.shape.sm)
+            .background(if (commander) Resurge.colors.surfaceMuted else Resurge.colors.accentMuted)
+            .padding(12.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        CoachMascot(commander = commander, size = 24.dp)
+        Spacer(Modifier.width(10.dp))
+        Text(text, style = Resurge.type.label, color = Resurge.colors.text)
+    }
+}
+
+/**
+ * The Saturday review: a `brand-tint` header that states the week, then wins, how each area moved
+ * (neutral pills: whether a change is good depends on the metric, so the words carry it), the habits
+ * note and the focus for next week.
+ */
+@Composable
+internal fun WeeklyReview(insight: CoachInsight, commander: Boolean = false) {
     val weekly = insight.weekly
-    Card(Modifier.fillMaxWidth(), inverse = true) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(ResurgeIcons.CoachFilled, contentDescription = null, tint = Resurge.colors.accent, size = 16.dp)
-            Spacer(Modifier.width(8.dp))
-            Text("Weekly review", style = Resurge.type.label, color = Resurge.colors.onInverseMuted, modifier = Modifier.weight(1f))
-            Text(whenLabel(insight.createdAt), style = Resurge.type.caption, color = Resurge.colors.onInverseMuted)
+    Column(Modifier.fillMaxWidth().clip(Resurge.shape.lg).background(Resurge.colors.surface)) {
+        Column(
+            Modifier.fillMaxWidth().background(Resurge.colors.accentMuted).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Overline(listOfNotNull("Weekly review", weekly?.let(::weekRange)).joinToString(" · "), Modifier.weight(1f), color = Resurge.colors.brandInk)
+                CoachMascot(commander = commander, size = 28.dp)
+            }
+            Text(insight.title, style = Resurge.type.brand.copy(fontSize = Resurge.type.title.fontSize, lineHeight = Resurge.type.title.lineHeight))
+            weekly?.summary?.takeIf { it.isNotBlank() }?.let { Text(it, style = Resurge.type.body, color = Resurge.colors.textMuted) }
         }
-        Spacer(Modifier.height(14.dp))
-        Text(insight.title, style = Resurge.type.title, color = Resurge.colors.onInverse)
         if (weekly != null) {
-            Spacer(Modifier.height(10.dp))
-            Text(weekly.summary, style = Resurge.type.body, color = Resurge.colors.onInverseMuted)
-            if (weekly.areas.isNotEmpty()) {
-                Spacer(Modifier.height(16.dp))
-                weekly.areas.forEach { area ->
-                    Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.Top) {
-                        Text(
-                            when (area.trend) { "up" -> "↑"; "down" -> "↓"; else -> "→" },
-                            style = Resurge.type.label,
-                            color = Resurge.colors.onInverse,
-                            modifier = Modifier.width(20.dp),
-                        )
-                        Text(
-                            "${area.area.replaceFirstChar { it.uppercase() }} · ${area.note}",
-                            style = Resurge.type.label,
-                            color = Resurge.colors.onInverse,
-                        )
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                if (weekly.wins.isNotEmpty()) ReviewSection("Wins") { weekly.wins.forEach { Bullet(it) } }
+                if (weekly.areas.isNotEmpty()) ReviewSection("How it moved") {
+                    weekly.areas.forEachIndexed { i, area ->
+                        if (i > 0) Divider()
+                        TrendRow(area)
+                    }
+                }
+                if (weekly.habits.isNotBlank()) ReviewSection("Habits") { Text(weekly.habits, style = Resurge.type.body) }
+                weekly.focus.firstOrNull()?.let { focus ->
+                    ReviewSection("Next week") {
+                        Row(
+                            Modifier.fillMaxWidth().clip(Resurge.shape.sm).background(Resurge.colors.surfaceMuted).padding(12.dp),
+                            verticalAlignment = Alignment.Top,
+                        ) {
+                            Icon(ResurgeIcons.Target, contentDescription = null, tint = Resurge.colors.brandInk, size = 20.dp)
+                            Spacer(Modifier.width(10.dp))
+                            Text(focus, style = Resurge.type.label)
+                        }
+                        weekly.focus.drop(1).forEach { Bullet(it) }
                     }
                 }
             }
-            if (weekly.wins.isNotEmpty()) BulletSection("Wins", weekly.wins)
-            if (weekly.habits.isNotBlank()) BulletSection("Habits", listOf(weekly.habits))
-            if (weekly.focus.isNotEmpty()) BulletSection("Next week", weekly.focus)
+        } else {
+            Text(insight.body, style = Resurge.type.body, color = Resurge.colors.textMuted, modifier = Modifier.padding(20.dp))
         }
     }
 }
 
 @Composable
-internal fun BulletSection(title: String, items: List<String>) {
-    Spacer(Modifier.height(16.dp))
-    Text(title.uppercase(), style = Resurge.type.caption, color = Resurge.colors.onInverseMuted)
-    Spacer(Modifier.height(6.dp))
-    items.forEach { Text("•  $it", style = Resurge.type.body, color = Resurge.colors.onInverse, modifier = Modifier.padding(vertical = 2.dp)) }
+private fun ReviewSection(title: String, content: @Composable () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Overline(title)
+        content()
+    }
 }
+
+@Composable
+private fun Bullet(text: String) {
+    Row {
+        Box(Modifier.padding(top = 8.dp).size(5.dp).clip(Resurge.shape.pill).background(Resurge.colors.textSubtle))
+        Spacer(Modifier.width(10.dp))
+        Text(text, style = Resurge.type.body)
+    }
+}
+
+/** One area of the week with a neutral trend pill. */
+@Composable
+private fun TrendRow(area: WeeklyArea) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.Top) {
+        Column(Modifier.weight(1f)) {
+            Text(area.area.replaceFirstChar { it.uppercase() }, style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight))
+            Text(area.note, style = Resurge.type.caption.copy(lineHeight = Resurge.type.label.lineHeight), color = Resurge.colors.textMuted)
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(
+            when (area.trend) { "up" -> "↑ Up"; "down" -> "↓ Down"; else -> "→ Steady" },
+            style = Resurge.type.caption,
+            color = Resurge.colors.textMuted,
+            modifier = Modifier.clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted).padding(horizontal = 10.dp, vertical = 4.dp),
+        )
+    }
+}
+
+/** "6–12 Oct" from the review's week bounds (ISO dates), or null when they're missing. */
+internal fun weekRange(weekly: WeeklyDetails): String? {
+    val start = weekly.weekStart?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return null
+    val end = weekly.weekEnd?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return null
+    val month = DateTimeFormatter.ofPattern("MMM", Locale.getDefault())
+    return if (start.month == end.month) "${start.dayOfMonth}–${end.dayOfMonth} ${end.format(month)}"
+    else "${start.dayOfMonth} ${start.format(month)} – ${end.dayOfMonth} ${end.format(month)}"
+}
+
+@Composable
+private fun timeLabel(at: Instant): String = at.atZone(ZoneId.systemDefault()).toLocalTime().format(clockFormatter())
 
 @Composable
 internal fun InsightsSkeleton() {
     SkeletonGroup {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             repeat(3) {
-                Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.fillMaxWidth().clip(Resurge.shape.md).background(Resurge.colors.surface).padding(16.dp)) {
                     SkeletonLine(90.dp)
                     Spacer(Modifier.height(14.dp))
                     SkeletonLine(200.dp, 18.dp)
