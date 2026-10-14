@@ -35,6 +35,7 @@ import com.resurgeai.core.designsystem.components.SkeletonLine
 import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.model.DailyHealth
 import com.resurgeai.core.model.HealthMetric
+import com.resurgeai.core.model.Targets
 import com.resurgeai.core.model.SleepStage
 import java.time.Duration
 import com.resurgeai.core.model.CoachInsight
@@ -82,33 +83,75 @@ internal fun CoachInsight(insight: CoachInsight?, onClick: () -> Unit) {
 
 // --- Sections ---
 
-/** Heart → Sleep | Steps → Calories | Distance → Weight | Exercise, one container per group. */
+/** Top of Today: food eaten vs burned, then steps and sleep. */
 @Composable
-internal fun TodayGrid(state: DashboardUiState, day: DailyHealth, onOpen: (HealthMetric) -> Unit) {
+internal fun GlanceGrid(state: DashboardUiState, day: DailyHealth?, onOpen: (HealthMetric) -> Unit, onOpenFood: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(CARD_GAP)) {
+        MetricGroup(
+            cells = listOf(
+                { EatenTile(state, it, onOpenFood) },
+                { CaloriesTile(day, it) { onOpen(HealthMetric.CALORIES_BURNED) } },
+            ),
+        )
+        MetricGroup(
+            cells = listOf(
+                { StepsTile(day, it) { onOpen(HealthMetric.STEPS) } },
+                { SleepTile(day, it) { onOpen(HealthMetric.SLEEP) } },
+            ),
+        )
+    }
+}
+
+/** Below the timeline: heart, then distance, weight, exercise days and water. */
+@Composable
+internal fun HealthGrid(state: DashboardUiState, day: DailyHealth, onOpen: (HealthMetric) -> Unit, onOpenFood: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(CARD_GAP)) {
         HeartTile(day) { onOpen(HealthMetric.HEART_RATE) }
         MetricGroup(
             cells = listOf(
-                { SleepTile(day, it) { onOpen(HealthMetric.SLEEP) } },
-                { StepsTile(day, it) { onOpen(HealthMetric.STEPS) } },
-            ),
-        )
-        MetricGroup(
-            cells = listOf(
-                { CaloriesTile(day, it) { onOpen(HealthMetric.CALORIES_BURNED) } },
                 { DistanceTile(state, day, it) { onOpen(HealthMetric.DISTANCE) } },
+                { WeightTile(state, day, it) { onOpen(HealthMetric.WEIGHT) } },
             ),
         )
         MetricGroup(
             cells = listOf(
-                { WeightTile(state, day, it) { onOpen(HealthMetric.WEIGHT) } },
                 { ExerciseTile(state, day, it) { onOpen(HealthMetric.EXERCISE) } },
+                { WaterTile(state, it, onOpenFood) },
             ),
         )
     }
 }
 
 // --- Tiles ---
+
+@Composable
+private fun EatenTile(state: DashboardUiState, modifier: Modifier, onClick: () -> Unit) {
+    val target = state.profile?.targets?.calories ?: Targets.DEFAULT_CALORIES
+    val eaten = state.eaten.kcal
+    val left = target - eaten.roundToInt()
+    MetricCell(
+        title = "Eaten", value = Formatters.kcal(eaten), unit = "kcal", onClick = onClick, modifier = modifier,
+        subtitle = if (left >= 0) "${Formatters.count(left.toLong())} left" else "${Formatters.count(-left.toLong())} over",
+    ) { m ->
+        Ring(
+            listOf(RingSegment((eaten / target).toFloat().coerceIn(0f, 1f), if (left < 0) Resurge.colors.danger else Resurge.colors.energy)),
+            m, strokeWidth = 8.dp,
+        ) { TileIcon(ResurgeIcons.Bowl, Resurge.colors.energy) }
+    }
+}
+
+@Composable
+private fun WaterTile(state: DashboardUiState, modifier: Modifier, onClick: () -> Unit) {
+    val target = state.profile?.targets?.waterMl ?: Targets.DEFAULT_WATER_ML
+    MetricCell(
+        title = "Water", value = Formatters.count(state.waterMl.toLong()), unit = "ml", onClick = onClick, modifier = modifier,
+        subtitle = "of ${Formatters.count(target.toLong())} ml",
+    ) { m ->
+        Ring(listOf(RingSegment((state.waterMl.toFloat() / target).coerceIn(0f, 1f), Resurge.colors.water)), m, strokeWidth = 8.dp) {
+            TileIcon(ResurgeIcons.Droplet, Resurge.colors.water)
+        }
+    }
+}
 
 @Composable
 private fun HeartTile(day: DailyHealth, onClick: () -> Unit) {
@@ -162,9 +205,9 @@ private fun HeartTile(day: DailyHealth, onClick: () -> Unit) {
 }
 
 @Composable
-private fun SleepTile(day: DailyHealth, modifier: Modifier, onClick: () -> Unit) {
-    val total = day.sleepDuration
-    val stages = day.sleep.flatMap { it.stages.entries }.groupBy({ it.key }, { it.value })
+private fun SleepTile(day: DailyHealth?, modifier: Modifier, onClick: () -> Unit) {
+    val total = day?.sleepDuration
+    val stages = day?.sleep.orEmpty().flatMap { it.stages.entries }.groupBy({ it.key }, { it.value })
         .mapValues { (_, d) -> d.fold(Duration.ZERO, Duration::plus) }
     val goal = DashboardGoals.SLEEP.toMinutes().toFloat()
     val segments = when {
@@ -184,8 +227,8 @@ private fun SleepTile(day: DailyHealth, modifier: Modifier, onClick: () -> Unit)
 }
 
 @Composable
-private fun StepsTile(day: DailyHealth, modifier: Modifier, onClick: () -> Unit) {
-    val steps = day.steps
+private fun StepsTile(day: DailyHealth?, modifier: Modifier, onClick: () -> Unit) {
+    val steps = day?.steps
     val progress = ((steps ?: 0L) / DashboardGoals.STEPS).toFloat()
     MetricCell(
         title = "Steps", value = steps?.let(Formatters::count), onClick = onClick, modifier = modifier,
@@ -202,10 +245,10 @@ private fun StepsTile(day: DailyHealth, modifier: Modifier, onClick: () -> Unit)
 }
 
 @Composable
-private fun CaloriesTile(day: DailyHealth, modifier: Modifier, onClick: () -> Unit) {
-    val energy = Resurge.colors.energy
-    val total = day.caloriesTotal
-    val active = day.caloriesActive
+private fun CaloriesTile(day: DailyHealth?, modifier: Modifier, onClick: () -> Unit) {
+    val energy = Resurge.colors.activity
+    val total = day?.caloriesTotal
+    val active = day?.caloriesActive
     val segments = when {
         total == null || total <= 0 -> emptyList()
         active == null -> listOf(RingSegment(1f, energy))
@@ -214,7 +257,7 @@ private fun CaloriesTile(day: DailyHealth, modifier: Modifier, onClick: () -> Un
         }
     }
     MetricCell(
-        title = "Calories", value = total?.let(Formatters::kcal), unit = "kcal", onClick = onClick, modifier = modifier,
+        title = "Burned", value = total?.let(Formatters::kcal), unit = "kcal", onClick = onClick, modifier = modifier,
         subtitle = active?.let { "${Formatters.kcal(it)} active" } ?: total?.let { "Total burned" },
     ) { m ->
         Ring(segments, m, strokeWidth = 8.dp) { TileIcon(ResurgeIcons.Flame, energy) }

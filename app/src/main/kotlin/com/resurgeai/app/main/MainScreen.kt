@@ -196,6 +196,7 @@ fun MainScreen(profile: UserProfile, openInsightsSignal: Int = 0, openHabitsSign
                 onLogWorkout = { rootNav.navigate(ActivityPickerRoute()) },
                 onOpenWorkout = { id -> rootNav.navigate(WorkoutEditorRoute(workoutId = id)) },
                 onLogMeal = { rootNav.navigate(FoodLogRoute()) },
+                onScanMeal = { rootNav.navigate(FoodLogRoute(mode = "scan")) },
                 onOpenMeal = { id -> rootNav.navigate(MealReviewRoute(mealId = id)) },
                 openFoodTabSignal = if (openFoodSignal.mode == null) openFoodSignal.count else 0,
                 openHabitsSignal = openHabitsSignal,
@@ -312,6 +313,7 @@ private fun TabsShell(
     onLogWorkout: () -> Unit,
     onOpenWorkout: (String) -> Unit,
     onLogMeal: () -> Unit,
+    onScanMeal: () -> Unit,
     onOpenMeal: (String) -> Unit,
     openFoodTabSignal: Int,
     openHabitsSignal: Int,
@@ -360,7 +362,15 @@ private fun TabsShell(
                 popExitTransition = { ExitTransition.None },
             ) {
                 composable<TodayRoute> {
-                    TodayScreenRoute(onOpenMetric = onOpenMetric, onOpenInsights = onOpenInsights)
+                    TodayScreenRoute(
+                        onOpenMetric = onOpenMetric,
+                        onOpenInsights = onOpenInsights,
+                        onOpenMeal = onOpenMeal,
+                        onOpenWorkout = onOpenWorkout,
+                        onScanMeal = onScanMeal,
+                        onLogWorkout = onLogWorkout,
+                        onOpenFood = { tabsNav.switchTab(FoodRoute) },
+                    )
                 }
                 composable<FitnessRoute> { FitnessScreenRoute(onOpenWorkout = onOpenWorkout, onLogWorkout = onLogWorkout) }
                 composable<FoodRoute> { FoodScreenRoute(onOpenMeal = onOpenMeal, onLogMeal = onLogMeal) }

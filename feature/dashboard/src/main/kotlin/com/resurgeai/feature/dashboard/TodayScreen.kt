@@ -42,11 +42,19 @@ import com.resurgeai.core.designsystem.theme.ResurgeTheme
 import com.resurgeai.core.healthconnect.HealthConnectAvailability
 import com.resurgeai.core.model.HealthMetric
 import com.resurgeai.core.model.SourceKind
+import com.resurgeai.core.model.UnitSystem
+import com.resurgeai.core.designsystem.components.SectionHeader
+import java.time.LocalDate
 
 @Composable
 fun TodayRoute(
     onOpenMetric: (HealthMetric) -> Unit,
     onOpenInsights: () -> Unit,
+    onOpenMeal: (String) -> Unit = {},
+    onOpenWorkout: (String) -> Unit = {},
+    onScanMeal: () -> Unit = {},
+    onLogWorkout: () -> Unit = {},
+    onOpenFood: () -> Unit = {},
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -65,9 +73,19 @@ fun TodayRoute(
         onRetry = { viewModel.refresh(force = true) },
         onOpenMetric = onOpenMetric,
         onOpenInsights = onOpenInsights,
+        onOpenMeal = onOpenMeal,
+        onOpenWorkout = onOpenWorkout,
+        onScanMeal = onScanMeal,
+        onLogWorkout = onLogWorkout,
+        onOpenFood = onOpenFood,
+        onAddWater = { viewModel.addWater(250) },
     )
 }
 
+/**
+ * Today: the latest insight, quick logging, food vs activity at a glance, then a timeline of
+ * today's and yesterday's meals, workouts, sleep and insights, and the rest of the health data.
+ */
 @Composable
 fun TodayScreen(
     state: DashboardUiState,
@@ -76,7 +94,24 @@ fun TodayScreen(
     onRetry: () -> Unit,
     onOpenMetric: (HealthMetric) -> Unit,
     onOpenInsights: () -> Unit = {},
+    onOpenMeal: (String) -> Unit = {},
+    onOpenWorkout: (String) -> Unit = {},
+    onScanMeal: () -> Unit = {},
+    onLogWorkout: () -> Unit = {},
+    onOpenFood: () -> Unit = {},
+    onAddWater: () -> Unit = {},
+    today: LocalDate = LocalDate.now(),
 ) {
+    val healthReady = state.availability == HealthConnectAvailability.AVAILABLE &&
+        (state.permissions == PermissionState.PARTIAL || state.permissions == PermissionState.ALL)
+    val feed = TodayFeed.build(
+        today = today,
+        meals = state.meals,
+        workouts = state.workouts,
+        sleep = state.today?.sleep.orEmpty(),
+        insights = state.insights,
+        lead = state.latestInsight,
+    )
     Column(
         Modifier
             .fillMaxSize()
@@ -88,13 +123,16 @@ fun TodayScreen(
                 start = 20.dp - INSIGHT_INSET,
                 end = 20.dp - INSIGHT_INSET,
                 top = LocalHeaderInset.current + 20.dp - INSIGHT_INSET,
-                bottom = 32.dp - INSIGHT_INSET,
+                bottom = 20.dp - INSIGHT_INSET,
             ),
         ) {
             CoachInsight(insight = state.latestInsight, onClick = onOpenInsights)
         }
 
         Column(Modifier.padding(horizontal = 16.dp)) {
+            QuickActions(onScanMeal = onScanMeal, onLogWorkout = onLogWorkout, onAddWater = onAddWater)
+            Spacer(Modifier.height(16.dp))
+
             when (state.availability) {
                 null -> TodaySkeleton()
                 HealthConnectAvailability.NOT_SUPPORTED -> InfoCard(
@@ -127,10 +165,30 @@ fun TodayScreen(
                             InfoCard(ResurgeIcons.Activity, "Something went wrong", it, action = "Retry", onAction = onRetry)
                             Spacer(Modifier.height(12.dp))
                         }
-                        val today = state.today
-                        if (today == null) TodaySkeleton() else TodayGrid(state, today, onOpenMetric)
                     }
                 }
+            }
+            if (state.availability != null && state.permissions != PermissionState.UNKNOWN) {
+                if (!healthReady) Spacer(Modifier.height(12.dp))
+                GlanceGrid(state, state.today, onOpenMetric, onOpenFood)
+            }
+
+            Timeline(
+                days = feed,
+                today = today,
+                units = state.profile?.units ?: UnitSystem.METRIC,
+                actions = FeedActions(
+                    onOpenMeal = onOpenMeal,
+                    onOpenWorkout = onOpenWorkout,
+                    onOpenSleep = { onOpenMetric(HealthMetric.SLEEP) },
+                    onOpenInsights = onOpenInsights,
+                ),
+            )
+
+            val day = state.today
+            if (healthReady && day != null) {
+                SectionHeader("Health")
+                HealthGrid(state, day, onOpenMetric, onOpenFood)
             }
             Spacer(Modifier.height(32.dp + LocalFloatingBarInset.current))
         }

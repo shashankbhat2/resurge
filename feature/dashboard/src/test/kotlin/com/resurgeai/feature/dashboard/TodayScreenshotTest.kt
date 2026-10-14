@@ -17,6 +17,14 @@ import com.resurgeai.core.model.SleepSession
 import com.resurgeai.core.model.SleepStage
 import com.resurgeai.core.model.Targets
 import com.resurgeai.core.model.UserProfile
+import com.resurgeai.core.model.FoodItem
+import com.resurgeai.core.model.Meal
+import com.resurgeai.core.model.MealSource
+import com.resurgeai.core.model.MealType
+import com.resurgeai.core.model.Nutrition
+import com.resurgeai.core.model.Workout
+import com.resurgeai.core.model.WorkoutMetricsInput
+import com.resurgeai.core.model.WorkoutSource
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -29,11 +37,12 @@ import java.time.LocalDate
 /** Today dashboard with synthetic data. Record with :feature:dashboard:recordRoborazziDebug. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35], qualifiers = "w400dp-h1300dp-xhdpi")
+@Config(sdk = [35], qualifiers = "w400dp-h2400dp-xhdpi")
 class TodayScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
     private val now = Instant.parse("2026-10-10T08:00:00Z")
+    private val day = LocalDate.of(2026, 10, 10)
     private val state = DashboardUiState(
         profile = UserProfile("u", "Shashank Bhat", null, null, setOf(Goal.SLEEP_BETTER), Targets(), true),
         availability = HealthConnectAvailability.AVAILABLE,
@@ -72,6 +81,19 @@ class TodayScreenshotTest {
             body = "You slept 40 minutes less than your weekly average, and your resting heart rate is up 3 bpm. Keep today's training light and aim to be in bed by 10:30.",
             highlights = emptyList(), suggestion = null, createdAt = now, weekly = null,
         ),
+        meals = listOf(
+            Meal(
+                "m1", MealType.BREAKFAST, Instant.parse("2026-10-10T03:15:00Z"), day, MealSource.TEXT, "Masala omelette with toast",
+                listOf(FoodItem("Omelette", 130.0, Nutrition(175.0, 11.0, 3.0, 13.0)), FoodItem("Toast", 60.0, Nutrition(250.0, 9.0, 43.0, 3.4))),
+            ),
+        ),
+        workouts = listOf(
+            Workout(
+                "w1", WorkoutSource.HEALTH_CONNECT, "run", null, Instant.parse("2026-10-10T01:00:00Z"), Instant.parse("2026-10-10T01:42:00Z"),
+                WorkoutMetricsInput(distanceM = 7_120.0, kcal = 468, avgHr = 151), sourceName = "Pixel Watch 3",
+            ),
+        ),
+        waterMl = 1_000,
     )
 
     private fun capture(name: String, scheme: ColorScheme, ui: DashboardUiState = state) {
@@ -79,7 +101,7 @@ class TodayScreenshotTest {
         compose.setContent {
             ResurgeTheme(colorScheme = scheme) {
                 Screen {
-                    TodayScreen(ui, onConnect = {}, onInstall = {}, onRetry = {}, onOpenMetric = {})
+                    TodayScreen(ui, onConnect = {}, onInstall = {}, onRetry = {}, onOpenMetric = {}, today = day)
                 }
             }
         }

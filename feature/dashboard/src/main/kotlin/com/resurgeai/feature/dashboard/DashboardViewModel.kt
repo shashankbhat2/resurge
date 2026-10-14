@@ -12,6 +12,13 @@ import com.resurgeai.core.data.health.ActivityEventWorker
 import com.resurgeai.core.data.coach.CoachRepository
 import com.resurgeai.core.model.CoachInsight
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import com.resurgeai.core.data.fitness.WorkoutsRepository
+import com.resurgeai.core.data.food.MealsRepository
+import com.resurgeai.core.model.Meal
+import com.resurgeai.core.model.Nutrition
+import com.resurgeai.core.model.Workout
+import java.time.Instant
 import com.resurgeai.core.data.session.SessionRepository
 import com.resurgeai.core.healthconnect.HealthConnectAvailability
 import com.resurgeai.core.healthconnect.HealthConnectManager
@@ -52,7 +59,20 @@ data class DashboardUiState(
     val error: String? = null,
     /** Most recent coach insight (activity, sleep or weekly), or null before the first one. */
     val latestInsight: CoachInsight? = null,
-)
+    /** Recent insights, newest first, for the timeline. */
+    val insights: List<CoachInsight> = emptyList(),
+    /** Meals logged today and yesterday. */
+    val meals: List<Meal> = emptyList(),
+    /** Workouts (device + logged) from yesterday onwards, newest first. */
+    val workouts: List<Workout> = emptyList(),
+    val waterMl: Int = 0,
+) {
+    /** Eaten on the day being shown (the Health Connect day, else the calendar day). */
+    val eaten: Nutrition get() {
+        val day = today?.date ?: LocalDate.now()
+        return meals.filter { it.date == day }.fold(Nutrition.Zero) { acc, m -> acc + m.totals }
+    }
+}
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
@@ -62,6 +82,8 @@ class DashboardViewModel @Inject constructor(
     private val healthSync: HealthSyncRepository,
     private val activityEvents: ActivityEventSync,
     coachRepository: CoachRepository,
+    private val meals: MealsRepository,
+    private val workouts: WorkoutsRepository,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
     private val _state = MutableStateFlow(DashboardUiState())
@@ -71,6 +93,12 @@ class DashboardViewModel @Inject constructor(
     val permissionsToRequest: Set<String> get() = healthConnect.permissionsToRequest()
 
     fun installIntent() = healthConnect.installIntent()
+
+    private val deviceWorkouts = MutableStateFlow<List<Workout>>(emptyList())
+
+    private fun feedStart(): Instant = LocalDate.now().minusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()
+
+    fun addWater(ml: Int) = meals.addWater(LocalDate.now(), ml)
 
     private var loadJob: Job? = null
     private var lastLoadedAt = 0L
@@ -82,9 +110,25 @@ class DashboardViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
-            coachRepository.insights(limit = 1)
+            coachRepository.insights(limit = 12)
                 .catch { Log.w(TAG, "Insights listener failed", it) }
-                .collect { list -> _state.update { it.copy(latestInsight = list.firstOrNull()) } }
+                .collect { list -> _state.update { it.copy(latestInsight = list.firstOrNull(), insights = list) } }
+        }
+        val yesterday = LocalDate.now().minusDays(1)
+        viewModelScope.launch {
+            meals.meals(yesterday)
+                .catch { Log.w(TAG, "Meals listener failed", it) }
+                .collect { list -> _state.update { it.copy(meals = list) } }
+        }
+        viewModelScope.launch {
+            meals.water(LocalDate.now())
+                .catch { Log.w(TAG, "Water listener failed", it) }
+                .collect { byDay -> _state.update { it.copy(waterMl = byDay[LocalDate.now()] ?: 0) } }
+        }
+        viewModelScope.launch {
+            combine(deviceWorkouts, workouts.records(feedStart()).catch { emit(emptyList()) }) { device, records ->
+                WorkoutsRepository.merge(device, records)
+            }.collect { list -> _state.update { it.copy(workouts = list) } }
         }
     }
 
@@ -121,7 +165,9 @@ class DashboardViewModel @Inject constructor(
                 val day = async { healthData.readDay(today, zone) }
                 val week = async { HealthMath.exerciseDays(healthData.exerciseThisWeek(zone), zone) }
                 val series = SPARKLINE_METRICS.map { m -> async { m to healthData.readSeries(m, 7, zone) } }
+                val device = async { runCatching { workouts.deviceWorkouts(feedStart(), Instant.now()) }.getOrDefault(emptyList()) }
                 val activeDays = week.await()
+                deviceWorkouts.value = device.await()
                 _state.update {
                     it.copy(
                         loading = false,
