@@ -97,8 +97,8 @@ import kotlinx.serialization.Serializable
 /** Add a habit (id = null) or edit one. */
 @Serializable data class HabitEditorRoute(val id: String? = null)
 
-/** Full-screen coach chat; [prompt] (from the tabs' ask bar) is sent into the latest conversation. */
-@Serializable data class CoachScreenRoute(val prompt: String? = null)
+/** Full-screen coach chat; [newChat] opens on an empty conversation instead of the latest one. */
+@Serializable data class CoachScreenRoute(val newChat: Boolean = false)
 
 /** Activity catalog search; [forResult] returns the pick to the workout editor instead of opening it. */
 @Serializable data class ActivityPickerRoute(val forResult: Boolean = false)
@@ -183,7 +183,7 @@ fun MainScreen(profile: UserProfile, openInsightsSignal: Int = 0, openHabitsSign
                 onOpenCatalog = if (BuildConfig.DEBUG) {
                     { rootNav.navigate(CatalogRoute) }
                 } else null,
-                onOpenCoach = { rootNav.navigate(CoachScreenRoute()) },
+                onOpenCoach = { rootNav.navigate(CoachScreenRoute(newChat = true)) },
                 onOpenInsights = { rootNav.navigate(InsightsScreenRoute) },
                 onOpenHabit = { id -> rootNav.navigate(HabitDetailRoute(id)) },
                 onAddHabit = { rootNav.navigate(HabitEditorRoute()) },

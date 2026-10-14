@@ -46,8 +46,8 @@ class CoachViewModelTest {
 
     private val session = mockk<SessionRepository> { every { session } returns flowOf(SessionState.Loading) }
 
-    private fun vm(prompt: String? = null) =
-        CoachViewModel(repo, session, SavedStateHandle(mapOf(CoachViewModel.PROMPT_KEY to prompt)))
+    private fun vm(newChat: Boolean = false) =
+        CoachViewModel(repo, session, SavedStateHandle(mapOf(CoachViewModel.NEW_CHAT_KEY to newChat)))
 
     @Test
     fun `sending streams text, then hands over to the saved turns`() = runTest {
@@ -96,17 +96,18 @@ class CoachViewModelTest {
     }
 
     @Test
-    fun `ask bar prompt continues the most recent thread once it has loaded`() {
+    fun `a new chat opens empty even when conversations exist`() {
         every { repo.threads(any()) } returns flowOf(listOf(CoachThread("recent", "Sleep", null, null)))
-        turns.value = listOf(CoachTurn("0", TurnRole.USER, "Hi", null, false), CoachTurn("1", TurnRole.COACH, "Hey", CoachModel.FAST, false))
-        val vm = vm(prompt = "How was my sleep?")
-        verify(exactly = 1) { repo.send("recent", "How was my sleep?", CoachModel.FAST) }
-        assertEquals(2, vm.state.value.pending?.baseline)
+        val vm = vm(newChat = true)
+        assertNull(vm.state.value.threadId)
+        assertTrue(vm.state.value.turns.isEmpty())
     }
 
     @Test
-    fun `ask bar prompt starts a conversation when there are none`() {
-        vm(prompt = "Hello")
-        verify(exactly = 1) { repo.send(null, "Hello", CoachModel.FAST) }
+    fun `a new chat sends its first message as a new conversation`() = runTest {
+        every { repo.threads(any()) } returns flowOf(listOf(CoachThread("recent", "Sleep", null, null)))
+        val vm = vm(newChat = true)
+        vm.send("Plan my week")
+        verify(exactly = 1) { repo.send(null, "Plan my week", CoachModel.FAST) }
     }
 }

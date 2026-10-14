@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
@@ -44,20 +45,23 @@ data class NavItem<T>(
     @DrawableRes val selectedIcon: Int = icon,
 )
 
-/** Height of the floating bar plus its gap; scrolling tab content should end with at least this much space. */
+/** Space the navbar takes at the bottom (bar plus system navigation inset); scrolling tab content should end with at least this much space. */
 val LocalFloatingBarInset = compositionLocalOf { 0.dp }
 
 private val BarHeight = 64.dp
+private val BarRadius = 28.dp
 private val ItemSize = 48.dp
-private val BarGap = 12.dp
 
-/** Total space the floating bar occupies above the navigation-bar inset. */
-val FloatingNavBarHeight: Dp = BarHeight + BarGap
+private val BarPaddingY = 8.dp
+
+/** Height of the navbar above the system navigation-bar inset. */
+val FloatingNavBarHeight: Dp = BarHeight + BarPaddingY * 2
 
 /**
- * Floating navigation bar (Resurge Tide): a `radius-lg` bar on `navBar` with a soft shadow,
- * icon-only tabs spread evenly, and the selected tab as a 48dp `navActive` circle holding its
- * filled icon. An optional [center] item (e.g. the Coach) sits between the two halves of [items].
+ * Navigation bar (Resurge Tide), docked to the bottom edge: `navBar` with `radius-lg` top corners
+ * and a soft shadow, running behind the system navigation bar. Icon-only tabs are spread evenly,
+ * and the selected tab is a 48dp `navActive` circle holding its filled icon. An optional [center]
+ * item (e.g. the Coach) sits between the two halves of [items].
  */
 @Composable
 fun <T> FloatingNavBar(
@@ -67,17 +71,17 @@ fun <T> FloatingNavBar(
     modifier: Modifier = Modifier,
     center: (@Composable () -> Unit)? = null,
 ) {
-    val shape = Resurge.shape.lg
+    val shape = RoundedCornerShape(topStart = BarRadius, topEnd = BarRadius)
     Row(
         modifier = modifier
-            .windowInsetsPadding(WindowInsets.navigationBars)
-            .padding(start = 16.dp, end = 16.dp, bottom = BarGap)
             .fillMaxWidth()
-            .height(BarHeight)
             .shadow(16.dp, shape, ambientColor = Color.Black.copy(alpha = 0.10f), spotColor = Color.Black.copy(alpha = 0.10f))
             .clip(shape)
             .background(Resurge.colors.navBar)
-            .padding(horizontal = 8.dp),
+            .windowInsetsPadding(WindowInsets.navigationBars)
+            .padding(vertical = BarPaddingY)
+            .height(BarHeight)
+            .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceEvenly,
     ) {
@@ -125,7 +129,7 @@ private fun NavTab(
 
 /**
  * The coach in the middle of [FloatingNavBar]: the persona's flat blob (Friend or Commander) in a
- * 48dp tap target. It keeps its own colours; tapping opens the coach chat.
+ * 48dp tap target. It keeps its own colours; tapping starts a new chat with the coach.
  */
 @Composable
 fun NavCoach(commander: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {

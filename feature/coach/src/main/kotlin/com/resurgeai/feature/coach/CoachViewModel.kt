@@ -70,8 +70,8 @@ class CoachViewModel @Inject constructor(
     private val threadId = MutableStateFlow<String?>(null)
     private var sendJob: Job? = null
 
-    /** Message typed in the tabs' ask bar; sent once the latest conversation has loaded. */
-    private var prompt: String? = savedState.get<String>(PROMPT_KEY)?.takeIf { it.isNotBlank() }
+    /** Opened from the navbar: start on an empty conversation instead of the latest one. */
+    private var startNew: Boolean = savedState.get<Boolean>(NEW_CHAT_KEY) == true
 
     init {
         viewModelScope.launch {
@@ -82,14 +82,12 @@ class CoachViewModel @Inject constructor(
         viewModelScope.launch {
             repository.threads().catch { emit(emptyList()) }.collect { list ->
                 _state.update { s ->
-                    // Open the most recent conversation on first load.
-                    if (s.threadId == null && s.pending == null && list.isNotEmpty() && threadId.value == null) {
+                    // Open the most recent conversation on first load, unless asked for a new chat.
+                    if (!startNew && s.threadId == null && s.pending == null && list.isNotEmpty() && threadId.value == null) {
                         threadId.value = list.first().id
                     }
                     s.copy(threads = list)
                 }
-                // No conversations yet: the ask-bar message starts the first one.
-                if (list.isEmpty()) sendPrompt()
             }
         }
         viewModelScope.launch {
@@ -98,18 +96,18 @@ class CoachViewModel @Inject constructor(
                 .catch { emit(emptyList()) }
                 .collect { turns ->
                     _state.update { it.copy(turns = turns).settled() }
-                    // Continue the opened conversation with the ask-bar message.
-                    if (threadId.value != null) sendPrompt()
                 }
         }
-        viewModelScope.launch { threadId.collect { id -> _state.update { it.copy(threadId = id) } } }
-    }
-
-    private fun sendPrompt() {
-        val text = prompt ?: return
-        prompt = null
-        savedState[PROMPT_KEY] = null
-        send(text)
+        viewModelScope.launch {
+            threadId.collect { id ->
+                _state.update { it.copy(threadId = id) }
+                // Once the new chat has a thread (or another is opened), a recreated screen shows it.
+                if (id != null && startNew) {
+                    startNew = false
+                    savedState[NEW_CHAT_KEY] = false
+                }
+            }
+        }
     }
 
     fun selectModel(model: CoachModel) = _state.update { it.copy(model = model) }
@@ -166,7 +164,7 @@ class CoachViewModel @Inject constructor(
     }
 
     companion object {
-        /** Name of the optional `prompt` argument on the coach route. */
-        const val PROMPT_KEY = "prompt"
+        /** Name of the optional `newChat` argument on the coach route. */
+        const val NEW_CHAT_KEY = "newChat"
     }
 }
