@@ -2,12 +2,11 @@ package com.resurgeai.feature.fitness
 
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -19,7 +18,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsBottomHeight
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
@@ -27,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,6 +35,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -43,25 +44,28 @@ import com.composeunstyled.UnstyledButton
 import com.resurgeai.core.designsystem.components.ActivityVisuals
 import com.resurgeai.core.designsystem.components.Button
 import com.resurgeai.core.designsystem.components.ButtonVariant
-import com.resurgeai.core.designsystem.components.Card
-import com.resurgeai.core.designsystem.components.IconBadge
-import com.resurgeai.core.designsystem.components.IconButton
+import com.resurgeai.core.designsystem.components.Divider
+import com.resurgeai.core.designsystem.components.EffortScale
+import com.resurgeai.core.designsystem.components.Icon
 import com.resurgeai.core.designsystem.components.InputField
+import com.resurgeai.core.designsystem.components.OptionalStepperRow
 import com.resurgeai.core.designsystem.components.ResurgeIcons
-import com.resurgeai.core.designsystem.components.SectionHeader
+import com.resurgeai.core.designsystem.components.SectionLabel
 import com.resurgeai.core.designsystem.components.SegmentOption
 import com.resurgeai.core.designsystem.components.SegmentedControl
 import com.resurgeai.core.designsystem.components.SkeletonBox
 import com.resurgeai.core.designsystem.components.SkeletonGroup
-import com.resurgeai.core.designsystem.components.TimeStepper
+import com.resurgeai.core.designsystem.components.StepperRow
 import com.resurgeai.core.designsystem.components.TopBar
-import com.resurgeai.core.designsystem.components.ValueStepper
 import com.resurgeai.core.designsystem.theme.Resurge
+import com.resurgeai.core.designsystem.theme.clockFormatter
 import com.resurgeai.core.model.ActivityCategory
 import com.resurgeai.core.model.FitnessMath
 import com.resurgeai.core.model.StrengthSet
 import com.resurgeai.core.model.WorkoutSource
+import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -102,7 +106,7 @@ internal fun WorkoutEditorScreen(
         if (!state.loaded) {
             SkeletonGroup {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    repeat(4) { SkeletonBox(Modifier.fillMaxWidth().height(72.dp), Resurge.shape.lg) }
+                    repeat(4) { SkeletonBox(Modifier.fillMaxWidth().height(72.dp), Resurge.shape.md) }
                 }
             }
             return
@@ -123,75 +127,126 @@ internal fun WorkoutEditorScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            ActivityHeader(state, onChangeActivity)
+            ActivityCard(state, onChangeActivity)
             if (state.activity.id == "other" || state.title.isNotBlank()) {
                 val title = syncedText(state.title, vm::setTitle)
                 InputField(title, placeholder = "Name (optional)", maxLength = 60)
             }
 
-            SectionHeader("When")
+            SectionLabel("When")
             DayChips(state.date, onSelect = vm::setDate)
             Spacer(Modifier.height(4.dp))
-            TimeStepper(state.time, onTimeChange = vm::setTime, caption = "Start time", stepMinutes = 15)
-
-            SectionHeader("Details")
-            ValueStepper(
-                label = "Duration",
-                value = state.durationMin.toDouble(),
-                onValueChange = { vm.setDuration((it ?: 1.0).roundToInt()) },
-                step = 5.0,
-                range = 1.0..600.0,
-                format = { UnitFormat.duration(java.time.Duration.ofMinutes(it.toLong())) },
-                icon = ResurgeIcons.Stopwatch,
-                optional = false,
-            )
-            CategoryFields(state, vm, f)
-            ValueStepper(
-                label = if (state.kcalAuto) "Calories (est.)" else "Calories",
-                value = state.metrics.kcal?.toDouble(),
-                onValueChange = { v -> vm.setKcal(v?.roundToInt()) },
-                step = 10.0,
-                range = 0.0..5000.0,
-                format = { "${it.roundToInt()} kcal" },
-                icon = ResurgeIcons.Flame,
-                start = 100.0,
-            )
-            ValueStepper(
-                label = "Avg heart rate",
-                value = state.metrics.avgHr?.toDouble(),
-                onValueChange = { v -> vm.updateMetrics { it.copy(avgHr = v?.roundToInt()) } },
-                step = 1.0,
-                range = 40.0..220.0,
-                format = { "${it.roundToInt()} bpm" },
-                icon = ResurgeIcons.Heart,
-                start = 120.0,
-            )
-
-            if (state.activity.category == ActivityCategory.STRENGTH) {
-                SectionHeader("Exercises")
-                StrengthEditor(state, vm, f)
+            val clock = clockFormatter()
+            Group {
+                StepperRow(
+                    label = "Start", hint = "15-minute steps", icon = ResurgeIcons.Clock, iconTint = Resurge.colors.textMuted,
+                    value = state.time.hour * 60 + state.time.minute,
+                    onValueChange = { vm.setTime(LocalTime.of(it / 60, it % 60)) },
+                    step = 15, range = 0..(24 * 60 - 1),
+                    format = { LocalTime.of(it / 60, it % 60).format(clock) },
+                )
+                RowDivider()
+                StepperRow(
+                    label = "Duration", hint = "5-minute steps", icon = ResurgeIcons.Stopwatch, iconTint = Resurge.colors.textMuted,
+                    value = state.durationMin, onValueChange = vm::setDuration,
+                    step = 5, range = 1..600,
+                    format = { UnitFormat.duration(Duration.ofMinutes(it.toLong())) },
+                )
             }
 
-            SectionHeader("Notes")
+            SectionLabel("Details")
+            Group {
+                CategoryRows(state, vm, f)
+                OptionalStepperRow(
+                    label = "Calories", hint = if (state.kcalAuto) "Estimated from duration" else "Your number",
+                    icon = ResurgeIcons.Flame, iconTint = Resurge.colors.energy,
+                    value = state.metrics.kcal, onValueChange = vm::setKcal,
+                    step = 10, range = 0..5000, start = 100, format = { "%,d".format(it) },
+                )
+                RowDivider()
+                OptionalStepperRow(
+                    label = "Avg heart rate", hint = "bpm",
+                    icon = ResurgeIcons.Heart, iconTint = Resurge.colors.heart,
+                    value = state.metrics.avgHr, onValueChange = { v -> vm.updateMetrics { it.copy(avgHr = v) } },
+                    step = 1, range = 40..220, start = 120, format = { it.toString() },
+                )
+            }
+            Group {
+                EffortScale(state.metrics.rpe, onValueChange = { v -> vm.updateMetrics { it.copy(rpe = v) } }, band = ::effortLabel)
+            }
+
+            if (state.activity.category == ActivityCategory.STRENGTH) {
+                val volume = state.exercises.sumOf { e -> e.sets.sumOf { (it.weightKg ?: 0.0) * it.reps } }
+                SectionLabel("Exercises", trailing = if (volume > 0) "Volume ${f.volume(volume)}" else null)
+                state.exercises.forEachIndexed { index, exercise ->
+                    key(exercise.key) { SetLogger(index, exercise, state.lastTime[LastSession.key(exercise.name)], vm, f) }
+                }
+                Button("Add exercise", onClick = vm::addExercise, variant = ButtonVariant.Secondary, leadingIcon = ResurgeIcons.Plus, modifier = Modifier.fillMaxWidth())
+            }
+
+            if (state.duplicates.isNotEmpty()) {
+                SectionLabel("Also recorded by")
+                Group {
+                    state.duplicates.forEachIndexed { i, d ->
+                        if (i > 0) RowDivider()
+                        DuplicateRow(d, f) { vm.useInstead(d) }
+                    }
+                }
+                Text(
+                    "Both devices logged this session, so it's shown once. Use the other recording if it's more accurate.",
+                    style = Resurge.type.caption,
+                    color = Resurge.colors.textSubtle,
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                )
+            }
+
+            SectionLabel("Notes")
             val notes = syncedText(state.notes, vm::setNotes)
             InputField(notes, placeholder = "How did it feel?", maxLength = 300)
 
-            Spacer(Modifier.height(16.dp))
-            Button(if (state.isNew) "Log workout" else "Save", onClick = vm::save, modifier = Modifier.fillMaxWidth())
-            if (state.source == WorkoutSource.HEALTH_CONNECT && state.edited) {
-                Button("Reset to device data", onClick = vm::resetToDevice, variant = ButtonVariant.Ghost, modifier = Modifier.fillMaxWidth())
-            }
             if (!state.isNew) {
+                Spacer(Modifier.height(16.dp))
+                if (state.source == WorkoutSource.HEALTH_CONNECT && state.edited) {
+                    Button("Reset to device data", onClick = vm::resetToDevice, variant = ButtonVariant.Ghost, modifier = Modifier.fillMaxWidth())
+                }
                 Button(
                     if (state.source == WorkoutSource.HEALTH_CONNECT) "Hide from feed" else "Delete workout",
                     onClick = vm::delete,
-                    variant = ButtonVariant.Ghost,
+                    variant = ButtonVariant.Danger,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
             Spacer(Modifier.height(24.dp))
         }
+        // Docked, so saving is always one tap away however long the form gets.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .background(Resurge.colors.bg)
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+        ) {
+            Button(if (state.isNew) "Log workout" else "Save", onClick = vm::save, variant = ButtonVariant.Accent, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+/** Another device's recording of this session, with what it measured. */
+@Composable
+private fun DuplicateRow(d: com.resurgeai.core.model.Workout, f: UnitFormat, onUse: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(ResurgeIcons.Watch, contentDescription = null, tint = Resurge.colors.textMuted, size = 22.dp)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(d.sourceName ?: "Health Connect", style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight, fontSize = Resurge.type.body.fontSize))
+            val facts = listOfNotNull(
+                UnitFormat.duration(d.duration),
+                d.metrics.distanceM?.let(f::distance),
+                d.metrics.avgHr?.let { "$it bpm" },
+            )
+            Text(facts.joinToString(" · "), style = Resurge.type.caption, color = Resurge.colors.textSubtle)
+        }
+        Button("Use this one", onClick = onUse, variant = ButtonVariant.Secondary)
     }
 }
 
@@ -203,30 +258,39 @@ private fun syncedText(initial: String, onChange: (String) -> Unit): TextFieldSt
     return state
 }
 
+/** Rounded `surface` card holding rows split by inset hairlines. */
 @Composable
-private fun ActivityHeader(state: WorkoutEditorState, onChangeActivity: () -> Unit) {
+private fun Group(content: @Composable ColumnScope.() -> Unit) {
+    Column(Modifier.fillMaxWidth().clip(Resurge.shape.md).background(Resurge.colors.surface), content = content)
+}
+
+@Composable
+private fun RowDivider() = Divider(Modifier.padding(start = 50.dp))
+
+@Composable
+private fun ActivityCard(state: WorkoutEditorState, onChangeActivity: () -> Unit) {
     val activity = state.activity
-    Card(Modifier.fillMaxWidth(), contentPadding = PaddingValues(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconBadge(ActivityVisuals.icon(activity.icon), tint = ActivityVisuals.color(activity.category), size = 48.dp)
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(activity.name, style = Resurge.type.title)
-                val caption = if (state.source == WorkoutSource.HEALTH_CONNECT) "From ${state.sourceName ?: "Health Connect"}" else activity.category.label
-                Text(caption, style = Resurge.type.caption, color = Resurge.colors.textMuted)
-            }
-            Button("Change", onClick = onChangeActivity, variant = ButtonVariant.Secondary)
+    Row(
+        Modifier.fillMaxWidth().clip(Resurge.shape.md).background(Resurge.colors.surface).padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(44.dp).clip(Resurge.shape.sm).background(Resurge.colors.surfaceMuted), contentAlignment = Alignment.Center) {
+            Icon(ActivityVisuals.icon(activity.icon), contentDescription = null, tint = Resurge.colors.activity, size = 24.dp)
         }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(activity.name, style = Resurge.type.headline)
+            val caption = if (state.source == WorkoutSource.HEALTH_CONNECT) "From ${state.sourceName ?: "Health Connect"}" else activity.category.label
+            Text(caption, style = Resurge.type.caption, color = Resurge.colors.textSubtle)
+        }
+        Button("Change", onClick = onChangeActivity, variant = ButtonVariant.Secondary)
     }
 }
 
 @Composable
 private fun DayChips(selected: LocalDate, onSelect: (LocalDate) -> Unit) {
     val today = LocalDate.now()
-    Row(
-        Modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         (0L..6L).forEach { back ->
             val date = today.minusDays(back)
             val label = when (back) {
@@ -240,165 +304,182 @@ private fun DayChips(selected: LocalDate, onSelect: (LocalDate) -> Unit) {
                 role = Role.Tab,
                 modifier = Modifier
                     .clip(Resurge.shape.pill)
-                    .background(if (isSelected) Resurge.colors.strong else Resurge.colors.surface)
-                    .border(1.dp, Resurge.colors.border, Resurge.shape.pill)
+                    .background(if (isSelected) Resurge.colors.accentMuted else Resurge.colors.surface)
                     .semantics { this.selected = isSelected },
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 10.dp),
                 indication = LocalIndication.current,
             ) {
-                Text(label, style = Resurge.type.label, color = if (isSelected) Resurge.colors.bg else Resurge.colors.text)
-            }
-        }
-    }
-}
-
-@Composable
-private fun CategoryFields(state: WorkoutEditorState, vm: WorkoutEditorViewModel, f: UnitFormat) {
-    val m = state.metrics
-    when (state.activity.category) {
-        ActivityCategory.DISTANCE -> {
-            ValueStepper(
-                label = "Distance",
-                value = m.distanceM?.let(f::toDistanceUnit),
-                onValueChange = { v -> vm.updateMetrics { it.copy(distanceM = v?.let(f::fromDistanceUnit)) } },
-                step = 0.1,
-                range = 0.1..500.0,
-                format = f::distanceValue,
-                icon = ResurgeIcons.Distance,
-                start = if (state.activity.showSpeed) 10.0 else 3.0,
-            )
-            val pace = FitnessMath.paceSecPerKm(m.distanceM, java.time.Duration.ofMinutes(state.durationMin.toLong()))
-            val speed = FitnessMath.speedKmh(m.distanceM, java.time.Duration.ofMinutes(state.durationMin.toLong()))
-            val derived = if (state.activity.showSpeed) speed?.let(f::speed) else pace?.let(f::pace)
-            if (derived != null) {
                 Text(
-                    "${if (state.activity.showSpeed) "Average speed" else "Average pace"}: $derived",
-                    style = Resurge.type.caption,
-                    color = Resurge.colors.textMuted,
-                    modifier = Modifier.padding(start = 4.dp),
+                    label,
+                    style = Resurge.type.label.copy(fontWeight = if (isSelected) Resurge.type.headline.fontWeight else Resurge.type.label.fontWeight),
+                    color = if (isSelected) Resurge.colors.brandInk else Resurge.colors.text,
                 )
             }
-            ValueStepper(
-                label = "Elevation gain",
-                value = m.elevationM?.let(f::toElevationUnit),
-                onValueChange = { v -> vm.updateMetrics { it.copy(elevationM = v?.let(f::fromElevationUnit)) } },
-                step = 10.0,
-                range = 10.0..9000.0,
-                format = { "${it.roundToInt()} ${f.elevationUnit}" },
-                icon = ResurgeIcons.Mountain,
-            )
         }
-        ActivityCategory.SWIM -> {
-            SegmentedControl(
-                options = listOf(SegmentOption(25, "25 m pool"), SegmentOption(50, "50 m pool"), SegmentOption(23, "25 yd pool")),
-                selected = m.poolLengthM ?: 25,
-                onSelect = { len -> vm.updateMetrics { it.copy(poolLengthM = len) } },
-            )
-            ValueStepper(
-                label = "Laps",
-                value = m.laps?.toDouble(),
-                onValueChange = { v -> vm.updateMetrics { it.copy(laps = v?.roundToInt()) } },
-                step = 2.0,
-                range = 1.0..400.0,
-                format = { "${it.roundToInt()}" },
-                icon = ResurgeIcons.Repeat,
-                start = 20.0,
-            )
-            FitnessMath.swimDistanceM(m.copy(distanceM = null))?.let {
-                Text("Distance: ${f.distance(it)}", style = Resurge.type.caption, color = Resurge.colors.textMuted, modifier = Modifier.padding(start = 4.dp))
-            }
-        }
-        ActivityCategory.TIMED -> EffortField(m.rpe) { v -> vm.updateMetrics { it.copy(rpe = v) } }
-        ActivityCategory.COUNT -> {
-            ValueStepper(
-                label = "Reps",
-                value = m.reps?.toDouble(),
-                onValueChange = { v -> vm.updateMetrics { it.copy(reps = v?.roundToInt()) } },
-                step = 5.0,
-                range = 1.0..10000.0,
-                format = { "${it.roundToInt()}" },
-                icon = ResurgeIcons.Repeat,
-                start = 50.0,
-            )
-            EffortField(m.rpe) { v -> vm.updateMetrics { it.copy(rpe = v) } }
-        }
-        ActivityCategory.STRENGTH -> EffortField(m.rpe) { v -> vm.updateMetrics { it.copy(rpe = v) } }
     }
 }
 
+/** The fields this kind of activity has, as compact rows; each ends with a divider. */
 @Composable
-private fun EffortField(rpe: Int?, onChange: (Int?) -> Unit) {
-    ValueStepper(
-        label = "Effort",
-        value = rpe?.toDouble(),
-        onValueChange = { onChange(it?.roundToInt()) },
-        step = 1.0,
-        range = 1.0..10.0,
-        format = { v -> "${v.roundToInt()}/10 · ${effortLabel(v.roundToInt())}" },
-        icon = ResurgeIcons.Activity,
-        start = 6.0,
-    )
+private fun CategoryRows(state: WorkoutEditorState, vm: WorkoutEditorViewModel, f: UnitFormat) {
+    val m = state.metrics
+    val duration = Duration.ofMinutes(state.durationMin.toLong())
+    when (state.activity.category) {
+        ActivityCategory.DISTANCE -> {
+            // Tenths of a km (or mile), so the stepper moves 0.1 at a time.
+            val derived = if (state.activity.showSpeed) FitnessMath.speedKmh(m.distanceM, duration)?.let { "Avg speed ${f.speed(it)}" }
+            else FitnessMath.paceSecPerKm(m.distanceM, duration)?.let { "Avg pace ${f.pace(it)}" }
+            OptionalStepperRow(
+                label = "Distance", hint = derived ?: "0.1 ${f.distanceUnit} steps", icon = ResurgeIcons.Distance, iconTint = Resurge.colors.activity,
+                value = m.distanceM?.let { (f.toDistanceUnit(it) * 10).roundToInt() },
+                onValueChange = { v -> vm.updateMetrics { it.copy(distanceM = v?.let { t -> f.fromDistanceUnit(t / 10.0) }) } },
+                step = 1, range = 1..5000, start = if (state.activity.showSpeed) 100 else 30,
+                format = { f.distanceValue(it / 10.0) },
+            )
+            RowDivider()
+            OptionalStepperRow(
+                label = "Elevation gain", hint = f.elevationUnit, icon = ResurgeIcons.Mountain, iconTint = Resurge.colors.textMuted,
+                value = m.elevationM?.let { f.toElevationUnit(it).roundToInt() },
+                onValueChange = { v -> vm.updateMetrics { it.copy(elevationM = v?.let { e -> f.fromElevationUnit(e.toDouble()) }) } },
+                step = 10, range = 10..9000, start = 50, format = { it.toString() },
+            )
+            RowDivider()
+        }
+        ActivityCategory.SWIM -> {
+            Box(Modifier.padding(16.dp)) {
+                SegmentedControl(
+                    options = listOf(SegmentOption(25, "25 m pool"), SegmentOption(50, "50 m pool"), SegmentOption(23, "25 yd pool")),
+                    selected = m.poolLengthM ?: 25,
+                    onSelect = { len -> vm.updateMetrics { it.copy(poolLengthM = len) } },
+                )
+            }
+            RowDivider()
+            OptionalStepperRow(
+                label = "Laps",
+                hint = FitnessMath.swimDistanceM(m.copy(distanceM = null))?.let { "Distance ${f.distance(it)}" } ?: "Lengths of the pool",
+                icon = ResurgeIcons.Repeat, iconTint = Resurge.colors.activity,
+                value = m.laps, onValueChange = { v -> vm.updateMetrics { it.copy(laps = v) } },
+                step = 2, range = 1..400, start = 20, format = { it.toString() },
+            )
+            RowDivider()
+        }
+        ActivityCategory.COUNT -> {
+            OptionalStepperRow(
+                label = "Reps", hint = null, icon = ResurgeIcons.Repeat, iconTint = Resurge.colors.activity,
+                value = m.reps, onValueChange = { v -> vm.updateMetrics { it.copy(reps = v) } },
+                step = 5, range = 1..10000, start = 50, format = { "%,d".format(it) },
+            )
+            RowDivider()
+        }
+        ActivityCategory.TIMED, ActivityCategory.STRENGTH -> Unit
+    }
 }
 
-private fun effortLabel(rpe: Int) = when (rpe) {
+internal fun effortLabel(rpe: Int) = when (rpe) {
     in 1..3 -> "Easy"
     in 4..6 -> "Moderate"
     in 7..8 -> "Hard"
     else -> "Max"
 }
 
+/**
+ * One strength exercise: its name, what it was last time, then numbered sets of reps × weight.
+ * "Add set" copies the previous set. When the volume beats last time, the earned pill says by how much.
+ */
 @Composable
-private fun StrengthEditor(state: WorkoutEditorState, vm: WorkoutEditorViewModel, f: UnitFormat) {
-    state.exercises.forEachIndexed { index, exercise ->
-        androidx.compose.runtime.key(exercise.key) {
-            Card(Modifier.fillMaxWidth(), contentPadding = PaddingValues(14.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    val name = syncedText(exercise.name) { vm.renameExercise(exercise.key, it) }
-                    Box(Modifier.weight(1f)) { InputField(name, placeholder = "Exercise ${index + 1} (e.g. Bench press)", maxLength = 40) }
-                    Spacer(Modifier.width(8.dp))
-                    IconButton(ResurgeIcons.Close, contentDescription = "Remove exercise", onClick = { vm.removeExercise(exercise.key) })
+private fun SetLogger(index: Int, exercise: EditableExercise, last: List<StrengthSet>?, vm: WorkoutEditorViewModel, f: UnitFormat) {
+    Column(
+        Modifier.fillMaxWidth().clip(Resurge.shape.md).background(Resurge.colors.surface).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            val name = syncedText(exercise.name) { vm.renameExercise(exercise.key, it) }
+            Box(Modifier.weight(1f)) { InputField(name, placeholder = "Exercise ${index + 1} (e.g. Bench press)", maxLength = 40) }
+            Spacer(Modifier.width(4.dp))
+            SmallIcon(ResurgeIcons.Close, "Remove exercise") { vm.removeExercise(exercise.key) }
+        }
+        last?.let {
+            Text("Last time: ${LastSession.describe(it, f::weight)}", style = Resurge.type.caption, color = Resurge.colors.textSubtle)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Spacer(Modifier.width(36.dp))
+            Text("Reps", style = Resurge.type.caption, color = Resurge.colors.textSubtle, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+            Spacer(Modifier.width(8.dp))
+            Text("Weight (${f.weightUnit})", style = Resurge.type.caption, color = Resurge.colors.textSubtle, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+            Spacer(Modifier.width(32.dp))
+        }
+        exercise.sets.forEachIndexed { i, set ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(28.dp).clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted), contentAlignment = Alignment.Center) {
+                    Text("${i + 1}", style = Resurge.type.caption, color = Resurge.colors.textMuted)
                 }
-                Spacer(Modifier.height(10.dp))
-                exercise.sets.forEachIndexed { i, set ->
-                    SetRow(i, set, f, onChange = { vm.updateSet(exercise.key, i, it) }, onRemove = { vm.removeSet(exercise.key, i) })
-                    Spacer(Modifier.height(6.dp))
-                }
-                Button("Add set", onClick = { vm.addSet(exercise.key) }, variant = ButtonVariant.Ghost, leadingIcon = ResurgeIcons.Plus)
+                Spacer(Modifier.width(8.dp))
+                MiniStepper(
+                    value = set.reps.toString(), label = "Reps, set ${i + 1}",
+                    canDecrease = set.reps > 1,
+                    onDecrease = { vm.updateSet(exercise.key, i, set.copy(reps = set.reps - 1)) },
+                    onIncrease = { vm.updateSet(exercise.key, i, set.copy(reps = (set.reps + 1).coerceAtMost(200))) },
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(8.dp))
+                val w = set.weightKg?.let(f::toWeightUnit)
+                MiniStepper(
+                    value = w?.let { UnitFormat.decimal(it, 1) } ?: "—", label = "Weight, set ${i + 1}",
+                    canDecrease = w != null,
+                    onDecrease = {
+                        val next = (w ?: 0.0) - f.weightStep
+                        vm.updateSet(exercise.key, i, set.copy(weightKg = if (next < f.weightStep) null else f.fromWeightUnit(next)))
+                    },
+                    onIncrease = {
+                        val next = if (w == null) (if (f.weightUnit == "kg") 20.0 else 45.0) else w + f.weightStep
+                        vm.updateSet(exercise.key, i, set.copy(weightKg = f.fromWeightUnit(next.coerceAtMost(1000.0))))
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(4.dp))
+                SmallIcon(ResurgeIcons.Close, "Remove set ${i + 1}") { vm.removeSet(exercise.key, i) }
             }
         }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Button("Add set", onClick = { vm.addSet(exercise.key) }, variant = ButtonVariant.Ghost, leadingIcon = ResurgeIcons.Plus)
+            Spacer(Modifier.weight(1f))
+            val volume = exercise.sets.sumOf { (it.weightKg ?: 0.0) * it.reps }
+            val lastVolume = last?.sumOf { (it.weightKg ?: 0.0) * it.reps } ?: 0.0
+            if (lastVolume > 0 && volume > lastVolume) EarnedPill("+${f.volume(volume - lastVolume)} vs last time")
+        }
     }
-    Button("Add exercise", onClick = vm::addExercise, variant = ButtonVariant.Secondary, leadingIcon = ResurgeIcons.Plus, modifier = Modifier.fillMaxWidth())
+}
+
+/** − value + in one `surface-muted` pill, for the dense set rows. */
+@Composable
+private fun MiniStepper(value: String, label: String, canDecrease: Boolean, onDecrease: () -> Unit, onIncrease: () -> Unit, modifier: Modifier) {
+    Row(
+        modifier.height(40.dp).clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        MiniButton("−", "Decrease $label", canDecrease, onDecrease)
+        Text(value, style = Resurge.type.headline.copy(fontFeatureSettings = "tnum"), textAlign = TextAlign.Center, maxLines = 1, modifier = Modifier.weight(1f))
+        MiniButton("+", "Increase $label", true, onIncrease)
+    }
 }
 
 @Composable
-private fun SetRow(index: Int, set: StrengthSet, f: UnitFormat, onChange: (StrengthSet) -> Unit, onRemove: () -> Unit) {
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Set ${index + 1}", style = Resurge.type.caption, color = Resurge.colors.textMuted, modifier = Modifier.weight(1f).padding(start = 4.dp))
-            UnstyledButton(
-                onClick = onRemove,
-                modifier = Modifier.size(32.dp).clip(Resurge.shape.pill).semantics { contentDescription = "Remove set ${index + 1}" },
-                indication = LocalIndication.current,
-            ) { com.resurgeai.core.designsystem.components.Icon(ResurgeIcons.Close, contentDescription = null, tint = Resurge.colors.textSubtle, size = 16.dp) }
-        }
-        ValueStepper(
-            label = "Reps",
-            value = set.reps.toDouble(),
-            onValueChange = { onChange(set.copy(reps = (it ?: 1.0).roundToInt())) },
-            step = 1.0,
-            range = 1.0..200.0,
-            format = { "${it.roundToInt()}" },
-            optional = false,
-        )
-        Spacer(Modifier.height(4.dp))
-        ValueStepper(
-            label = "Weight",
-            value = set.weightKg?.let(f::toWeightUnit),
-            onValueChange = { v -> onChange(set.copy(weightKg = v?.let(f::fromWeightUnit))) },
-            step = f.weightStep,
-            range = f.weightStep..1000.0,
-            format = f::weightValue,
-            start = if (f.weightUnit == "kg") 20.0 else 45.0,
-        )
+private fun MiniButton(symbol: String, description: String, enabled: Boolean, onClick: () -> Unit) {
+    UnstyledButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.size(40.dp).clip(Resurge.shape.pill).semantics { contentDescription = description },
+        indication = LocalIndication.current,
+    ) {
+        Text(symbol, style = Resurge.type.headline, color = if (enabled) Resurge.colors.text else Resurge.colors.textSubtle)
     }
+}
+
+@Composable
+private fun SmallIcon(icon: Int, description: String, onClick: () -> Unit) {
+    UnstyledButton(
+        onClick = onClick,
+        modifier = Modifier.size(32.dp).clip(Resurge.shape.pill).semantics { contentDescription = description },
+        indication = LocalIndication.current,
+    ) { Icon(icon, contentDescription = null, tint = Resurge.colors.textSubtle, size = 16.dp) }
 }

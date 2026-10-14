@@ -179,6 +179,11 @@ data class Workout(
     val notes: String? = null,
     val sourceName: String? = null,
     val edited: Boolean = false,
+    /**
+     * Other device recordings of this same session (e.g. a watch and a phone both logged the run),
+     * folded into this one so the feed and totals count it once.
+     */
+    val duplicates: List<Workout> = emptyList(),
 ) {
     val activity: Activity get() = ActivityCatalog.byId(activityId)
     val duration: Duration get() = Duration.between(start, end)

@@ -23,7 +23,7 @@ import java.time.ZoneId
 /** Record with :feature:fitness:recordRoborazziDebug. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35], qualifiers = "w400dp-h880dp-xhdpi")
+@Config(sdk = [35], qualifiers = "w400dp-h1400dp-xhdpi")
 class FitnessScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
@@ -47,7 +47,9 @@ class FitnessScreenshotTest {
     private val state = FitnessUiState(
         loading = false,
         days = workouts.groupBy { it.date(zone) }.toList().sortedByDescending { it.first },
-        week = WeekSummary(workouts = 4, activeMinutes = 191, kcal = 1012),
+        // Wed 14 Oct: the week runs Sun 11 to Sat 17.
+        week = WeekSummary(workouts = 4, activeMinutes = 96, kcal = 1012, dailyMinutes = listOf(0, 34, 0, 62, 0, 0, 0), todayIndex = 3),
+        bests = mapOf("a" to PersonalBest.FastestPace(355)),
         today = today,
     )
 
@@ -64,5 +66,5 @@ class FitnessScreenshotTest {
 
     @Test fun feed() = capture("feed", state)
     @Test fun feedDark() = capture("feed_dark", state, ColorScheme.Dark)
-    @Test fun empty() = capture("empty", state.copy(days = emptyList(), week = WeekSummary(0, 0, 0)))
+    @Test fun empty() = capture("empty", state.copy(days = emptyList(), week = WeekSummary(0, 0, 0, todayIndex = 3), bests = emptyMap()))
 }

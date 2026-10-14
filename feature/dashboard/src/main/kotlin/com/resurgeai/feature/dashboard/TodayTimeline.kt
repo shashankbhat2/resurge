@@ -1,5 +1,6 @@
 package com.resurgeai.feature.dashboard
 
+import com.resurgeai.core.designsystem.components.SectionLabel
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.LocalIndication
@@ -57,7 +58,7 @@ class FeedActions(
 @Composable
 internal fun Feed(days: List<FeedDay>, today: LocalDate, units: UnitSystem, commander: Boolean, actions: FeedActions) {
     if (days.isEmpty()) {
-        TodaySection("Today")
+        SectionLabel("Today")
         Text(
             "Meals, workouts and sleep show up here as you log them or your devices sync.",
             style = Resurge.type.body,
@@ -67,7 +68,7 @@ internal fun Feed(days: List<FeedDay>, today: LocalDate, units: UnitSystem, comm
         return
     }
     days.forEach { day ->
-        TodaySection(dayLabel(day.date, today), trailing = "${day.items.size} ${if (day.items.size == 1) "entry" else "entries"}")
+        SectionLabel(dayLabel(day.date, today), trailing = "${day.items.size} ${if (day.items.size == 1) "entry" else "entries"}")
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             day.items.forEach { item ->
                 when (item) {
@@ -161,7 +162,7 @@ private fun WorkoutRow(w: Workout, units: UnitSystem, onClick: () -> Unit) {
     FeedRow(
         icon = { IconTile(ActivityVisuals.icon(activity.icon), ActivityVisuals.color(activity.category)) },
         title = w.displayName,
-        caption = "$origin · ${clock(w.start)}",
+        caption = "$origin · ${clock(w.start)}" + if (w.duplicates.isNotEmpty()) " · ${w.duplicates.size + 1} devices" else "",
         value = Formatters.duration(w.duration),
         detail = distance
             ?: w.metrics.exercises.takeIf { it.isNotEmpty() }?.let { ex -> "${ex.sumOf { it.sets.size }} sets" }

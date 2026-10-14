@@ -57,12 +57,11 @@ object ResurgeIcons {
     @DrawableRes val FlameFilled = TablerFilled.drawable.tabler_ic_flame_filled
     @DrawableRes val Snowflake = Tabler.drawable.tabler_ic_snowflake_outline
 
-    // Rise count (days in a row): a medal, filled on the badge, outline on habit tiles.
-    @DrawableRes val Medal = TablerFilled.drawable.tabler_ic_award_filled
-    @DrawableRes val MedalOutline = Tabler.drawable.tabler_ic_award_outline
+    // Habit streaks (days in a row), everywhere. Fire is only for the weekly goal.
+    @DrawableRes val HabitStreak = Tabler.drawable.tabler_ic_calendar_check_outline
 
-    // Weekly goal (full days this week).
-    @DrawableRes val Trophy = Tabler.drawable.tabler_ic_trophy_outline
+    // Personal bests in Fitness. Streaks and the weekly goal use flames (FlameFilled, ProgressFlame).
+    @DrawableRes val Medal = TablerFilled.drawable.tabler_ic_award_filled
 
     // Metrics
     @DrawableRes val Flame = Tabler.drawable.tabler_ic_flame_outline

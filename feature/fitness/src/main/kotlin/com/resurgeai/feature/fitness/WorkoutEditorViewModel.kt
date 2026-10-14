@@ -1,5 +1,8 @@
 package com.resurgeai.feature.fitness
 
+import java.time.Duration
+import java.time.Instant
+import com.resurgeai.core.data.fitness.WorkoutRecord
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -31,6 +34,33 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 
+/** What an exercise looked like the last time it was logged, for reference while logging. */
+object LastSession {
+    fun key(name: String): String = name.trim().lowercase()
+
+    /**
+     * For each exercise name, the sets from the most recent earlier session of [activityId] that
+     * included it (excluding [excludeId], the workout being edited).
+     */
+    fun find(records: List<WorkoutRecord>, activityId: String, before: Instant, excludeId: String?): Map<String, List<StrengthSet>> =
+        buildMap {
+            records
+                .filter { !it.deleted && it.activityId == activityId && it.id != excludeId && it.start.isBefore(before) }
+                .sortedByDescending { it.start }
+                .forEach { r -> r.metrics.exercises.forEach { e -> if (key(e.name) !in this && e.sets.isNotEmpty()) put(key(e.name), e.sets) } }
+        }
+
+    /** "3 × 8 at 60 kg" when every set matched, else "3 sets, top 62.5 kg × 7". */
+    fun describe(sets: List<StrengthSet>, weight: (Double) -> String): String {
+        val first = sets.first()
+        if (sets.all { it.reps == first.reps && it.weightKg == first.weightKg }) {
+            return "${sets.size} × ${first.reps}" + (first.weightKg?.let { " at ${weight(it)}" } ?: "")
+        }
+        val top = sets.maxBy { it.weightKg ?: 0.0 }
+        return "${sets.size} sets" + (top.weightKg?.let { ", top ${weight(it)} × ${top.reps}" } ?: "")
+    }
+}
+
 /** A strength exercise being edited; [key] keeps text fields stable as rows are added and removed. */
 data class EditableExercise(val key: Int, val name: String, val sets: List<StrengthSet>)
 
@@ -53,6 +83,10 @@ data class WorkoutEditorState(
     val units: UnitSystem = UnitSystem.METRIC,
     val done: Boolean = false,
     val notFound: Boolean = false,
+    /** Other device recordings of this session, folded into it in the feed. */
+    val duplicates: List<Workout> = emptyList(),
+    /** Last session's sets per exercise ([LastSession.key] of the name). */
+    val lastTime: Map<String, List<StrengthSet>> = emptyMap(),
 ) {
     val isNew: Boolean get() = workoutId == null
 }
@@ -72,6 +106,9 @@ class WorkoutEditorViewModel @Inject constructor(
     val state: StateFlow<WorkoutEditorState> = _state.asStateFlow()
     private var weightKg: Double? = null
     private var nextKey = 0
+    private var history: List<WorkoutRecord> = emptyList()
+    /** The workout as loaded (with its duplicates), for hiding it. */
+    private var loadedWorkout: Workout? = null
 
     init {
         val workoutId = savedState.get<String>("workoutId")
@@ -81,12 +118,14 @@ class WorkoutEditorViewModel @Inject constructor(
                 sessionRepository.session.filterIsInstance<SessionState.Ready>().first().profile.units
             }.getOrDefault(UnitSystem.METRIC)
             weightKg = repository.latestWeightKg()
+            history = runCatching { repository.records(Instant.now().minus(Duration.ofDays(HISTORY_DAYS))).first() }.getOrDefault(emptyList())
             if (workoutId != null) {
                 val w = repository.find(workoutId)
                 if (w == null) {
                     _state.value = WorkoutEditorState(loaded = true, notFound = true, units = units)
                     return@launch
                 }
+                loadedWorkout = w
                 val local = w.start.atZone(zone)
                 _state.value = WorkoutEditorState(
                     loaded = true,
@@ -104,8 +143,10 @@ class WorkoutEditorViewModel @Inject constructor(
                     kcalAuto = w.metrics.kcal == null,
                     notes = w.notes.orEmpty(),
                     units = units,
+                    duplicates = w.duplicates,
                 )
                 if (w.metrics.kcal == null) recomputeKcal()
+                _state.update { it.copy(lastTime = LastSession.find(history, w.activityId, w.start, w.id)) }
             } else {
                 val activity = ActivityCatalog.byId(activityId)
                 val now = LocalTime.now()
@@ -120,6 +161,7 @@ class WorkoutEditorViewModel @Inject constructor(
                     units = units,
                 )
                 recomputeKcal()
+                _state.update { it.copy(lastTime = LastSession.find(history, activity.id, Instant.now(), null)) }
             }
         }
     }
@@ -147,7 +189,11 @@ class WorkoutEditorViewModel @Inject constructor(
             val exercises = if (activity.category == ActivityCategory.STRENGTH && s.exercises.isEmpty()) {
                 listOf(EditableExercise(nextKey++, "", listOf(StrengthSet(10))))
             } else s.exercises
-            s.copy(activity = activity, exercises = exercises)
+            s.copy(
+                activity = activity,
+                exercises = exercises,
+                lastTime = LastSession.find(history, activity.id, s.date.atTime(s.time).atZone(zone).toInstant(), s.workoutId),
+            )
         }
         recomputeKcal()
     }
@@ -212,12 +258,24 @@ class WorkoutEditorViewModel @Inject constructor(
         val id = s.workoutId ?: return
         val start = s.date.atTime(s.time).atZone(zone).toInstant()
         repository.delete(
-            Workout(id, s.source, s.activity.id, s.title.ifBlank { null }, start, start.plusSeconds(s.durationMin * 60L), s.metrics, edited = s.edited),
+            loadedWorkout ?: Workout(id, s.source, s.activity.id, s.title.ifBlank { null }, start, start.plusSeconds(s.durationMin * 60L), s.metrics, edited = s.edited),
         )
         _state.update { it.copy(done = true) }
     }
 
+    /** Shows [duplicate] in the feed instead of this recording: hides just this one. */
+    fun useInstead(duplicate: Workout) {
+        val current = loadedWorkout ?: return
+        if (duplicate !in current.duplicates) return
+        repository.hideOnly(current)
+        _state.update { it.copy(done = true) }
+    }
+
     /** Drops the user's edits to a Health Connect session. */
+    private companion object {
+        const val HISTORY_DAYS = 120L
+    }
+
     fun resetToDevice() {
         val id = _state.value.workoutId ?: return
         repository.resetToDevice(id)

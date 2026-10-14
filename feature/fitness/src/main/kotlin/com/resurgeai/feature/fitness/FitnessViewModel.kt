@@ -1,5 +1,7 @@
 package com.resurgeai.feature.fitness
 
+import com.resurgeai.core.model.ActivityCategory
+import com.resurgeai.core.model.FitnessMath
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.resurgeai.core.data.fitness.WorkoutRecord
@@ -26,12 +28,72 @@ import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
 
-data class WeekSummary(val workouts: Int, val activeMinutes: Long, val kcal: Int)
+data class WeekSummary(
+    val workouts: Int,
+    val activeMinutes: Long,
+    val kcal: Int,
+    /** Active minutes per day, Sunday to Saturday (the app's week). */
+    val dailyMinutes: List<Long> = List(7) { 0L },
+    /** Index of today in [dailyMinutes]. */
+    val todayIndex: Int = 6,
+) {
+    val reached: Boolean get() = activeMinutes >= MOVE_WEEK_TARGET
+
+    companion object {
+        /** Weekly active minutes to aim for (WHO guideline for adults). */
+        const val MOVE_WEEK_TARGET = 150
+    }
+}
+
+/** Something a workout did better than the user's own recent ones. Compares only with themselves. */
+sealed interface PersonalBest {
+    /** The fastest pace for this activity in the feed window (at least two to compare). */
+    data class FastestPace(val secPerKm: Long) : PersonalBest
+
+    /** More strength volume than the previous session of the same activity. */
+    data class MoreVolume(val deltaKg: Double) : PersonalBest
+}
+
+object PersonalBests {
+    /** Pace needs a real distance to mean anything. */
+    private const val MIN_DISTANCE_M = 1_000.0
+
+    /** At most one per workout, keyed by workout id. [all] is the whole feed window. */
+    fun find(all: List<Workout>): Map<String, PersonalBest> = buildMap {
+        all.filter { it.activity.category == ActivityCategory.DISTANCE && !it.activity.showSpeed }
+            .groupBy { it.activityId }
+            .values
+            .forEach { group ->
+                val paced = group.mapNotNull { w ->
+                    w.metrics.distanceM?.takeIf { it >= MIN_DISTANCE_M }?.let { FitnessMath.paceSecPerKm(it, w.duration) }?.let { w to it }
+                }
+                if (paced.size >= 2) {
+                    val (best, pace) = paced.minBy { it.second }
+                    put(best.id, PersonalBest.FastestPace(pace))
+                }
+            }
+        all.filter { it.activity.category == ActivityCategory.STRENGTH }
+            .groupBy { it.activityId }
+            .values
+            .forEach { group ->
+                group.map { it to it.metrics.exercises.sumOf { e -> e.volumeKg } }
+                    .filter { it.second > 0 }
+                    .sortedBy { it.first.start }
+                    .zipWithNext()
+                    .forEach { (previous, current) ->
+                        if (current.second > previous.second && current.first.id !in this) {
+                            put(current.first.id, PersonalBest.MoreVolume(current.second - previous.second))
+                        }
+                    }
+            }
+    }
+}
 
 data class FitnessUiState(
     val loading: Boolean = true,
     val days: List<Pair<LocalDate, List<Workout>>> = emptyList(),
     val week: WeekSummary = WeekSummary(0, 0, 0),
+    val bests: Map<String, PersonalBest> = emptyMap(),
     val units: UnitSystem = UnitSystem.METRIC,
     val today: LocalDate = LocalDate.now(),
     /** Set right after a delete, for the undo bar. */
@@ -61,6 +123,7 @@ class FitnessViewModel @Inject constructor(
         val all = WorkoutsRepository.merge(dev, recs)
         val weekStart = HabitStreaks.weekStart(today)
         val thisWeek = all.filter { !it.date(zone).isBefore(weekStart) }
+        val byDay = thisWeek.groupBy { it.date(zone) }
         FitnessUiState(
             loading = false,
             days = all.groupBy { it.date(zone) }.toList().sortedByDescending { it.first },
@@ -68,7 +131,10 @@ class FitnessViewModel @Inject constructor(
                 workouts = thisWeek.size,
                 activeMinutes = thisWeek.sumOf { it.duration.toMinutes() },
                 kcal = thisWeek.sumOf { it.metrics.kcal ?: 0 },
+                dailyMinutes = (0L until 7L).map { i -> byDay[weekStart.plusDays(i)].orEmpty().sumOf { it.duration.toMinutes() } },
+                todayIndex = (today.toEpochDay() - weekStart.toEpochDay()).toInt(),
             ),
+            bests = PersonalBests.find(all),
             units = u,
             today = today,
             deleted = del,

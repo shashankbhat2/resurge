@@ -1,5 +1,7 @@
 package com.resurgeai.app.main
 
+import androidx.compose.ui.unit.sp
+import com.resurgeai.feature.dashboard.WeeklyGoalFlame
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -380,7 +382,7 @@ private fun TabsShell(
             modifier = Modifier.align(Alignment.TopCenter),
             // Today greets the user in the header, left of the profile photo.
             leading = if (currentTab == Tab.Today) {
-                { Text(greeting(profile), style = Resurge.type.brand, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                { Text(greeting(profile), style = Resurge.type.brand.copy(fontSize = 20.sp, lineHeight = 26.sp), maxLines = 1, overflow = TextOverflow.Ellipsis) }
             } else null,
             trailing = {
                 // Fitness and Food get a "+" to log, left of the profile photo.
@@ -401,17 +403,25 @@ private fun TabsShell(
                 val avatarPress = remember { MutableInteractionSource() }
                 val pressed by avatarPress.collectIsPressedAsState()
                 val scale by animateFloatAsState(if (pressed) 0.88f else 1f, tween(120), label = "avatarPress")
-                UnstyledButton(
-                    onClick = onOpenSettings,
-                    role = Role.Button,
-                    interactionSource = avatarPress,
-                    modifier = Modifier
-                        .graphicsLayer { scaleX = scale; scaleY = scale }
-                        .clip(Resurge.shape.pill)
-                        .semantics { contentDescription = "Settings" },
-                    indication = LocalIndication.current,
-                ) {
-                    Avatar(profile.displayName, profile.photoUrl, size = 38.dp)
+                // The weekly-goal flame sits left of the photo, partly tucked behind it (drawn first, so
+                // it's underneath). Both read as 38dp; the photo's 2dp ring is the background colour.
+                Box(Modifier.size(width = 70.dp, height = 42.dp)) {
+                    WeeklyGoalFlame(Modifier.align(Alignment.CenterStart), size = 38.dp)
+                    UnstyledButton(
+                        onClick = onOpenSettings,
+                        role = Role.Button,
+                        interactionSource = avatarPress,
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .graphicsLayer { scaleX = scale; scaleY = scale }
+                            .clip(Resurge.shape.pill)
+                            .background(Resurge.colors.bg)
+                            .padding(2.dp)
+                            .semantics { contentDescription = "Settings" },
+                        indication = LocalIndication.current,
+                    ) {
+                        Avatar(profile.displayName, profile.photoUrl, size = 38.dp)
+                    }
                 }
             },
         )

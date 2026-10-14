@@ -1,5 +1,7 @@
 package com.resurgeai.feature.dashboard
 
+import com.resurgeai.core.designsystem.components.ProgressFlame
+import com.resurgeai.core.designsystem.components.Overline
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -90,11 +92,11 @@ internal fun StreakSheet(habits: List<TodayHabit>, today: LocalDate, settings: H
     val reset = settings.resetTime.format(clockFormatter())
     SheetColumn {
         SheetHeader(
-            icon = ResurgeIcons.Medal,
+            icon = ResurgeIcons.HabitStreak,
             iconTint = if (streak > 0) Resurge.colors.onGlow else Resurge.colors.textMuted,
             iconBackground = if (streak > 0) Resurge.colors.glow else Resurge.colors.surfaceMuted,
             title = days(streak),
-            subtitle = "Streak · days in a row with every habit done",
+            subtitle = "Habit streak · days in a row with every habit done",
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Pill("Best ${days(best)}")
@@ -209,9 +211,10 @@ internal fun WeekSheet(habits: List<TodayHabit>, today: LocalDate, onDone: () ->
     val needed = (goal - full).coerceAtLeast(0)
     SheetColumn {
         SheetHeader(
-            icon = ResurgeIcons.Trophy,
-            iconTint = if (ascent.metThisWeek) Resurge.colors.onGlow else Resurge.colors.brandInk,
-            iconBackground = if (ascent.metThisWeek) Resurge.colors.glow else Resurge.colors.accentMuted,
+            icon = null,
+            iconTint = Resurge.colors.glow,
+            iconBackground = if (ascent.metThisWeek) Resurge.colors.glowTint else Resurge.colors.surfaceMuted,
+            iconContent = { ProgressFlame(full.coerceAtMost(goal) / goal.toFloat(), size = 28.dp) },
             title = "${full.coerceAtMost(goal)} of $goal days",
             subtitle = "Weekly goal · $goal full days, Sun to Sat",
         )
@@ -276,7 +279,7 @@ private fun WeekRow(week: WeekResult, isCurrent: Boolean) {
         Spacer(Modifier.width(12.dp))
         Text("${week.fullDays.coerceAtMost(7)}/$goal", style = Resurge.type.caption.copy(fontFeatureSettings = "tnum"), color = Resurge.colors.textMuted, modifier = Modifier.width(28.dp))
         Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
-            if (week.won) Icon(ResurgeIcons.Trophy, contentDescription = "Won", tint = Resurge.colors.glowInk, size = 18.dp)
+            if (week.won) Icon(ResurgeIcons.FlameFilled, contentDescription = "Won", tint = Resurge.colors.glow, size = 18.dp)
         }
     }
 }
@@ -299,10 +302,20 @@ private fun SheetColumn(content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-private fun SheetHeader(icon: Int, iconTint: Color, iconBackground: Color, title: String, subtitle: String) {
+private fun SheetHeader(
+    icon: Int?,
+    iconTint: Color,
+    iconBackground: Color,
+    title: String,
+    subtitle: String,
+    iconContent: (@Composable () -> Unit)? = null,
+) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(52.dp).clip(Resurge.shape.pill).background(iconBackground), contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = iconTint, size = 28.dp)
+            when {
+                iconContent != null -> iconContent()
+                icon != null -> Icon(icon, contentDescription = null, tint = iconTint, size = 28.dp)
+            }
         }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {

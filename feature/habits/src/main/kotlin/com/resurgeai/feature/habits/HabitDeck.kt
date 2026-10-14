@@ -237,9 +237,9 @@ private fun HabitCardFace(item: HabitItem, modifier: Modifier = Modifier, swipeP
 internal fun StreakLine(current: Int, best: Int) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
-            if (current > 0) ResurgeIcons.FlameFilled else ResurgeIcons.Flame,
+            ResurgeIcons.HabitStreak,
             contentDescription = null,
-            tint = if (current > 0) Resurge.colors.energy else Resurge.colors.textSubtle,
+            tint = if (current > 0) Resurge.colors.glowInk else Resurge.colors.textSubtle,
             size = 20.dp,
         )
         Spacer(Modifier.width(6.dp))

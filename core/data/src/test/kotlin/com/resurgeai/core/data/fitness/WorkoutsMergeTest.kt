@@ -49,4 +49,38 @@ class WorkoutsMergeTest {
         )
         assertEquals(metrics, metricsFrom(metrics.toMap()))
     }
+
+    private fun session(id: String, source: String, startMin: Long, minutes: Long, distance: Double? = null, hr: Int? = null, activity: String = "run") = Workout(
+        id, WorkoutSource.HEALTH_CONNECT, activity, null, t0.plusSeconds(startMin * 60), t0.plusSeconds((startMin + minutes) * 60),
+        WorkoutMetricsInput(distanceM = distance, avgHr = hr), sourceName = source,
+    )
+
+    @Test
+    fun `a session recorded by two devices shows once, keeping the one with more data`() {
+        val watch = session("watch", "Fitbit Air", 0, 20, distance = 2150.0, hr = 140)
+        val phone = session("phone", "OnePlus CPH2723", 0, 23, distance = 2150.0)
+        val merged = WorkoutsRepository.merge(listOf(phone, watch), emptyList())
+        assertEquals(listOf("watch"), merged.map { it.id })
+        assertEquals(listOf("phone"), merged.single().duplicates.map { it.id })
+    }
+
+    @Test
+    fun `different activities, or sessions that barely overlap, stay separate`() {
+        val run = session("run", "Fitbit Air", 0, 30)
+        val lift = session("lift", "OnePlus", 0, 30, activity = "weights")
+        val walk = session("walk", "Fitbit Air", -10, 54, activity = "walk")
+        val later = session("later", "OnePlus", 25, 30)
+        assertEquals(4, WorkoutsRepository.merge(listOf(run, lift, walk, later), emptyList()).size)
+    }
+
+    @Test
+    fun `the recording the user edited wins, and hiding one shows the other on its own`() {
+        val watch = session("watch", "Fitbit Air", 0, 20, distance = 2150.0, hr = 140)
+        val phone = session("phone", "OnePlus", 0, 23)
+        val edited = WorkoutsRepository.merge(listOf(watch, phone), listOf(record("phone", WorkoutSource.HEALTH_CONNECT, start = phone.start)))
+        assertEquals(listOf("phone"), edited.map { it.id })
+        val hidden = WorkoutsRepository.merge(listOf(watch, phone), listOf(record("watch", WorkoutSource.HEALTH_CONNECT, deleted = true)))
+        assertEquals(listOf("phone"), hidden.map { it.id })
+        assertTrue(hidden.single().duplicates.isEmpty())
+    }
 }

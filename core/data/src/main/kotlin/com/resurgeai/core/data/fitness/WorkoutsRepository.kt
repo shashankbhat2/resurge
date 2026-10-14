@@ -1,5 +1,6 @@
 package com.resurgeai.core.data.fitness
 
+import kotlinx.coroutines.flow.first
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
@@ -75,8 +76,12 @@ class WorkoutsRepository @Inject constructor(
         val record = runCatching { user()?.collection("workouts")?.document(id)?.get()?.await()?.let(::toRecord) }.getOrNull()
         if (record != null && record.source == WorkoutSource.MANUAL) return merge(emptyList(), listOf(record)).firstOrNull()
         val now = Instant.now()
-        val device = deviceWorkouts(record?.start?.minus(Duration.ofDays(1)) ?: now.minus(lookback), now).filter { it.id == id }
-        return merge(device, listOfNotNull(record)).firstOrNull()
+        val from = record?.start?.minus(Duration.ofDays(1)) ?: now.minus(lookback)
+        // Read the neighbours too, so a merged session comes back with its duplicates.
+        val device = deviceWorkouts(from, now)
+        val records = runCatching { records(from).first() }.getOrDefault(listOfNotNull(record))
+        val merged = merge(device, records)
+        return merged.firstOrNull { it.id == id } ?: merged.flatMap { it.duplicates }.firstOrNull { it.id == id }
     }
 
     suspend fun latestWeightKg(): Double? = runCatching { healthData.latestWeight() }.getOrNull()
@@ -122,29 +127,44 @@ class WorkoutsRepository @Inject constructor(
         )
     }
 
-    /** Manual workouts are deleted; Health Connect sessions are hidden with a tombstone. */
+    /**
+     * Manual workouts are deleted; Health Connect sessions are hidden with a tombstone (they belong
+     * to the app that recorded them). Hiding a merged session hides its duplicates too, so the
+     * other recording doesn't reappear on its own.
+     */
     fun delete(workout: Workout) {
+        workout.duplicates.forEach(::delete)
         val doc = user()?.collection("workouts")?.document(workout.id) ?: return
         if (workout.source == WorkoutSource.MANUAL) {
             doc.delete()
         } else {
-            doc.set(
-                mapOf(
-                    "source" to HC,
-                    "activityId" to workout.activityId,
-                    "startMs" to workout.start.toEpochMilli(),
-                    "endMs" to workout.end.toEpochMilli(),
-                    "localDate" to workout.date().toString(),
-                    "metrics" to workout.metrics.toMap(),
-                    "deleted" to true,
-                    "updatedAt" to FieldValue.serverTimestamp(),
-                ),
-            )
+            doc.set(tombstone(workout))
         }
     }
 
+    /** Hides only this recording, so its duplicate shows instead ("Use this one instead"). */
+    fun hideOnly(workout: Workout) {
+        user()?.collection("workouts")?.document(workout.id)?.set(tombstone(workout))
+    }
+
+    private fun tombstone(workout: Workout) = mapOf(
+        "source" to HC,
+        "activityId" to workout.activityId,
+        // The security rules read title and notes on every write; a missing key fails the rule,
+        // so the tombstone must carry them even when they're null.
+        "title" to workout.title,
+        "startMs" to workout.start.toEpochMilli(),
+        "endMs" to workout.end.toEpochMilli(),
+        "localDate" to workout.date().toString(),
+        "metrics" to workout.metrics.toMap(),
+        "notes" to workout.notes,
+        "deleted" to true,
+        "updatedAt" to FieldValue.serverTimestamp(),
+    )
+
     /** Brings back a deleted workout: re-saves a manual one, or drops the tombstone of a device one. */
     fun restore(workout: Workout) {
+        workout.duplicates.forEach(::restore)
         if (workout.source == WorkoutSource.HEALTH_CONNECT && !workout.edited) {
             user()?.collection("workouts")?.document(workout.id)?.delete()
         } else {
@@ -202,10 +222,39 @@ class WorkoutsRepository @Inject constructor(
                 )
             }
             val deviceIds = device.map { it.id }.toSet()
+            val folded = foldDuplicates(fromDevice)
             val manual = records
                 .filter { it.source == WorkoutSource.MANUAL && !it.deleted && it.id !in deviceIds }
                 .map { r -> Workout(r.id, WorkoutSource.MANUAL, r.activityId, r.title, r.start, r.end, r.metrics, r.notes) }
-            return (fromDevice + manual).sortedByDescending { it.start }
+            return (folded + manual).sortedByDescending { it.start }
+        }
+
+        /**
+         * Two device recordings are the same session when they're the same activity (a run, not a
+         * run and a walk) and overlap for at least half of the shorter one. Each group keeps the recording the user
+         * edited, else the one with the most data, else the longest; the rest ride along in
+         * [Workout.duplicates].
+         */
+        internal fun foldDuplicates(workouts: List<Workout>): List<Workout> {
+            val ranked = workouts.sortedWith(
+                compareByDescending<Workout> { it.edited }
+                    .thenByDescending { dataScore(it) }
+                    .thenByDescending { it.duration },
+            )
+            val kept = mutableListOf<Workout>()
+            ranked.forEach { w ->
+                val i = kept.indexOfFirst { k -> k.activityId == w.activityId && overlapsMostly(k, w) }
+                if (i >= 0) kept[i] = kept[i].copy(duplicates = kept[i].duplicates + w) else kept += w
+            }
+            return kept
+        }
+
+        private fun dataScore(w: Workout): Int = listOfNotNull(w.metrics.distanceM, w.metrics.avgHr, w.metrics.kcal).size
+
+        private fun overlapsMostly(a: Workout, b: Workout): Boolean {
+            val overlap = Duration.between(maxOf(a.start, b.start), minOf(a.end, b.end))
+            val shorter = minOf(a.duration, b.duration)
+            return !overlap.isNegative && !shorter.isZero && overlap.toMillis() * 2 >= shorter.toMillis()
         }
 
         fun WorkoutMetricsInput.toMap(): Map<String, Any?> = buildMap {

@@ -1,5 +1,6 @@
 package com.resurgeai.feature.dashboard
 
+import com.resurgeai.core.designsystem.components.SectionLabel
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateOf
@@ -132,16 +133,16 @@ fun TodayScreen(
         when {
             habits == null -> Unit
             habits.isEmpty() -> {
-                TodaySection("Habits")
+                SectionLabel("Habits")
                 FirstHabitCard(onAddHabit)
             }
             else -> {
-                TodaySection("Habits", trailing = "${habits.count { it.done }} of ${habits.size} done")
+                SectionLabel("Habits", trailing = "${habits.count { it.done }} of ${habits.size} done")
                 HabitGrid(habits, onToggle = onToggleHabit, onOpen = onOpenHabit, onAdd = onAddHabit, onSeeAll = onOpenHabits)
             }
         }
 
-        TodaySection("Health")
+        SectionLabel("Health")
         when (state.availability) {
             null -> TodaySkeleton()
             HealthConnectAvailability.NOT_SUPPORTED -> InfoCard(

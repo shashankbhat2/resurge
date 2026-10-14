@@ -1,5 +1,6 @@
 package com.resurgeai.core.designsystem.components
 
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.semantics.contentDescription
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.tween
@@ -200,6 +201,102 @@ fun StepperRow(
             modifier = Modifier.width(76.dp),
         )
         SmallStep("+", "Increase $label", enabled = value + step <= range.last) { onValueChange((value + step).coerceIn(range)) }
+    }
+}
+
+/**
+ * [StepperRow] for a value that may be unset: shows "—" until + is tapped (starting from [start]),
+ * and − from the minimum clears it again. [icon] is optional here.
+ */
+@Composable
+fun OptionalStepperRow(
+    label: String,
+    hint: String?,
+    value: Int?,
+    onValueChange: (Int?) -> Unit,
+    step: Int,
+    range: IntRange,
+    start: Int,
+    format: (Int) -> String,
+    modifier: Modifier = Modifier,
+    @DrawableRes icon: Int? = null,
+    iconTint: Color = Resurge.colors.textMuted,
+) {
+    Row(modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (icon != null) {
+            Icon(icon, contentDescription = null, tint = iconTint, size = 22.dp)
+            Spacer(Modifier.width(12.dp))
+        }
+        Column(Modifier.weight(1f)) {
+            Text(label, style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight, fontSize = Resurge.type.body.fontSize), maxLines = 1)
+            hint?.let { Text(it, style = Resurge.type.caption, color = Resurge.colors.textSubtle, maxLines = 1) }
+        }
+        Spacer(Modifier.width(8.dp))
+        SmallStep("−", "Decrease $label", enabled = value != null) {
+            val v = value ?: return@SmallStep
+            onValueChange(if (v - step < range.first) null else v - step)
+        }
+        Text(
+            value?.let(format) ?: "—",
+            style = Resurge.type.headline.copy(fontFeatureSettings = "tnum"),
+            color = if (value != null) Resurge.colors.text else Resurge.colors.textSubtle,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            modifier = Modifier.width(84.dp),
+        )
+        SmallStep("+", "Increase $label", enabled = value == null || value + step <= range.last) {
+            onValueChange(if (value == null) start else (value + step).coerceAtMost(range.last))
+        }
+    }
+}
+
+/**
+ * Rate of perceived exertion, 1–10, as ten tap targets that fill (in `move`) up to the chosen
+ * value, with its band beside it. Tapping the chosen value again clears it: effort is optional.
+ */
+@Composable
+fun EffortScale(value: Int?, onValueChange: (Int?) -> Unit, band: (Int) -> String, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Effort", style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight, fontSize = Resurge.type.body.fontSize), modifier = Modifier.weight(1f))
+            Text(
+                value?.let { "$it · ${band(it)}" } ?: "Tap to rate",
+                style = Resurge.type.label,
+                color = if (value != null) Resurge.colors.text else Resurge.colors.textSubtle,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            (1..10).forEach { n ->
+                val on = value != null && n <= value
+                UnstyledButton(
+                    onClick = { onValueChange(if (n == value) null else n) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(36.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (on) Resurge.colors.activity else Resurge.colors.surfaceMuted)
+                        .semantics {
+                            contentDescription = "Effort $n, ${band(n)}"
+                            selected = n == value
+                        },
+                    indication = LocalIndication.current,
+                ) {
+                    Text(n.toString(), style = Resurge.type.caption.copy(fontFeatureSettings = "tnum"), color = if (on) Resurge.colors.onAccent else Resurge.colors.textMuted)
+                }
+            }
+        }
+        Row {
+            // Bands sit over their numbers: 1–3, 4–6, 7–8, 9–10.
+            listOf("Easy" to 3f, "Moderate" to 3f, "Hard" to 2f, "Max" to 2f).forEach { (text, span) ->
+                Text(
+                    text,
+                    style = Resurge.type.caption,
+                    color = Resurge.colors.textSubtle,
+                    textAlign = if (text == "Max") TextAlign.End else TextAlign.Start,
+                    modifier = Modifier.weight(span),
+                )
+            }
+        }
     }
 }
 

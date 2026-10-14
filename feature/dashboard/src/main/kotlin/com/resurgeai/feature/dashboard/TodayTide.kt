@@ -1,6 +1,9 @@
 package com.resurgeai.feature.dashboard
 
-import androidx.compose.ui.focus.focusProperties
+import com.resurgeai.core.designsystem.components.ProgressFlame
+import com.resurgeai.core.designsystem.components.Overline
+import com.resurgeai.core.designsystem.components.StatDivider
+import com.resurgeai.core.designsystem.components.StatCell
 import androidx.compose.runtime.getValue
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateIntAsState
@@ -9,7 +12,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -41,7 +43,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.composeunstyled.Text
 import com.composeunstyled.UnstyledButton
 import com.resurgeai.core.designsystem.components.Button
@@ -164,8 +165,8 @@ private const val LEGEND_ROWS = 5
 @Composable
 private fun TideFooter(streak: Int, week: Ascent, onOpen: (TideDetail) -> Unit) {
     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-        FooterStat(
-            icon = ResurgeIcons.Medal,
+        StatCell(
+            icon = ResurgeIcons.HabitStreak,
             iconTint = if (streak > 0) Resurge.colors.onGlow else Resurge.colors.textMuted,
             iconBackground = if (streak > 0) Resurge.colors.glow else Resurge.colors.surfaceMuted,
             value = when (streak) {
@@ -173,18 +174,20 @@ private fun TideFooter(streak: Int, week: Ascent, onOpen: (TideDetail) -> Unit) 
                 1 -> "1 day"
                 else -> "$streak days"
             },
-            label = "Streak",
+            label = "Habit streak",
             description = if (streak > 0) "Streak: $streak days in a row with every habit done" else "No streak yet. Do every habit today to start one.",
             onClick = { onOpen(TideDetail.STREAK) },
             modifier = Modifier.weight(1f),
         )
-        Box(Modifier.width(1.dp).fillMaxHeight().background(Resurge.colors.border))
+        StatDivider()
         val days = week.fullDaysThisWeek.coerceAtMost(TideMath.STRONG_WEEK_DAYS)
-        FooterStat(
-            icon = ResurgeIcons.Trophy,
-            iconTint = if (week.metThisWeek) Resurge.colors.onGlow else Resurge.colors.brandInk,
-            iconBackground = if (week.metThisWeek) Resurge.colors.glow else Resurge.colors.accentMuted,
-            value = "$days of ${TideMath.STRONG_WEEK_DAYS} days",
+        StatCell(
+            icon = null,
+            iconTint = Resurge.colors.glow,
+            iconBackground = if (week.metThisWeek) Resurge.colors.glowTint else Resurge.colors.surfaceMuted,
+            // Fills from the bottom as full days add up toward the goal.
+            iconContent = { ProgressFlame(days / TideMath.STRONG_WEEK_DAYS.toFloat()) },
+            value = "$days/${TideMath.STRONG_WEEK_DAYS} days",
             label = when {
                 week.metThisWeek -> "Weekly goal met"
                 week.weeksWon > 0 -> "Weekly goal · ${week.weeksWon} won"
@@ -195,43 +198,6 @@ private fun TideFooter(streak: Int, week: Ascent, onOpen: (TideDetail) -> Unit) 
             onClick = { onOpen(TideDetail.WEEK) },
             modifier = Modifier.weight(1f),
         )
-    }
-}
-
-@Composable
-private fun FooterStat(
-    icon: Int,
-    iconTint: Color,
-    iconBackground: Color,
-    value: String,
-    label: String,
-    description: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier
-            .fillMaxHeight()
-            // Not focusable, so the cell doesn't stay highlighted after its sheet closes.
-            .focusProperties { canFocus = false }
-            .clickable(onClickLabel = "Show details", onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp)
-            .semantics(mergeDescendants = true) { contentDescription = description },
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.size(36.dp).clip(Resurge.shape.pill).background(iconBackground), contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = iconTint, size = 20.dp)
-        }
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                value,
-                style = Resurge.type.metric.copy(fontSize = 18.sp, lineHeight = 22.sp),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(label, style = Resurge.type.caption, color = Resurge.colors.textSubtle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
     }
 }
 
@@ -342,7 +308,7 @@ private fun HabitTile(item: TodayHabit, onToggle: (String) -> Unit, onOpen: (Str
         Row(verticalAlignment = Alignment.CenterVertically) {
             val meta = if (item.done) content else Resurge.colors.textSubtle
             if (item.stats.current > 0) {
-                Icon(ResurgeIcons.MedalOutline, contentDescription = null, tint = meta, size = 14.dp)
+                Icon(ResurgeIcons.HabitStreak, contentDescription = null, tint = meta, size = 14.dp)
                 Spacer(Modifier.width(4.dp))
                 Text(if (item.stats.current == 1) "1 day" else "${item.stats.current} days", style = Resurge.type.caption, color = meta)
             } else {
@@ -486,21 +452,6 @@ internal fun HighTideSheet(state: DashboardUiState, onDone: () -> Unit, modifier
 }
 
 // --- Shared ---
-
-/** Uppercase section label. */
-@Composable
-internal fun Overline(text: String, modifier: Modifier = Modifier, color: Color = Resurge.colors.textMuted) {
-    Text(text.uppercase(), style = Resurge.type.overline, color = color, modifier = modifier, maxLines = 1, overflow = TextOverflow.Ellipsis)
-}
-
-/** Section label above a group on Today, with an optional trailing note. */
-@Composable
-internal fun TodaySection(title: String, trailing: String? = null) {
-    Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 24.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Overline(title, Modifier.weight(1f))
-        trailing?.let { Text(it, style = Resurge.type.caption.copy(fontFeatureSettings = "tnum"), color = Resurge.colors.textSubtle) }
-    }
-}
 
 internal fun dayLabel(date: LocalDate, today: LocalDate): String = when (date) {
     today -> "Today"

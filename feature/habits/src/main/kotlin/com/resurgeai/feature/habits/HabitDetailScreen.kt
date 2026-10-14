@@ -93,9 +93,9 @@ fun HabitDetailRoute(
             Card(Modifier.fillMaxWidth()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        if (item.stats.current > 0) ResurgeIcons.FlameFilled else ResurgeIcons.Flame,
+                        ResurgeIcons.HabitStreak,
                         contentDescription = null,
-                        tint = if (item.stats.current > 0) Resurge.colors.energy else Resurge.colors.textSubtle,
+                        tint = if (item.stats.current > 0) Resurge.colors.glowInk else Resurge.colors.textSubtle,
                         size = 32.dp,
                     )
                     Spacer(Modifier.width(10.dp))
@@ -105,7 +105,7 @@ fun HabitDetailRoute(
                 }
                 Spacer(Modifier.height(20.dp))
                 Row {
-                    Stat("Best streak", "${item.stats.best} days", Modifier.weight(1f))
+                    Stat("Best streak", if (item.stats.best == 1) "1 day" else "${item.stats.best} days", Modifier.weight(1f))
                     Stat("Last 30 days", "${(item.stats.completion30 * 100).roundToInt()}%", Modifier.weight(1f))
                     Stat("Freeze", if (item.stats.freezesLeftThisWeek > 0) "Ready" else "Used", Modifier.weight(1f))
                 }

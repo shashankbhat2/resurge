@@ -1,5 +1,8 @@
 package com.resurgeai.core.designsystem.components
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -31,8 +34,8 @@ import com.resurgeai.core.designsystem.theme.Resurge
 import kotlin.math.min
 
 /*
- * Resurge Tide: the daily game layer. The tide ring is today's single score and a medal marks the
- * streak (days in a row with every habit done).
+ * Resurge Tide: the daily game layer. The tide ring is today's single score; a calendar check marks
+ * the habit streak (days in a row with every habit done) and a filling flame the weekly goal.
  */
 
 /** Ease-out used for every rising value (tide fill, count-ups). */
@@ -82,7 +85,7 @@ fun TideRing(
 }
 
 /**
- * Streak: consecutive days, shown with a medal on `glow`. Only for a run that exists;
+ * Habit streak: consecutive days with every habit done, shown with the calendar check on `glow`. Only for a run that exists;
  * callers show their own "start" copy at zero.
  */
 @Composable
@@ -99,8 +102,37 @@ fun RiseBadge(count: Int, modifier: Modifier = Modifier, label: String = "day st
         Box(
             Modifier.size(32.dp).clip(Resurge.shape.pill).background(Resurge.colors.glow),
             contentAlignment = Alignment.Center,
-        ) { Icon(ResurgeIcons.Medal, contentDescription = null, tint = Resurge.colors.onGlow, size = 20.dp) }
+        ) { Icon(ResurgeIcons.HabitStreak, contentDescription = null, tint = Resurge.colors.onGlow, size = 20.dp) }
         Text(count.toString(), style = Resurge.type.title.copy(fontFamily = Resurge.type.metric.fontFamily, fontFeatureSettings = "tnum"), color = Resurge.colors.glowInk)
         Text(label, style = Resurge.type.label, color = Resurge.colors.glowInk)
+    }
+}
+
+/**
+ * The weekly goal as a flame that fills with [fill] from the bottom as [fraction] (0–1) rises:
+ * an outline in [track] when empty, solid when the goal is met.
+ */
+@Composable
+fun ProgressFlame(
+    fraction: Float,
+    modifier: Modifier = Modifier,
+    size: Dp = 20.dp,
+    fill: Color = Resurge.colors.glow,
+    track: Color = Resurge.colors.textSubtle,
+) {
+    val level by animateFloatAsState(fraction.coerceIn(0f, 1f), tween(TIDE_RISE_MS, easing = TideEasing), label = "flame")
+    Box(modifier.size(size), contentAlignment = Alignment.Center) {
+        Icon(ResurgeIcons.Flame, contentDescription = null, tint = track, size = size)
+        if (level > 0f) {
+            Icon(
+                ResurgeIcons.FlameFilled,
+                contentDescription = null,
+                tint = fill,
+                size = size,
+                modifier = Modifier.drawWithContent {
+                    clipRect(top = this.size.height * (1f - level)) { this@drawWithContent.drawContent() }
+                },
+            )
+        }
     }
 }

@@ -1,5 +1,6 @@
 package com.resurgeai.feature.dashboard
 
+import kotlinx.coroutines.flow.Flow
 import android.content.Context
 import android.os.SystemClock
 import android.util.Log
@@ -178,21 +179,8 @@ class DashboardViewModel @Inject constructor(
                 .catch { Log.w(TAG, "Water listener failed", it) }
                 .collect { byDay -> _state.update { it.copy(waterMl = byDay[LocalDate.now()] ?: 0) } }
         }
-        val habitSettings = sessionRepository.session
-            .filterIsInstance<SessionState.Ready>()
-            .map { it.profile.habitSettings }
-            .distinctUntilChanged()
         viewModelScope.launch {
-            combine(habitSettings, clock) { settings, now -> HabitStreaks.habitDay(now, ZoneId.systemDefault(), settings.resetTime) }
-                .distinctUntilChanged()
-                .flatMapLatest { day ->
-                    combine(habitsRepository.habits(), habitsRepository.days(day.minusDays(HABIT_HISTORY_DAYS))) { habits, days ->
-                        day to habits.filterNot { it.archived }.sortedBy { it.order }.map { habit ->
-                            val log = days.mapNotNull { (date, entries) -> entries[habit.id]?.let { date to it } }.toMap()
-                            TodayHabit(habit, HabitStreaks.compute(habit.createdDate, day, log))
-                        }
-                    }
-                }
+            todayHabits(sessionRepository, habitsRepository, clock)
                 .catch { Log.w(TAG, "Habits listener failed", it); emit(LocalDate.now() to emptyList()) }
                 .collect { (day, list) -> _state.update { it.copy(habitDay = day, habits = list) } }
         }
@@ -276,11 +264,38 @@ class DashboardViewModel @Inject constructor(
     private companion object {
         const val TAG = "Dashboard"
         const val MIN_REFRESH_INTERVAL_MS = 30_000L
-        /** Habit history for the rise count and the Ascent. */
-        const val HABIT_HISTORY_DAYS = 400L
         val SPARKLINE_METRICS = listOf(
             HealthMetric.STEPS, HealthMetric.DISTANCE, HealthMetric.CALORIES_BURNED,
             HealthMetric.SLEEP, HealthMetric.WEIGHT,
         )
     }
+}
+
+/** Habit history for the streak and the weekly goal. */
+private const val HABIT_HISTORY_DAYS = 400L
+
+/**
+ * The current habit day (it rolls over at the user's reset time, re-checked whenever [clock] ticks)
+ * with each active habit and its streak stats. Shared by Today and the header's weekly-goal flame.
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
+internal fun todayHabits(
+    sessionRepository: SessionRepository,
+    habitsRepository: HabitsRepository,
+    clock: Flow<Instant>,
+): Flow<Pair<LocalDate, List<TodayHabit>>> {
+    val settings = sessionRepository.session
+        .filterIsInstance<SessionState.Ready>()
+        .map { it.profile.habitSettings }
+        .distinctUntilChanged()
+    return combine(settings, clock) { s, now -> HabitStreaks.habitDay(now, ZoneId.systemDefault(), s.resetTime) }
+        .distinctUntilChanged()
+        .flatMapLatest { day ->
+            combine(habitsRepository.habits(), habitsRepository.days(day.minusDays(HABIT_HISTORY_DAYS))) { habits, days ->
+                day to habits.filterNot { it.archived }.sortedBy { it.order }.map { habit ->
+                    val log = days.mapNotNull { (date, entries) -> entries[habit.id]?.let { date to it } }.toMap()
+                    TodayHabit(habit, HabitStreaks.compute(habit.createdDate, day, log))
+                }
+            }
+        }
 }

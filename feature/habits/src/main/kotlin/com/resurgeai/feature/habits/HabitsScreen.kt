@@ -171,9 +171,9 @@ private fun HabitRow(
                 }
             }
             Icon(
-                if (item.stats.current > 0) ResurgeIcons.FlameFilled else ResurgeIcons.Flame,
+                ResurgeIcons.HabitStreak,
                 contentDescription = null,
-                tint = if (item.stats.current > 0) Resurge.colors.energy else Resurge.colors.textSubtle,
+                tint = if (item.stats.current > 0) Resurge.colors.glowInk else Resurge.colors.textSubtle,
                 size = 22.dp,
             )
             Spacer(Modifier.width(4.dp))
