@@ -22,6 +22,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -122,15 +124,13 @@ fun SignInScreen(state: SignInUiState, onSignIn: () -> Unit) {
 
 @Composable
 private fun LogoMark() {
-    Box(
+    Image(
+        painter = painterResource(R.drawable.ic_brand_tile),
+        contentDescription = null,
         modifier = Modifier
             .size(56.dp)
-            .clip(Resurge.shape.md)
-            .background(Resurge.colors.accent),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(ResurgeIcons.Activity, contentDescription = null, tint = Color.White, size = 28.dp)
-    }
+            .clip(Resurge.shape.md),
+    )
 }
 
 @Composable

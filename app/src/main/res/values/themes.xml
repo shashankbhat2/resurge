@@ -9,6 +9,7 @@
     <style name="Theme.Resurge.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/window_bg</item>
         <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="windowSplashScreenIconBackgroundColor">#1E1E1E</item>
         <item name="postSplashScreenTheme">@style/Theme.Resurge</item>
     </style>
 </resources>

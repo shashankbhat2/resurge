@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Matches the flat background in assets/resurge_new.png. -->
+<!-- Matches the flat tile background in assets/resurge_new.png. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#6F66FB" />
+    <solid android:color="#1E1E1E" />
 </shape>
