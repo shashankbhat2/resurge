@@ -92,7 +92,11 @@ data class DailyHealth(
     val weightKg: Double?,
     val sources: Map<HealthMetric, SourceBreakdown>,
 ) {
+    /** Time in bed across the night's sessions (includes awake time). */
     val sleepDuration: Duration? get() = sleep.takeIf { it.isNotEmpty() }?.fold(Duration.ZERO) { acc, s -> acc + s.duration }
+
+    /** Time actually asleep (awake stages removed), the figure shown on Today and its sleep goal. */
+    val asleepDuration: Duration? get() = sleep.takeIf { it.isNotEmpty() }?.fold(Duration.ZERO) { acc, s -> acc + s.asleep }
     val exerciseDuration: Duration get() = exercise.fold(Duration.ZERO) { acc, s -> acc + s.duration }
 }
 

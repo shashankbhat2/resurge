@@ -1,48 +1,39 @@
 package com.resurgeai.feature.dashboard
 
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composeunstyled.Text
 import com.composeunstyled.UnstyledButton
-import androidx.compose.foundation.LocalIndication
-import androidx.compose.ui.draw.clip
-import com.resurgeai.core.designsystem.components.Card
-import com.resurgeai.core.designsystem.components.MetricCell
-import com.resurgeai.core.designsystem.components.MetricGroup
 import com.resurgeai.core.designsystem.components.Icon
-import com.resurgeai.core.designsystem.components.RadialBars
-import com.resurgeai.core.designsystem.components.RangeDial
 import com.resurgeai.core.designsystem.components.ResurgeIcons
-import com.resurgeai.core.designsystem.components.Ring
-import com.resurgeai.core.designsystem.components.RingSegment
-import com.resurgeai.core.designsystem.components.SkeletonCircle
 import com.resurgeai.core.designsystem.components.SkeletonGroup
 import com.resurgeai.core.designsystem.components.SkeletonLine
 import com.resurgeai.core.designsystem.theme.Resurge
+import com.resurgeai.core.designsystem.theme.clockFormatter
 import com.resurgeai.core.model.DailyHealth
 import com.resurgeai.core.model.HealthMetric
-import com.resurgeai.core.model.Targets
-import com.resurgeai.core.model.SleepStage
 import java.time.Duration
-import com.resurgeai.core.model.CoachInsight
-import androidx.compose.ui.text.style.TextOverflow
+import java.time.ZoneId
 import java.util.Locale
-import kotlin.math.abs
-import kotlin.math.roundToInt
 
 /** Default daily goals until they're user-configurable. */
 internal object DashboardGoals {
@@ -54,327 +45,135 @@ internal object DashboardGoals {
     const val HR_MAX = 200f
 }
 
-// --- Insight ---
-
 /**
- * Latest coach insight, text only. Before the first insight exists, explains what will trigger one.
- * Tapping opens Coach › Insights.
+ * Today's health numbers as compact tiles, two per row: the value Health Connect reports for today
+ * and a one-line note saying what the number is. Tapping a tile opens its detail.
  */
 @Composable
-internal fun CoachInsight(insight: CoachInsight?, onClick: () -> Unit) {
+internal fun HealthTiles(day: DailyHealth, onOpen: (HealthMetric) -> Unit) {
+    val zone = ZoneId.systemDefault()
+    val clock = clockFormatter()
+    val night = day.sleep.takeIf { it.isNotEmpty() }
+    val hr = day.heartRate
+    val stepGoal = DashboardGoals.STEPS.toLong()
+    val rows = buildList {
+        add(
+            HealthRow(
+                HealthMetric.SLEEP, "Sleep", ResurgeIcons.Bed, Resurge.colors.sleep,
+                value = day.asleepDuration?.let(Formatters::duration),
+                note = night?.let {
+                    val bed = it.minOf { s -> s.start }.atZone(zone).toLocalTime().format(clock)
+                    val wake = it.maxOf { s -> s.end }.atZone(zone).toLocalTime().format(clock)
+                    "$bed – $wake"
+                } ?: "None recorded last night",
+            ),
+        )
+        add(
+            HealthRow(
+                HealthMetric.STEPS, "Steps", ResurgeIcons.Footprints, Resurge.colors.activity,
+                value = day.steps?.let(Formatters::count),
+                note = day.steps?.let { steps ->
+                    if (steps >= stepGoal) "Goal ${Formatters.count(stepGoal)} met"
+                    else "${Formatters.count(stepGoal - steps)} to go"
+                } ?: "None yet today",
+            ),
+        )
+        add(
+            HealthRow(
+                HealthMetric.CALORIES_BURNED, "Burned", ResurgeIcons.Flame, Resurge.colors.heart,
+                value = day.caloriesTotal?.let { "${Formatters.kcal(it)} kcal" },
+                note = day.caloriesActive?.let { "${Formatters.kcal(it)} from activity" } ?: "So far today",
+            ),
+        )
+        add(
+            HealthRow(
+                HealthMetric.HEART_RATE, if (hr?.restingBpm != null) "Resting heart rate" else "Avg heart rate", ResurgeIcons.Heartbeat, Resurge.colors.heart,
+                value = (hr?.restingBpm ?: hr?.avgBpm)?.let { "$it bpm" },
+                note = if (hr?.minBpm != null && hr.maxBpm != null) "Range ${hr.minBpm}–${hr.maxBpm} today" else "No readings yet",
+            ),
+        )
+        day.distanceMeters?.let { m ->
+            add(HealthRow(HealthMetric.DISTANCE, "Distance", ResurgeIcons.Distance, Resurge.colors.water, "${Formatters.kilometres(m)} km", "Walked and run today"))
+        }
+        day.weightKg?.let { kg ->
+            add(HealthRow(HealthMetric.WEIGHT, "Weight", ResurgeIcons.Scale, Resurge.colors.textMuted, String.format(Locale.getDefault(), "%.1f kg", kg), "Latest weigh-in"))
+        }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(TILE_GAP)) {
+        rows.chunked(2).forEach { pair ->
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(TILE_GAP)) {
+                pair.forEach { row -> HealthTile(row, Modifier.weight(1f).fillMaxHeight()) { onOpen(row.metric) } }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+private val TILE_GAP = 12.dp
+
+private class HealthRow(
+    val metric: HealthMetric,
+    val label: String,
+    @DrawableRes val icon: Int,
+    val color: Color,
+    val value: String?,
+    val note: String,
+)
+
+@Composable
+private fun HealthTile(row: HealthRow, modifier: Modifier, onClick: () -> Unit) {
     UnstyledButton(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().clip(Resurge.shape.md),
+        modifier = modifier
+            .clip(Resurge.shape.md)
+            .background(Resurge.colors.surface),
         indication = LocalIndication.current,
         contentAlignment = Alignment.TopStart,
     ) {
-        // Inset inside the rounded press area so the corners never clip the text.
-        Text(
-            insight?.body ?: "Your first insight arrives after your next workout or night of sleep.",
-            style = Resurge.type.body.copy(fontSize = 17.sp, lineHeight = 27.sp),
-            color = if (insight != null) Resurge.colors.text else Resurge.colors.textMuted,
-            maxLines = 6,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(INSIGHT_INSET),
-        )
-    }
-}
-
-
-// --- Sections ---
-
-/** Top of Today: food eaten vs burned, then steps and sleep. */
-@Composable
-internal fun GlanceGrid(state: DashboardUiState, day: DailyHealth?, onOpen: (HealthMetric) -> Unit, onOpenFood: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(CARD_GAP)) {
-        MetricGroup(
-            cells = listOf(
-                { EatenTile(state, it, onOpenFood) },
-                { CaloriesTile(day, it) { onOpen(HealthMetric.CALORIES_BURNED) } },
-            ),
-        )
-        MetricGroup(
-            cells = listOf(
-                { StepsTile(day, it) { onOpen(HealthMetric.STEPS) } },
-                { SleepTile(day, it) { onOpen(HealthMetric.SLEEP) } },
-            ),
-        )
-    }
-}
-
-/** Below the timeline: heart, then distance, weight, exercise days and water. */
-@Composable
-internal fun HealthGrid(state: DashboardUiState, day: DailyHealth, onOpen: (HealthMetric) -> Unit, onOpenFood: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(CARD_GAP)) {
-        HeartTile(day) { onOpen(HealthMetric.HEART_RATE) }
-        MetricGroup(
-            cells = listOf(
-                { DistanceTile(state, day, it) { onOpen(HealthMetric.DISTANCE) } },
-                { WeightTile(state, day, it) { onOpen(HealthMetric.WEIGHT) } },
-            ),
-        )
-        MetricGroup(
-            cells = listOf(
-                { ExerciseTile(state, day, it) { onOpen(HealthMetric.EXERCISE) } },
-                { WaterTile(state, it, onOpenFood) },
-            ),
-        )
-    }
-}
-
-// --- Tiles ---
-
-@Composable
-private fun EatenTile(state: DashboardUiState, modifier: Modifier, onClick: () -> Unit) {
-    val target = state.profile?.targets?.calories ?: Targets.DEFAULT_CALORIES
-    val eaten = state.eaten.kcal
-    val left = target - eaten.roundToInt()
-    MetricCell(
-        title = "Eaten", value = Formatters.kcal(eaten), unit = "kcal", onClick = onClick, modifier = modifier,
-        subtitle = if (left >= 0) "${Formatters.count(left.toLong())} left" else "${Formatters.count(-left.toLong())} over",
-    ) { m ->
-        Ring(
-            listOf(RingSegment((eaten / target).toFloat().coerceIn(0f, 1f), if (left < 0) Resurge.colors.danger else Resurge.colors.energy)),
-            m, strokeWidth = 8.dp,
-        ) { TileIcon(ResurgeIcons.Bowl, Resurge.colors.energy) }
-    }
-}
-
-@Composable
-private fun WaterTile(state: DashboardUiState, modifier: Modifier, onClick: () -> Unit) {
-    val target = state.profile?.targets?.waterMl ?: Targets.DEFAULT_WATER_ML
-    MetricCell(
-        title = "Water", value = Formatters.count(state.waterMl.toLong()), unit = "ml", onClick = onClick, modifier = modifier,
-        subtitle = "of ${Formatters.count(target.toLong())} ml",
-    ) { m ->
-        Ring(listOf(RingSegment((state.waterMl.toFloat() / target).coerceIn(0f, 1f), Resurge.colors.water)), m, strokeWidth = 8.dp) {
-            TileIcon(ResurgeIcons.Droplet, Resurge.colors.water)
-        }
-    }
-}
-
-@Composable
-private fun HeartTile(day: DailyHealth, onClick: () -> Unit) {
-    val hr = day.heartRate
-    val heart = Resurge.colors.heart
-    val headline = hr?.restingBpm ?: hr?.avgBpm
-    fun scale(bpm: Long) = (bpm - DashboardGoals.HR_MIN) / (DashboardGoals.HR_MAX - DashboardGoals.HR_MIN)
-
-    Card(inverse = true, onClick = onClick, contentPadding = PaddingValues(20.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            RangeDial(
-                low = hr?.minBpm?.let(::scale),
-                high = hr?.maxBpm?.let(::scale),
-                marker = headline?.let(::scale),
-                color = heart,
-                trackColor = Resurge.colors.onInverse.copy(alpha = 0.08f),
-                markerColor = Resurge.colors.onInverse,
-                markerRing = Resurge.colors.inverse,
-                strokeWidth = 9.dp,
-                modifier = Modifier.size(80.dp),
-            ) { TileIcon(ResurgeIcons.Heartbeat, heart, size = 26) }
-            Spacer(Modifier.width(18.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    if (hr?.restingBpm != null) "Resting heart rate" else "Heart rate",
-                    style = Resurge.type.label,
-                    color = Resurge.colors.onInverseMuted,
-                )
-                Spacer(Modifier.height(6.dp))
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(headline?.toString() ?: "—", style = Resurge.type.title, color = Resurge.colors.onInverse)
-                    Spacer(Modifier.width(4.dp))
-                    Text("bpm", style = Resurge.type.label, color = Resurge.colors.onInverseMuted, modifier = Modifier.padding(bottom = 3.dp))
-                }
-                hr?.avgBpm?.takeIf { hr.restingBpm != null }?.let {
-                    Spacer(Modifier.height(6.dp))
-                    Text("Average $it bpm", style = Resurge.type.caption, color = Resurge.colors.onInverseMuted)
-                }
+        Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(row.icon, contentDescription = null, tint = row.color, size = 16.dp)
+                Spacer(Modifier.width(6.dp))
+                Text(row.label, style = Resurge.type.caption, color = Resurge.colors.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    if (hr?.minBpm != null && hr.maxBpm != null) "${hr.minBpm}–${hr.maxBpm}" else "—",
-                    style = Resurge.type.title,
-                    color = Resurge.colors.onInverse,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text("range today", style = Resurge.type.caption, color = Resurge.colors.onInverseMuted)
-            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                row.value ?: "—",
+                style = Resurge.type.metric.copy(fontSize = 22.sp, lineHeight = 28.sp),
+                color = if (row.value != null) Resurge.colors.text else Resurge.colors.textSubtle,
+                maxLines = 1,
+            )
+            Text(row.note, style = Resurge.type.caption, color = Resurge.colors.textSubtle, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
-
-@Composable
-private fun SleepTile(day: DailyHealth?, modifier: Modifier, onClick: () -> Unit) {
-    val total = day?.sleepDuration
-    val stages = day?.sleep.orEmpty().flatMap { it.stages.entries }.groupBy({ it.key }, { it.value })
-        .mapValues { (_, d) -> d.fold(Duration.ZERO, Duration::plus) }
-    val goal = DashboardGoals.SLEEP.toMinutes().toFloat()
-    val segments = when {
-        total == null -> emptyList()
-        stages.isEmpty() -> listOf(RingSegment((total.toMinutes() / goal).coerceAtMost(1f), Resurge.colors.sleep))
-        else -> listOf(SleepStage.DEEP, SleepStage.LIGHT, SleepStage.SLEEPING, SleepStage.REM, SleepStage.AWAKE)
-            .mapNotNull { st -> stages[st]?.let { RingSegment(it.toMinutes() / goal, sleepStageColor(st)) } }
-            .let(::capToOne)
-    }
-    MetricCell(
-        title = "Sleep", value = total?.let(Formatters::duration), onClick = onClick, modifier = modifier,
-        subtitle = stages[SleepStage.DEEP]?.let { "Deep ${Formatters.duration(it)}" }
-            ?: total?.let { "of ${DashboardGoals.SLEEP.toHours()}h goal" },
-    ) { m ->
-        Ring(segments, m, strokeWidth = 8.dp) { TileIcon(ResurgeIcons.Bed, Resurge.colors.sleep) }
-    }
-}
-
-@Composable
-private fun StepsTile(day: DailyHealth?, modifier: Modifier, onClick: () -> Unit) {
-    val steps = day?.steps
-    val progress = ((steps ?: 0L) / DashboardGoals.STEPS).toFloat()
-    MetricCell(
-        title = "Steps", value = steps?.let(Formatters::count), onClick = onClick, modifier = modifier,
-        subtitle = when {
-            steps == null -> null
-            progress >= 1f -> "Goal reached"
-            else -> "${(progress * 100).roundToInt()}% of 10k"
-        },
-    ) { m ->
-        Ring(listOf(RingSegment(progress.coerceAtMost(1f), Resurge.colors.activity)), m, strokeWidth = 8.dp) {
-            TileIcon(ResurgeIcons.Footprints, Resurge.colors.activity)
-        }
-    }
-}
-
-@Composable
-private fun CaloriesTile(day: DailyHealth?, modifier: Modifier, onClick: () -> Unit) {
-    val energy = Resurge.colors.activity
-    val total = day?.caloriesTotal
-    val active = day?.caloriesActive
-    val segments = when {
-        total == null || total <= 0 -> emptyList()
-        active == null -> listOf(RingSegment(1f, energy))
-        else -> (active / total).toFloat().coerceIn(0f, 1f).let { a ->
-            listOf(RingSegment(a, energy), RingSegment(1f - a, energy.copy(alpha = 0.3f)))
-        }
-    }
-    MetricCell(
-        title = "Burned", value = total?.let(Formatters::kcal), unit = "kcal", onClick = onClick, modifier = modifier,
-        subtitle = active?.let { "${Formatters.kcal(it)} active" } ?: total?.let { "Total burned" },
-    ) { m ->
-        Ring(segments, m, strokeWidth = 8.dp) { TileIcon(ResurgeIcons.Flame, energy) }
-    }
-}
-
-@Composable
-private fun DistanceTile(state: DashboardUiState, day: DailyHealth, modifier: Modifier, onClick: () -> Unit) {
-    val water = Resurge.colors.water
-    val week = state.sparklines[HealthMetric.DISTANCE].orEmpty()
-    val avg = week.mapNotNull { it }.takeIf { it.isNotEmpty() }?.average()
-    MetricCell(
-        title = "Distance", value = day.distanceMeters?.let(Formatters::kilometres), unit = "km", onClick = onClick, modifier = modifier,
-        subtitle = avg?.let { String.format(Locale.getDefault(), "7-day avg %.1f km", it) },
-    ) { m ->
-        RadialBars(week.ifEmpty { List(7) { null } }, water, m, innerFraction = 0.5f, gapDegrees = 8f) {
-            TileIcon(ResurgeIcons.Distance, water, size = 18)
-        }
-    }
-}
-
-@Composable
-private fun WeightTile(state: DashboardUiState, day: DailyHealth, modifier: Modifier, onClick: () -> Unit) {
-    val kg = day.weightKg
-    val week = state.sparklines[HealthMetric.WEIGHT].orEmpty().mapNotNull { it }
-    val lo = (week + listOfNotNull(kg)).minOrNull()?.minus(1.0)
-    val hi = (week + listOfNotNull(kg)).maxOrNull()?.plus(1.0)
-    val position = if (kg != null && lo != null && hi != null && hi > lo) ((kg - lo) / (hi - lo)).toFloat() else null
-    val change = if (kg != null && week.size >= 2) kg - week.first() else null
-    MetricCell(
-        title = "Weight", value = kg?.let { String.format(Locale.getDefault(), "%.1f", it) }, unit = "kg", onClick = onClick, modifier = modifier,
-        subtitle = when {
-            kg == null -> null
-            change != null && abs(change) >= 0.05 -> String.format(Locale.getDefault(), "%+.1f kg this week", change)
-            else -> "Latest"
-        },
-    ) { m ->
-        RangeDial(
-            low = if (position != null) 0f else null, high = position, marker = position,
-            color = Resurge.colors.text, strokeWidth = 8.dp, modifier = m,
-        ) { TileIcon(ResurgeIcons.Scale, Resurge.colors.textMuted) }
-    }
-}
-
-@Composable
-private fun ExerciseTile(state: DashboardUiState, day: DailyHealth, modifier: Modifier, onClick: () -> Unit) {
-    val activity = Resurge.colors.activity
-    val track = Resurge.colors.surfaceMuted
-    MetricCell(
-        title = "Exercise", value = "${state.exerciseWeek.count { it }}/7", unit = "days", onClick = onClick, modifier = modifier,
-        subtitle = if (day.exerciseDuration > Duration.ZERO) "${Formatters.duration(day.exerciseDuration)} today" else "This week",
-    ) { m ->
-        Ring(
-            state.exerciseWeek.map { RingSegment(1f / 7, if (it) activity else track) },
-            m, strokeWidth = 8.dp, gapDegrees = 10f, showTrack = false,
-        ) { TileIcon(ResurgeIcons.Dumbbell, activity) }
-    }
-}
-
-@Composable
-private fun TileIcon(icon: Int, tint: Color, size: Int = 22) =
-    Icon(icon, contentDescription = null, tint = tint, size = size.dp)
-
-/** Trims segments so they never exceed one full ring (sleeping past the goal). */
-private fun capToOne(segments: List<RingSegment>): List<RingSegment> {
-    var remaining = 1f
-    return segments.map { s ->
-        val f = s.fraction.coerceAtMost(remaining)
-        remaining -= f
-        s.copy(fraction = f)
-    }.filter { it.fraction > 0f }
-}
-
 
 // --- Loading ---
 
-/** Shimmering placeholders shaped like the Today cards, shown until the first Health Connect read lands. */
+/** Shimmering tiles shaped like [HealthTiles], shown until the first Health Connect read lands. */
 @Composable
 internal fun TodaySkeleton() {
     SkeletonGroup {
-        Column(verticalArrangement = Arrangement.spacedBy(CARD_GAP)) {
-            Card(contentPadding = PaddingValues(20.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    SkeletonCircle(80.dp)
-                    Spacer(Modifier.width(18.dp))
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        SkeletonLine(80.dp)
-                        SkeletonLine(110.dp, 22.dp)
-                    }
-                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        SkeletonLine(70.dp, 22.dp)
-                        SkeletonLine(60.dp)
+        Column(verticalArrangement = Arrangement.spacedBy(TILE_GAP)) {
+            repeat(2) {
+                Row(horizontalArrangement = Arrangement.spacedBy(TILE_GAP)) {
+                    repeat(2) {
+                        Column(
+                            Modifier
+                                .weight(1f)
+                                .clip(Resurge.shape.md)
+                                .background(Resurge.colors.surface)
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                        ) {
+                            SkeletonLine(56.dp, 10.dp)
+                            Spacer(Modifier.height(10.dp))
+                            SkeletonLine(84.dp, 20.dp)
+                            Spacer(Modifier.height(8.dp))
+                            SkeletonLine(96.dp, 10.dp)
+                        }
                     }
                 }
-            }
-            repeat(3) {
-                MetricGroup(cells = List(2) { { m: Modifier -> SkeletonCell(m) } })
             }
         }
     }
 }
-
-@Composable
-private fun SkeletonCell(modifier: Modifier) {
-    Column(modifier.padding(20.dp)) {
-        SkeletonCircle(68.dp)
-        Spacer(Modifier.height(18.dp))
-        SkeletonLine(56.dp)
-        Spacer(Modifier.height(10.dp))
-        SkeletonLine(96.dp, 22.dp)
-        Spacer(Modifier.height(10.dp))
-        SkeletonLine(80.dp)
-    }
-}
-
-/** Inner padding of the tappable insight; TodayScreen offsets it so text aligns with the cards. */
-internal val INSIGHT_INSET = 8.dp
-
-/** Vertical gap between Today cards. */
-internal val CARD_GAP = 16.dp

@@ -67,7 +67,6 @@ import com.resurgeai.core.designsystem.components.SegmentOption
 import com.resurgeai.core.designsystem.components.SegmentedControl
 import com.resurgeai.core.designsystem.components.SkeletonGroup
 import com.resurgeai.core.designsystem.components.SkeletonLine
-import com.resurgeai.core.designsystem.components.TopShade
 import com.resurgeai.core.designsystem.components.TopBar
 import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.designsystem.theme.clockFormatter
@@ -95,7 +94,6 @@ fun InsightsRoute(
 @Composable
 fun InsightsScreen(state: InsightsUiState, onBack: () -> Unit) {
     Box(Modifier.fillMaxSize()) {
-        TopShade()
         Column(Modifier.fillMaxSize()) {
             TopBar(title = "Insights", onBack = onBack)
             Box(Modifier.weight(1f)) { InsightsFeed(state) }

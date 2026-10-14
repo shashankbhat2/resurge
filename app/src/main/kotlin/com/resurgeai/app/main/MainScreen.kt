@@ -1,5 +1,7 @@
 package com.resurgeai.app.main
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -19,31 +21,25 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.UnstyledButton
 import com.resurgeai.core.designsystem.components.Avatar
-import com.resurgeai.core.designsystem.components.AskBar
-import com.resurgeai.core.designsystem.components.AskBarHeight
+import com.resurgeai.core.designsystem.components.NavCoach
 import com.resurgeai.core.model.CoachStyle
 import androidx.compose.foundation.layout.size
 import com.resurgeai.core.designsystem.components.LocalHeaderInset
 import com.resurgeai.core.designsystem.components.MainHeader
 import com.resurgeai.core.designsystem.components.MainHeaderHeight
-import com.resurgeai.core.designsystem.components.TopShade
 import androidx.compose.ui.text.style.TextOverflow
 import com.composeunstyled.Text
 import java.time.LocalTime
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavBackStackEntry
@@ -87,7 +83,6 @@ import com.resurgeai.feature.food.FoodRoute as FoodScreenRoute
 import com.resurgeai.feature.food.MealReviewRoute as MealReviewScreen
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.navigation.toRoute
 import kotlinx.serialization.Serializable
 
@@ -189,7 +184,6 @@ fun MainScreen(profile: UserProfile, openInsightsSignal: Int = 0, openHabitsSign
                     { rootNav.navigate(CatalogRoute) }
                 } else null,
                 onOpenCoach = { rootNav.navigate(CoachScreenRoute()) },
-                onAsk = { text -> rootNav.navigate(CoachScreenRoute(prompt = text)) },
                 onOpenInsights = { rootNav.navigate(InsightsScreenRoute) },
                 onOpenHabit = { id -> rootNav.navigate(HabitDetailRoute(id)) },
                 onAddHabit = { rootNav.navigate(HabitEditorRoute()) },
@@ -299,14 +293,12 @@ private fun FullScreen(content: @Composable () -> Unit) {
     ) { content() }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TabsShell(
     profile: UserProfile,
     onOpenMetric: (HealthMetric) -> Unit,
     onOpenCatalog: (() -> Unit)?,
     onOpenCoach: () -> Unit,
-    onAsk: (String) -> Unit,
     onOpenInsights: () -> Unit,
     onOpenHabit: (String) -> Unit,
     onAddHabit: () -> Unit,
@@ -342,16 +334,9 @@ private fun TabsShell(
     } ?: Tab.Today
 
     // Header, ask bar and navbar float over the content; scrolling screens pad with these insets.
-    val bottomInset = AskBarHeight + AskBarGap + FloatingNavBarHeight + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val bottomInset = FloatingNavBarHeight + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val topInset = MainHeaderHeight + WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     Box(Modifier.fillMaxSize()) {
-        val glow = when (currentTab) {
-            Tab.Today -> Resurge.colors.accent
-            Tab.Fitness -> Resurge.colors.activity
-            Tab.Food -> Resurge.colors.energy
-            Tab.Habits -> Resurge.colors.heart
-        }
-        TopShade(glow)
         CompositionLocalProvider(LocalFloatingBarInset provides bottomInset, LocalHeaderInset provides topInset) {
             NavHost(
                 navController = tabsNav,
@@ -367,9 +352,8 @@ private fun TabsShell(
                         onOpenInsights = onOpenInsights,
                         onOpenMeal = onOpenMeal,
                         onOpenWorkout = onOpenWorkout,
-                        onScanMeal = onScanMeal,
-                        onLogWorkout = onLogWorkout,
-                        onOpenFood = { tabsNav.switchTab(FoodRoute) },
+                        onOpenHabit = onOpenHabit,
+                        onAddHabit = onAddHabit,
                     )
                 }
                 composable<FitnessRoute> { FitnessScreenRoute(onOpenWorkout = onOpenWorkout, onLogWorkout = onLogWorkout) }
@@ -380,7 +364,6 @@ private fun TabsShell(
         MainHeader(
             title = currentTab.title,
             modifier = Modifier.align(Alignment.TopCenter),
-            glow = glow,
             // Today greets the user in the header, left of the profile photo.
             leading = if (currentTab == Tab.Today) {
                 { Text(greeting(profile), style = Resurge.type.brand, maxLines = 1, overflow = TextOverflow.Ellipsis) }
@@ -412,32 +395,16 @@ private fun TabsShell(
                 }
             },
         )
-        // Ask bar above the navbar on every tab; while typing, the navbar steps aside so the bar
-        // rests on the keyboard.
-        val typing = WindowInsets.isImeVisible
-        Column(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .imePadding(),
-        ) {
-            AskBar(
-                commander = profile.coachStyle == CoachStyle.COMMANDER,
-                onSubmit = onAsk,
-                onOpenCoach = onOpenCoach,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = if (typing) 12.dp else AskBarGap),
-            )
-            if (!typing) {
-                FloatingNavBar(
-                    items = Tab.entries.map { NavItem(it, it.label, it.icon, it.selectedIcon) },
-                    selected = currentTab,
-                    onSelect = { tab -> tabsNav.switchTab(tab.route) },
-                )
-            }
-        }
+        // The coach sits in the middle of the navbar, between the first two and last two tabs.
+        FloatingNavBar(
+            items = Tab.entries.map { NavItem(it, it.label, it.icon, it.selectedIcon) },
+            selected = currentTab,
+            onSelect = { tab -> tabsNav.switchTab(tab.route) },
+            modifier = Modifier.align(Alignment.BottomCenter),
+            center = { NavCoach(commander = profile.coachStyle == CoachStyle.COMMANDER, onClick = onOpenCoach) },
+        )
     }
 }
-
-private val AskBarGap = 8.dp
 
 private const val PICKED_ACTIVITY = "pickedActivity"
 

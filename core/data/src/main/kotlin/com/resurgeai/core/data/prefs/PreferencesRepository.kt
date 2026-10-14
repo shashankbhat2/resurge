@@ -13,6 +13,7 @@ import com.resurgeai.core.model.TimeFormat
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import java.time.LocalDate
 import java.time.LocalTime
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -110,7 +111,16 @@ class PreferencesRepository @Inject constructor(
         dataStore.edit { it[NOTIFICATION_PROMPT] = true }
     }
 
+    /** Habit day whose high-tide celebration was last shown (it plays once per habit day). */
+    suspend fun highTideShownOn(): LocalDate? =
+        dataStore.data.first()[HIGH_TIDE_SHOWN]?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+
+    suspend fun setHighTideShown(day: LocalDate) {
+        dataStore.edit { it[HIGH_TIDE_SHOWN] = day.toString() }
+    }
+
     private companion object {
+        val HIGH_TIDE_SHOWN = stringPreferencesKey("high_tide_shown")
         const val MAX_POSTED = 300
         val NOTIFICATION_PROMPT = booleanPreferencesKey("notification_prompt_shown")
         val HABIT_RESET = stringPreferencesKey("habit_reset")

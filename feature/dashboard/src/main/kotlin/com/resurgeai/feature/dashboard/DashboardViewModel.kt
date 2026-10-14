@@ -12,6 +12,14 @@ import com.resurgeai.core.data.health.ActivityEventWorker
 import com.resurgeai.core.data.coach.CoachRepository
 import com.resurgeai.core.model.CoachInsight
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
+import com.resurgeai.core.data.habits.HabitsRepository
+import com.resurgeai.core.data.prefs.PreferencesRepository
+import com.resurgeai.core.model.HabitStatus
+import com.resurgeai.core.model.HabitStreaks
 import kotlinx.coroutines.flow.combine
 import com.resurgeai.core.data.fitness.WorkoutsRepository
 import com.resurgeai.core.data.food.MealsRepository
@@ -31,6 +39,7 @@ import com.resurgeai.core.model.SessionState
 import com.resurgeai.core.model.UserProfile
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -66,7 +75,32 @@ data class DashboardUiState(
     /** Workouts (device + logged) from yesterday onwards, newest first. */
     val workouts: List<Workout> = emptyList(),
     val waterMl: Int = 0,
+    /** Habit day being shown (rolls over at the user's reset time, not midnight). */
+    val habitDay: LocalDate = LocalDate.now(),
+    /** Active habits with streak stats; null until the first read. */
+    val habits: List<TodayHabit>? = null,
+    /** The day's one celebration: open once per habit day when the tide first reaches 100%. */
+    val showHighTide: Boolean = false,
 ) {
+    val healthReady: Boolean get() = availability == HealthConnectAvailability.AVAILABLE &&
+        (permissions == PermissionState.PARTIAL || permissions == PermissionState.ALL)
+
+    val tide: Tide get() = TideMath.tide(
+        habits = habits.orEmpty(),
+        health = healthReady,
+        sleep = today?.asleepDuration,
+        steps = today?.steps,
+        mealsToday = meals.count { it.date == (today?.date ?: LocalDate.now()) },
+    )
+
+    /** Everything the tide counts has loaded, so a full tide is real (not a half-loaded screen). */
+    val tideReady: Boolean get() = habits != null && availability != null &&
+        (availability != HealthConnectAvailability.AVAILABLE || permissions != PermissionState.UNKNOWN) &&
+        (!healthReady || today != null)
+
+    val riseCount: Int get() = TideMath.riseCount(habits.orEmpty(), habitDay)
+    val ascent: Ascent get() = TideMath.ascent(habits.orEmpty(), habitDay)
+
     /** Eaten on the day being shown (the Health Connect day, else the calendar day). */
     val eaten: Nutrition get() {
         val day = today?.date ?: LocalDate.now()
@@ -74,6 +108,7 @@ data class DashboardUiState(
     }
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     sessionRepository: SessionRepository,
@@ -83,6 +118,8 @@ class DashboardViewModel @Inject constructor(
     private val activityEvents: ActivityEventSync,
     coachRepository: CoachRepository,
     private val meals: MealsRepository,
+    private val habitsRepository: HabitsRepository,
+    private val preferences: PreferencesRepository,
     private val workouts: WorkoutsRepository,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
@@ -98,7 +135,21 @@ class DashboardViewModel @Inject constructor(
 
     private fun feedStart(): Instant = LocalDate.now().minusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()
 
-    fun addWater(ml: Int) = meals.addWater(LocalDate.now(), ml)
+    /** Ticks on resume so the habit day rolls over at the reset time. */
+    private val clock = MutableStateFlow(Instant.now())
+
+    /** Marks a habit done for the habit day, or clears it again (undo). */
+    fun toggleHabit(habitId: String) {
+        val s = _state.value
+        val item = s.habits?.firstOrNull { it.habit.id == habitId } ?: return
+        habitsRepository.setStatus(s.habitDay, habitId, if (item.done) null else HabitStatus.DONE)
+    }
+
+    fun dismissHighTide() {
+        val day = _state.value.habitDay
+        _state.update { it.copy(showHighTide = false) }
+        viewModelScope.launch { preferences.setHighTideShown(day) }
+    }
 
     private var loadJob: Job? = null
     private var lastLoadedAt = 0L
@@ -125,6 +176,31 @@ class DashboardViewModel @Inject constructor(
                 .catch { Log.w(TAG, "Water listener failed", it) }
                 .collect { byDay -> _state.update { it.copy(waterMl = byDay[LocalDate.now()] ?: 0) } }
         }
+        val habitSettings = sessionRepository.session
+            .filterIsInstance<SessionState.Ready>()
+            .map { it.profile.habitSettings }
+            .distinctUntilChanged()
+        viewModelScope.launch {
+            combine(habitSettings, clock) { settings, now -> HabitStreaks.habitDay(now, ZoneId.systemDefault(), settings.resetTime) }
+                .distinctUntilChanged()
+                .flatMapLatest { day ->
+                    combine(habitsRepository.habits(), habitsRepository.days(day.minusDays(HABIT_HISTORY_DAYS))) { habits, days ->
+                        day to habits.filterNot { it.archived }.sortedBy { it.order }.map { habit ->
+                            val log = days.mapNotNull { (date, entries) -> entries[habit.id]?.let { date to it } }.toMap()
+                            TodayHabit(habit, HabitStreaks.compute(habit.createdDate, day, log))
+                        }
+                    }
+                }
+                .catch { Log.w(TAG, "Habits listener failed", it); emit(LocalDate.now() to emptyList()) }
+                .collect { (day, list) -> _state.update { it.copy(habitDay = day, habits = list) } }
+        }
+        viewModelScope.launch {
+            state.map { s -> s.habitDay.takeIf { s.tideReady && s.tide.high } }
+                .distinctUntilChanged()
+                .collect { day ->
+                    if (day != null && preferences.highTideShownOn() != day) _state.update { it.copy(showHighTide = true) }
+                }
+        }
         viewModelScope.launch {
             combine(deviceWorkouts, workouts.records(feedStart()).catch { emit(emptyList()) }) { device, records ->
                 WorkoutsRepository.merge(device, records)
@@ -135,6 +211,7 @@ class DashboardViewModel @Inject constructor(
     /** Called on resume. Skips if data was loaded very recently unless [force]. */
     fun refresh(force: Boolean = false) {
         val now = SystemClock.elapsedRealtime()
+        clock.value = Instant.now()
         if (!force && loadJob?.isActive == true) return
         if (!force && now - lastLoadedAt < MIN_REFRESH_INTERVAL_MS && _state.value.today != null) return
         loadJob = viewModelScope.launch { load() }
@@ -197,6 +274,8 @@ class DashboardViewModel @Inject constructor(
     private companion object {
         const val TAG = "Dashboard"
         const val MIN_REFRESH_INTERVAL_MS = 30_000L
+        /** Habit history for the rise count and the Ascent. */
+        const val HABIT_HISTORY_DAYS = 400L
         val SPARKLINE_METRICS = listOf(
             HealthMetric.STEPS, HealthMetric.DISTANCE, HealthMetric.CALORIES_BURNED,
             HealthMetric.SLEEP, HealthMetric.WEIGHT,

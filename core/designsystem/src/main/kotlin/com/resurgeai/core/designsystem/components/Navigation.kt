@@ -1,12 +1,12 @@
 package com.resurgeai.core.designsystem.components
 
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -17,20 +17,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -59,8 +55,9 @@ private val BarGap = 12.dp
 val FloatingNavBarHeight: Dp = BarHeight + BarGap
 
 /**
- * Floating pill navigation across the width: the active tab is a highlighted pill with icon + label,
- * inactive tabs are outline icons, and an optional [center] item (the Coach) sits in the middle.
+ * Floating navigation bar (Resurge Tide): a `radius-lg` bar on `navBar` with a soft shadow,
+ * icon-only tabs spread evenly, and the selected tab as a 48dp `navActive` circle holding its
+ * filled icon. An optional [center] item (e.g. the Coach) sits between the two halves of [items].
  */
 @Composable
 fun <T> FloatingNavBar(
@@ -68,33 +65,29 @@ fun <T> FloatingNavBar(
     selected: T,
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
-    /** Optional centre item (e.g. the Coach), placed between the first and second half of [items]. */
     center: (@Composable () -> Unit)? = null,
 ) {
-    // One pill across the width: tabs with the centre item in the middle.
+    val shape = Resurge.shape.lg
     Row(
         modifier = modifier
             .windowInsetsPadding(WindowInsets.navigationBars)
             .padding(start = 16.dp, end = 16.dp, bottom = BarGap)
             .fillMaxWidth()
             .height(BarHeight)
-            .clip(Resurge.shape.pill)
+            .shadow(16.dp, shape, ambientColor = Color.Black.copy(alpha = 0.10f), spotColor = Color.Black.copy(alpha = 0.10f))
+            .clip(shape)
             .background(Resurge.colors.navBar)
-            .border(1.dp, Resurge.colors.border, Resurge.shape.pill)
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.SpaceEvenly,
     ) {
         val half = (items.size + 1) / 2
         items.forEachIndexed { index, item ->
             if (index == half) center?.invoke()
             val isSelected = item.key == selected
-            NavCircle(
+            NavTab(
                 icon = if (isSelected) item.selectedIcon else item.icon,
                 label = item.label,
-                background = if (isSelected) Resurge.colors.navHighlight else Color.Transparent,
-                tint = if (isSelected) Resurge.colors.onNavHighlight else Resurge.colors.navInactive,
-                role = Role.Tab,
                 selected = isSelected,
                 onClick = { onSelect(item.key) },
             )
@@ -103,43 +96,49 @@ fun <T> FloatingNavBar(
     }
 }
 
-/** Nav item: icon-only circle when inactive; a pill with icon + label when [selected]. */
+/** One tab: an outline icon, or when [selected] a filled icon in a `navActive` circle. */
 @Composable
-private fun NavCircle(
+private fun NavTab(
     @DrawableRes icon: Int,
     label: String,
-    background: Color,
-    tint: Color,
-    role: Role,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val bg = background
-    val fg = tint
+    val bg by animateColorAsState(if (selected) Resurge.colors.navActive else Color.Transparent, tween(180), label = "tab")
+    val fg by animateColorAsState(if (selected) Resurge.colors.navOnActive else Resurge.colors.navInactive, tween(180), label = "tabIcon")
     UnstyledButton(
         onClick = onClick,
-        role = role,
+        role = Role.Tab,
         modifier = Modifier
-            .height(ItemSize)
-            .widthIn(min = ItemSize)
+            .size(ItemSize)
             .clip(Resurge.shape.pill)
             .background(bg)
             .semantics {
                 contentDescription = label
                 this.selected = selected
             },
-        contentPadding = PaddingValues(horizontal = if (selected) 16.dp else 0.dp),
         indication = LocalIndication.current,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, tint = fg, size = 22.dp)
-            if (selected) {
-                Row {
-                    Spacer(Modifier.width(8.dp))
-                    Text(label, style = Resurge.type.label, color = fg, maxLines = 1)
-                }
-            }
-        }
+        Icon(icon, contentDescription = null, tint = fg, size = 24.dp)
+    }
+}
+
+/**
+ * The coach in the middle of [FloatingNavBar]: the persona's flat blob (Friend or Commander) in a
+ * 48dp tap target. It keeps its own colours; tapping opens the coach chat.
+ */
+@Composable
+fun NavCoach(commander: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    UnstyledButton(
+        onClick = onClick,
+        role = Role.Button,
+        modifier = modifier
+            .size(ItemSize)
+            .clip(Resurge.shape.pill)
+            .semantics { contentDescription = "Coach" },
+        indication = LocalIndication.current,
+    ) {
+        CoachMascot(commander = commander, size = 32.dp)
     }
 }
 
@@ -183,7 +182,7 @@ val MainHeaderHeight: Dp = 60.dp
 /**
  * Permanent header for the main tabs: [title] on the left (or any [leading] content, e.g. a greeting),
  * [trailing] (profile photo) on the right. Its background fades downward so content scrolls softly
- * underneath, and it repaints the [TopShade] so the shade stays continuous across the header edge.
+ * underneath.
  */
 @Composable
 fun MainHeader(
@@ -191,30 +190,14 @@ fun MainHeader(
     modifier: Modifier = Modifier,
     leading: (@Composable () -> Unit)? = null,
     trailing: @Composable () -> Unit = {},
-    glow: Color = Resurge.colors.accent,
 ) {
     val bg = Resurge.colors.bg
-    // Same alpha ramp for the background and for the header's copy of the shade: wherever the
-    // background hides the shade behind it, this copy shows through by exactly that amount.
     val ramp = arrayOf(0f to 1f, 0.6f to 0.9f, 1f to 0f)
     Box(
         modifier
             .fillMaxWidth()
             .background(Brush.verticalGradient(*ramp.map { (p, a) -> p to bg.copy(alpha = a) }.toTypedArray())),
     ) {
-        Box(
-            Modifier
-                .matchParentSize()
-                .clipToBounds()
-                .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
-                .drawWithContent {
-                    drawContent()
-                    drawRect(
-                        Brush.verticalGradient(*ramp.map { (p, a) -> p to Color.Black.copy(alpha = a) }.toTypedArray()),
-                        blendMode = BlendMode.DstIn,
-                    )
-                },
-        ) { TopShade(glow) }
         Row(
             Modifier
                 .fillMaxWidth()

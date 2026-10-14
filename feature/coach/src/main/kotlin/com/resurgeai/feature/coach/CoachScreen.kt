@@ -68,7 +68,6 @@ import com.resurgeai.core.designsystem.components.SegmentOption
 import com.resurgeai.core.designsystem.components.SegmentedControl
 import com.resurgeai.core.designsystem.components.SkeletonGroup
 import com.resurgeai.core.designsystem.components.SkeletonLine
-import com.resurgeai.core.designsystem.components.TopShade
 import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.designsystem.theme.clockFormatter
 import com.resurgeai.core.model.CoachInsight
@@ -120,7 +119,6 @@ fun CoachScreen(
 ) {
     val input = rememberTextFieldState()
     Box(Modifier.fillMaxSize()) {
-        TopShade()
         Column(Modifier.fillMaxSize()) {
             Row(
                 Modifier

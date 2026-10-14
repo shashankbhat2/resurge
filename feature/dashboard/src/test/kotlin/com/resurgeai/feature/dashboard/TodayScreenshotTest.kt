@@ -11,6 +11,9 @@ import com.resurgeai.core.healthconnect.HealthConnectAvailability
 import com.resurgeai.core.model.DailyHealth
 import com.resurgeai.core.model.ExerciseSession
 import com.resurgeai.core.model.Goal
+import com.resurgeai.core.model.Habit
+import com.resurgeai.core.model.HabitStatus
+import com.resurgeai.core.model.HabitStreaks
 import com.resurgeai.core.model.HealthMetric
 import com.resurgeai.core.model.HeartRateSummary
 import com.resurgeai.core.model.SleepSession
@@ -25,6 +28,8 @@ import com.resurgeai.core.model.Nutrition
 import com.resurgeai.core.model.Workout
 import com.resurgeai.core.model.WorkoutMetricsInput
 import com.resurgeai.core.model.WorkoutSource
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -37,7 +42,7 @@ import java.time.LocalDate
 /** Today dashboard with synthetic data. Record with :feature:dashboard:recordRoborazziDebug. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35], qualifiers = "w400dp-h2400dp-xhdpi")
+@Config(sdk = [35], qualifiers = "w400dp-h2800dp-xhdpi")
 class TodayScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
@@ -69,6 +74,9 @@ class TodayScreenshotTest {
             sources = emptyMap(),
         ),
         sparklines = mapOf(
+            HealthMetric.STEPS to listOf(9_120.0, 11_400.0, 6_300.0, 8_800.0, 12_050.0, 10_200.0, 7_412.0),
+            HealthMetric.SLEEP to listOf(7.2, 6.4, 7.9, 6.8, 7.5, 8.1, 7.6),
+            HealthMetric.CALORIES_BURNED to listOf(2_150.0, 2_420.0, 2_010.0, 2_280.0, 2_510.0, 2_190.0, 2_310.0),
             HealthMetric.HEART_RATE to listOf(80.0, 78.0, 83.0, 81.0, 86.0, 82.0, 84.0),
             HealthMetric.DISTANCE to listOf(4.1, 6.3, 2.2, 7.8, 5.0, 8.4, 5.43),
             HealthMetric.WEIGHT to listOf(77.2, null, 77.0, null, 76.9, null, 76.7),
@@ -94,7 +102,24 @@ class TodayScreenshotTest {
             ),
         ),
         waterMl = 1_000,
+        habitDay = day,
+        habits = listOf(
+            habit("h1", "In bed by 23:00", "bed", "sleep", streakDays = 12, doneToday = true),
+            habit("h2", "Walk 10,000 steps", "walk", "activity", streakDays = 5, doneToday = true),
+            habit("h3", "Read for 15 minutes", "book", "accent", streakDays = 3, doneToday = false),
+            habit("h4", "Drink 2.5 L of water", "droplet", "water", streakDays = 0, doneToday = false),
+            habit("h5", "Take my vitamins", "pill", "heart", streakDays = 12, doneToday = true),
+        ),
     )
+
+    /** A habit created 20 days ago, done for the last [streakDays] days before today. */
+    private fun habit(id: String, name: String, icon: String, color: String, streakDays: Int, doneToday: Boolean): TodayHabit {
+        val created = day.minusDays(20)
+        val log = (1..streakDays).associate { day.minusDays(it.toLong()) to HabitStatus.DONE } +
+            (if (streakDays < 20) mapOf(day.minusDays(streakDays + 1L) to HabitStatus.MISSED, day.minusDays(streakDays + 2L) to HabitStatus.MISSED) else emptyMap()) +
+            (if (doneToday) mapOf(day to HabitStatus.DONE) else emptyMap())
+        return TodayHabit(Habit(id, name, icon, color, 0, archived = false, createdDate = created), HabitStreaks.compute(created, day, log))
+    }
 
     private fun capture(name: String, scheme: ColorScheme, ui: DashboardUiState = state) {
         compose.mainClock.autoAdvance = false // shimmer is an infinite animation
@@ -112,6 +137,30 @@ class TodayScreenshotTest {
     @Test fun todayLight() = capture("light", ColorScheme.Light)
 
     @Test fun todayDark() = capture("dark", ColorScheme.Dark)
+
+    @Test fun highTideLight() = captureSheet("light", ColorScheme.Light)
+
+    @Test fun highTideDark() = captureSheet("dark", ColorScheme.Dark)
+
+    /** Every segment done: all habits, sleep, 10k+ steps and two meals. */
+    private val highTide = state.copy(
+        today = state.today!!.copy(steps = 10_480),
+        meals = state.meals + state.meals.first().copy(id = "m2", type = MealType.LUNCH, title = "Dal, rice and salad"),
+        habits = state.habits!!.map { habit(it.habit.id, it.habit.name, it.habit.icon, it.habit.color, streakDays = 12, doneToday = true) },
+    )
+
+    private fun captureSheet(name: String, scheme: ColorScheme) {
+        compose.setContent {
+            ResurgeTheme(colorScheme = scheme) {
+                Screen {
+                    androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.padding(12.dp)) {
+                        HighTideSheet(highTide, onDone = {})
+                    }
+                }
+            }
+        }
+        compose.onRoot().captureRoboImage("src/test/screenshots/today_high_tide_$name.png")
+    }
 
     @Test fun loadingLight() = capture("loading_light", ColorScheme.Light, state.copy(today = null))
 

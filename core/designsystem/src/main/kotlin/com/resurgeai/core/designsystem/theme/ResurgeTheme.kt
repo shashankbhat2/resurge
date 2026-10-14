@@ -20,17 +20,18 @@ import com.composeunstyled.theme.rememberColoredIndication
 import com.resurgeai.core.designsystem.R
 import com.resurgeai.core.designsystem.theme.ColorTokens as C
 
-private fun interWeight(weight: FontWeight) = Font(
-    resId = R.font.inter_variable,
+private fun figtreeWeight(weight: FontWeight) = Font(
+    resId = R.font.figtree_variable,
     weight = weight,
     variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight)),
 )
 
-val Inter = FontFamily(
-    interWeight(FontWeight.Normal),
-    interWeight(FontWeight.Medium),
-    interWeight(FontWeight.SemiBold),
-    interWeight(FontWeight.Bold),
+/** UI face: titles, body, labels and captions. */
+val Figtree = FontFamily(
+    figtreeWeight(FontWeight.Normal),
+    figtreeWeight(FontWeight.Medium),
+    figtreeWeight(FontWeight.SemiBold),
+    figtreeWeight(FontWeight.Bold),
 )
 
 private fun bricolageWeight(weight: FontWeight) = Font(
@@ -39,7 +40,7 @@ private fun bricolageWeight(weight: FontWeight) = Font(
     variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight)),
 )
 
-/** Brand typeface for marketing/personality text only; all UI and stats use Inter. */
+/** Display face: greeting, headings with personality, and the numbers people track (tide, metrics, rise count). */
 val Bricolage = FontFamily(
     bricolageWeight(FontWeight.Normal),
     bricolageWeight(FontWeight.Medium),
@@ -49,50 +50,58 @@ val Bricolage = FontFamily(
 
 private val Tabular = "tnum"
 
-private object Palette {
-    /** Brand primary. */
-    val accent = Color(0xFF6F66FB)
-    val sleep = Color(0xFF6366F1)
-    val activity = Color(0xFF16A34A)
-    val energy = Color(0xFFF97316)
-    val water = Color(0xFF0EA5E9)
-    val heart = Color(0xFFE11D48)
+/** Resurge Tide palette: see the design system's tokens.json for each colour's usage. */
+private object Light {
+    val brand = Color(0xFF6F66FB)
+    val text = Color(0xFF111127)
+}
+
+private object Dark {
+    val brand = Color(0xFF8C85FF)
+    val bg = Color(0xFF0C0C11)
 }
 
 val ResurgeTheme = buildThemeV2 {
     name = "Resurge"
     colorSchemeTransitionSpec = tween(200)
 
-    properties[colors] = mapOf(
-        C.accent to Palette.accent,
-        C.onAccent to Color.White,
-        C.navHighlight to Palette.accent,
-        C.onNavHighlight to Color.White,
-        C.sleep to Palette.sleep,
-        C.activity to Palette.activity,
-        C.energy to Palette.energy,
-        C.water to Palette.water,
-        C.heart to Palette.heart,
-        C.danger to Color(0xFFDC2626),
-        C.success to Color(0xFF16A34A),
-    )
-
     colorScheme(ColorScheme.Light) {
         properties[colors] = mapOf(
-            C.bg to Color(0xFFF7F7F5),
+            C.bg to Color(0xFFF6F6F9),
             C.surface to Color(0xFFFFFFFF),
-            C.surfaceMuted to Color(0xFFF0EFEC),
-            C.border to Color(0xFFE7E5E4),
-            C.text to Color(0xFF0C0A09),
-            C.textMuted to Color(0xFF57534E),
-            C.textSubtle to Color(0xFF8A8580),
-            C.accentMuted to Palette.accent.copy(alpha = 0.10f),
+            C.surfaceMuted to Color(0xFFEEEEF4),
+            C.border to Color(0xFFE3E3EC),
+            C.text to Light.text,
+            C.textMuted to Color(0xFF55556B),
+            C.textSubtle to Color(0xFF6E6E84),
+            C.accent to Light.brand,
+            C.accentMuted to Color(0xFFECEBFF),
+            C.onAccent to Color.White,
+            C.brandInk to Color(0xFF4A41D9),
+            C.foam to Color(0xFFA9A3FF),
+            C.glow to Color(0xFFF5B544),
+            C.onGlow to Light.text,
+            C.glowInk to Color(0xFF8A5A00),
+            C.glowTint to Color(0xFFFFF3DC),
+            C.frost to Color(0xFFCFE6FA),
+            C.frostInk to Color(0xFF1F5E94),
+            C.ebb to Color(0xFFD9D9E3),
+            C.commander to Color(0xFFB31717),
+            C.sleep to Color(0xFF4250B8),
+            C.activity to Color(0xFF1A7D44),
+            C.energy to Color(0xFFB65015),
+            C.water to Color(0xFF0B70A0),
+            C.heart to Color(0xFFC92E55),
+            C.danger to Color(0xFFC62828),
+            C.success to Color(0xFF1A7D44),
+            C.navHighlight to Light.brand,
+            C.onNavHighlight to Color.White,
             C.navBar to Color(0xFFFFFFFF),
-            C.navActive to Color(0xFF0C0A09),
+            C.navActive to Light.text,
             C.navOnActive to Color(0xFFFFFFFF),
-            C.navInactive to Color(0xFF8A8580),
+            C.navInactive to Color(0xFF6E6E84),
         )
-        defaultContentColor = Color(0xFF0C0A09)
+        defaultContentColor = Light.text
         defaultIndication = rememberColoredIndication(
             hoveredColor = Color.Black.copy(alpha = 0.04f),
             pressedColor = Color.Black.copy(alpha = 0.08f),
@@ -102,20 +111,41 @@ val ResurgeTheme = buildThemeV2 {
 
     colorScheme(ColorScheme.Dark) {
         properties[colors] = mapOf(
-            C.bg to Color(0xFF0B0B0C),
-            C.surface to Color(0xFF151517),
-            C.surfaceMuted to Color(0xFF1E1E21),
-            C.border to Color(0xFF26262A),
-            C.text to Color(0xFFF5F5F4),
-            C.textMuted to Color(0xFFB4AFAA),
-            C.textSubtle to Color(0xFF85807B),
-            C.accentMuted to Palette.accent.copy(alpha = 0.18f),
-            C.navBar to Color(0xFF1E1E21),
-            C.navActive to Color(0xFFF5F5F4),
-            C.navOnActive to Color(0xFF0B0B0C),
-            C.navInactive to Color(0xFF85807B),
+            C.bg to Dark.bg,
+            C.surface to Color(0xFF16161D),
+            C.surfaceMuted to Color(0xFF1F1F28),
+            C.border to Color(0xFF2A2A35),
+            C.text to Color(0xFFF3F3F8),
+            C.textMuted to Color(0xFFB3B3C6),
+            C.textSubtle to Color(0xFF8E8EA5),
+            C.accent to Dark.brand,
+            C.accentMuted to Color(0xFF25234A),
+            C.onAccent to Dark.bg,
+            C.brandInk to Color(0xFFB4AFFF),
+            C.foam to Color(0xFFA9A3FF),
+            C.glow to Color(0xFFF7C15F),
+            C.onGlow to Dark.bg,
+            C.glowInk to Color(0xFFF7C15F),
+            C.glowTint to Color(0xFF3A2E14),
+            C.frost to Color(0xFF1E3346),
+            C.frostInk to Color(0xFF9CCBF5),
+            C.ebb to Color(0xFF34343F),
+            C.commander to Color(0xFFFF6464),
+            C.sleep to Color(0xFF97A2F5),
+            C.activity to Color(0xFF5BD394),
+            C.energy to Color(0xFFFF9A57),
+            C.water to Color(0xFF5CC8F2),
+            C.heart to Color(0xFFFF7A97),
+            C.danger to Color(0xFFFF6B6B),
+            C.success to Color(0xFF5BD394),
+            C.navHighlight to Dark.brand,
+            C.onNavHighlight to Dark.bg,
+            C.navBar to Color(0xFF1F1F28),
+            C.navActive to Color(0xFFF3F3F8),
+            C.navOnActive to Dark.bg,
+            C.navInactive to Color(0xFF8E8EA5),
         )
-        defaultContentColor = Color(0xFFF5F5F4)
+        defaultContentColor = Color(0xFFF3F3F8)
         defaultIndication = rememberColoredIndication(
             hoveredColor = Color.White.copy(alpha = 0.04f),
             pressedColor = Color.White.copy(alpha = 0.08f),
@@ -123,10 +153,10 @@ val ResurgeTheme = buildThemeV2 {
         )
     }
 
-    defaultTextStyle = TextStyle(fontFamily = Inter, fontSize = 15.sp, lineHeight = 22.sp)
+    defaultTextStyle = TextStyle(fontFamily = Figtree, fontSize = 15.sp, lineHeight = 22.sp)
     defaultTextSelectionColors = TextSelectionColors(
-        handleColor = Palette.accent,
-        backgroundColor = Palette.accent.copy(alpha = 0.3f),
+        handleColor = Light.brand,
+        backgroundColor = Light.brand.copy(alpha = 0.3f),
     )
 
     properties[typography] = mapOf(
@@ -138,33 +168,41 @@ val ResurgeTheme = buildThemeV2 {
             fontFamily = Bricolage, fontWeight = FontWeight.SemiBold,
             fontSize = 32.sp, lineHeight = 38.sp, letterSpacing = (-0.5).sp,
         ),
+        TypeTokens.tide to TextStyle(
+            fontFamily = Bricolage, fontWeight = FontWeight.SemiBold,
+            fontSize = 56.sp, lineHeight = 56.sp, letterSpacing = (-1.7).sp, fontFeatureSettings = Tabular,
+        ),
         TypeTokens.display to TextStyle(
-            fontFamily = Inter, fontWeight = FontWeight.SemiBold,
+            fontFamily = Figtree, fontWeight = FontWeight.SemiBold,
             fontSize = 32.sp, lineHeight = 38.sp, letterSpacing = (-0.5).sp,
         ),
         TypeTokens.metric to TextStyle(
-            fontFamily = Inter, fontWeight = FontWeight.SemiBold,
-            fontSize = 28.sp, lineHeight = 34.sp, fontFeatureSettings = Tabular,
+            fontFamily = Bricolage, fontWeight = FontWeight.SemiBold,
+            fontSize = 28.sp, lineHeight = 34.sp, letterSpacing = (-0.2).sp, fontFeatureSettings = Tabular,
         ),
         TypeTokens.title to TextStyle(
-            fontFamily = Inter, fontWeight = FontWeight.SemiBold,
+            fontFamily = Figtree, fontWeight = FontWeight.SemiBold,
             fontSize = 22.sp, lineHeight = 28.sp, letterSpacing = (-0.2).sp,
         ),
         TypeTokens.headline to TextStyle(
-            fontFamily = Inter, fontWeight = FontWeight.SemiBold,
+            fontFamily = Figtree, fontWeight = FontWeight.SemiBold,
             fontSize = 17.sp, lineHeight = 24.sp,
         ),
         TypeTokens.body to TextStyle(
-            fontFamily = Inter, fontWeight = FontWeight.Normal,
+            fontFamily = Figtree, fontWeight = FontWeight.Normal,
             fontSize = 15.sp, lineHeight = 22.sp,
         ),
         TypeTokens.label to TextStyle(
-            fontFamily = Inter, fontWeight = FontWeight.Medium,
+            fontFamily = Figtree, fontWeight = FontWeight.Medium,
             fontSize = 14.sp, lineHeight = 20.sp,
         ),
         TypeTokens.caption to TextStyle(
-            fontFamily = Inter, fontWeight = FontWeight.Medium,
+            fontFamily = Figtree, fontWeight = FontWeight.Medium,
             fontSize = 12.sp, lineHeight = 16.sp,
+        ),
+        TypeTokens.overline to TextStyle(
+            fontFamily = Figtree, fontWeight = FontWeight.SemiBold,
+            fontSize = 11.sp, lineHeight = 14.sp, letterSpacing = 0.9.sp,
         ),
     )
 
@@ -211,6 +249,16 @@ object ColorAccess {
     val energy @Composable get() = Theme[colors][C.energy]
     val water @Composable get() = Theme[colors][C.water]
     val heart @Composable get() = Theme[colors][C.heart]
+    val brandInk @Composable get() = Theme[colors][C.brandInk]
+    val foam @Composable get() = Theme[colors][C.foam]
+    val glow @Composable get() = Theme[colors][C.glow]
+    val onGlow @Composable get() = Theme[colors][C.onGlow]
+    val glowInk @Composable get() = Theme[colors][C.glowInk]
+    val glowTint @Composable get() = Theme[colors][C.glowTint]
+    val frost @Composable get() = Theme[colors][C.frost]
+    val frostInk @Composable get() = Theme[colors][C.frostInk]
+    val ebb @Composable get() = Theme[colors][C.ebb]
+    val commander @Composable get() = Theme[colors][C.commander]
     val navBar @Composable get() = Theme[colors][C.navBar]
     val navActive @Composable get() = Theme[colors][C.navActive]
     val navOnActive @Composable get() = Theme[colors][C.navOnActive]
@@ -234,6 +282,8 @@ object ColorAccess {
 object TypeAccess {
     val brand @Composable get() = Theme[typography][TypeTokens.brand]
     val brandLarge @Composable get() = Theme[typography][TypeTokens.brandLarge]
+    val tide @Composable get() = Theme[typography][TypeTokens.tide]
+    val overline @Composable get() = Theme[typography][TypeTokens.overline]
     val display @Composable get() = Theme[typography][TypeTokens.display]
     val metric @Composable get() = Theme[typography][TypeTokens.metric]
     val title @Composable get() = Theme[typography][TypeTokens.title]

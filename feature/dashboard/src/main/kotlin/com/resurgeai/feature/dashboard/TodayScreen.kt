@@ -1,25 +1,20 @@
 package com.resurgeai.feature.dashboard
 
+import androidx.compose.runtime.getValue
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.annotation.DrawableRes
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -36,14 +31,13 @@ import com.resurgeai.core.designsystem.components.IconBadge
 import com.resurgeai.core.designsystem.components.LocalFloatingBarInset
 import com.resurgeai.core.designsystem.components.LocalHeaderInset
 import com.resurgeai.core.designsystem.components.ResurgeIcons
-import com.resurgeai.core.designsystem.components.Spinner
 import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.designsystem.theme.ResurgeTheme
 import com.resurgeai.core.healthconnect.HealthConnectAvailability
+import com.resurgeai.core.model.CoachStyle
 import com.resurgeai.core.model.HealthMetric
 import com.resurgeai.core.model.SourceKind
 import com.resurgeai.core.model.UnitSystem
-import com.resurgeai.core.designsystem.components.SectionHeader
 import java.time.LocalDate
 
 @Composable
@@ -52,9 +46,8 @@ fun TodayRoute(
     onOpenInsights: () -> Unit,
     onOpenMeal: (String) -> Unit = {},
     onOpenWorkout: (String) -> Unit = {},
-    onScanMeal: () -> Unit = {},
-    onLogWorkout: () -> Unit = {},
-    onOpenFood: () -> Unit = {},
+    onOpenHabit: (String) -> Unit = {},
+    onAddHabit: () -> Unit = {},
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -75,16 +68,17 @@ fun TodayRoute(
         onOpenInsights = onOpenInsights,
         onOpenMeal = onOpenMeal,
         onOpenWorkout = onOpenWorkout,
-        onScanMeal = onScanMeal,
-        onLogWorkout = onLogWorkout,
-        onOpenFood = onOpenFood,
-        onAddWater = { viewModel.addWater(250) },
+        onToggleHabit = viewModel::toggleHabit,
+        onOpenHabit = onOpenHabit,
+        onAddHabit = onAddHabit,
+        onDismissHighTide = viewModel::dismissHighTide,
     )
 }
 
 /**
- * Today: the latest insight, quick logging, food vs activity at a glance, then a timeline of
- * today's and yesterday's meals, workouts, sleep and insights, and the rest of the health data.
+ * Today, built around one daily tide: the tide card (with rise count and Ascent), one-tap habits,
+ * today's health numbers as compact tiles, then a feed of today's and yesterday's meals, workouts,
+ * sleep and coach notes.
  */
 @Composable
 fun TodayScreen(
@@ -96,105 +90,102 @@ fun TodayScreen(
     onOpenInsights: () -> Unit = {},
     onOpenMeal: (String) -> Unit = {},
     onOpenWorkout: (String) -> Unit = {},
-    onScanMeal: () -> Unit = {},
-    onLogWorkout: () -> Unit = {},
-    onOpenFood: () -> Unit = {},
-    onAddWater: () -> Unit = {},
+    onToggleHabit: (String) -> Unit = {},
+    onOpenHabit: (String) -> Unit = {},
+    onAddHabit: () -> Unit = {},
+    onDismissHighTide: () -> Unit = {},
     today: LocalDate = LocalDate.now(),
 ) {
-    val healthReady = state.availability == HealthConnectAvailability.AVAILABLE &&
-        (state.permissions == PermissionState.PARTIAL || state.permissions == PermissionState.ALL)
+    val commander = state.profile?.coachStyle == CoachStyle.COMMANDER
     val feed = TodayFeed.build(
         today = today,
         meals = state.meals,
         workouts = state.workouts,
         sleep = state.today?.sleep.orEmpty(),
         insights = state.insights,
-        lead = state.latestInsight,
+        lead = null,
     )
+    val habits = state.habits
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp),
     ) {
-        // Greeting lives in the shared header; the latest insight leads the page.
-        Column(
-            Modifier.padding(
-                start = 20.dp - INSIGHT_INSET,
-                end = 20.dp - INSIGHT_INSET,
-                top = LocalHeaderInset.current + 20.dp - INSIGHT_INSET,
-                bottom = 20.dp - INSIGHT_INSET,
-            ),
-        ) {
-            CoachInsight(insight = state.latestInsight, onClick = onOpenInsights)
+        Spacer(Modifier.height(LocalHeaderInset.current + 12.dp))
+        val withHabits = !habits.isNullOrEmpty()
+        TideCard(state.tide, rise = state.riseCount.takeIf { withHabits }, ascent = state.ascent.takeIf { withHabits })
+
+        when {
+            habits == null -> Unit
+            habits.isEmpty() -> {
+                TodaySection("Habits")
+                FirstHabitCard(onAddHabit)
+            }
+            else -> {
+                TodaySection("Habits", trailing = "${habits.count { it.done }} of ${habits.size} done")
+                HabitGrid(habits, onToggle = onToggleHabit, onOpen = onOpenHabit, onAdd = onAddHabit)
+            }
         }
 
-        Column(Modifier.padding(horizontal = 16.dp)) {
-            QuickActions(onScanMeal = onScanMeal, onLogWorkout = onLogWorkout, onAddWater = onAddWater)
-            Spacer(Modifier.height(16.dp))
-
-            when (state.availability) {
-                null -> TodaySkeleton()
-                HealthConnectAvailability.NOT_SUPPORTED -> InfoCard(
-                    icon = ResurgeIcons.Activity,
-                    title = "Health Connect isn't available",
-                    body = "This device doesn't support Health Connect, so health data can't be shown.",
+        TodaySection("Health")
+        when (state.availability) {
+            null -> TodaySkeleton()
+            HealthConnectAvailability.NOT_SUPPORTED -> InfoCard(
+                icon = ResurgeIcons.Activity,
+                title = "Health Connect isn't available",
+                body = "This device doesn't support Health Connect, so health data can't be shown.",
+            )
+            HealthConnectAvailability.NOT_INSTALLED, HealthConnectAvailability.UPDATE_REQUIRED -> InfoCard(
+                icon = ResurgeIcons.Activity,
+                title = if (state.availability == HealthConnectAvailability.NOT_INSTALLED) "Install Health Connect" else "Update Health Connect",
+                body = "Resurge reads your steps, sleep and workouts through Health Connect. They count toward your tide once connected.",
+                action = "Open Play Store",
+                onAction = onInstall,
+            )
+            HealthConnectAvailability.AVAILABLE -> when (state.permissions) {
+                PermissionState.UNKNOWN -> TodaySkeleton()
+                PermissionState.NONE -> InfoCard(
+                    icon = ResurgeIcons.Watch,
+                    title = "Connect your health data",
+                    body = "Allow Resurge to read sleep, steps, calories, workouts and heart rate via Health Connect. Sleep and steps then count toward your tide.",
+                    action = "Connect Health Connect",
+                    onAction = onConnect,
                 )
-                HealthConnectAvailability.NOT_INSTALLED, HealthConnectAvailability.UPDATE_REQUIRED -> InfoCard(
-                    icon = ResurgeIcons.Activity,
-                    title = if (state.availability == HealthConnectAvailability.NOT_INSTALLED) "Install Health Connect" else "Update Health Connect",
-                    body = "Resurge reads your steps, sleep and workouts through Health Connect.",
-                    action = "Open Play Store",
-                    onAction = onInstall,
-                )
-                HealthConnectAvailability.AVAILABLE -> when (state.permissions) {
-                    PermissionState.UNKNOWN -> TodaySkeleton()
-                    PermissionState.NONE -> InfoCard(
-                        icon = ResurgeIcons.Watch,
-                        title = "Connect your health data",
-                        body = "Allow Resurge to read sleep, steps, calories, workouts and heart rate from your phone and wearable via Health Connect.",
-                        action = "Connect Health Connect",
-                        onAction = onConnect,
-                    )
-                    PermissionState.PARTIAL, PermissionState.ALL -> {
-                        if (state.permissions == PermissionState.PARTIAL) {
-                            PartialBanner(onConnect)
-                            Spacer(Modifier.height(12.dp))
-                        }
-                        state.error?.let {
-                            InfoCard(ResurgeIcons.Activity, "Something went wrong", it, action = "Retry", onAction = onRetry)
-                            Spacer(Modifier.height(12.dp))
-                        }
+                PermissionState.PARTIAL, PermissionState.ALL -> {
+                    if (state.permissions == PermissionState.PARTIAL) {
+                        PartialBanner(onConnect)
+                        Spacer(Modifier.height(12.dp))
+                    }
+                    state.error?.let {
+                        InfoCard(ResurgeIcons.Activity, "Couldn't read Health Connect", "Check that Health Connect is set up, then try again.", action = "Retry", onAction = onRetry)
+                        Spacer(Modifier.height(12.dp))
                     }
                 }
             }
-            if (state.availability != null && state.permissions != PermissionState.UNKNOWN) {
-                if (!healthReady) Spacer(Modifier.height(12.dp))
-                GlanceGrid(state, state.today, onOpenMetric, onOpenFood)
-            }
-
-            Timeline(
-                days = feed,
-                today = today,
-                units = state.profile?.units ?: UnitSystem.METRIC,
-                actions = FeedActions(
-                    onOpenMeal = onOpenMeal,
-                    onOpenWorkout = onOpenWorkout,
-                    onOpenSleep = { onOpenMetric(HealthMetric.SLEEP) },
-                    onOpenInsights = onOpenInsights,
-                ),
-            )
-
-            val day = state.today
-            if (healthReady && day != null) {
-                SectionHeader("Health")
-                HealthGrid(state, day, onOpenMetric, onOpenFood)
-            }
-            Spacer(Modifier.height(32.dp + LocalFloatingBarInset.current))
         }
-    }
-}
+        val day = state.today
+        if (state.healthReady) {
+            if (day != null) HealthTiles(day, onOpenMetric) else if (state.error == null) TodaySkeleton()
+        }
 
+        Feed(
+            days = feed,
+            today = today,
+            units = state.profile?.units ?: UnitSystem.METRIC,
+            commander = commander,
+            actions = FeedActions(
+                onOpenMeal = onOpenMeal,
+                onOpenWorkout = onOpenWorkout,
+                onOpenSleep = { onOpenMetric(HealthMetric.SLEEP) },
+                onOpenInsights = onOpenInsights,
+            ),
+        )
+        Spacer(Modifier.height(32.dp + LocalFloatingBarInset.current))
+    }
+
+    if (state.showHighTide) HighTideDialog(state, onDismissHighTide)
+}
 
 @DrawableRes
 internal fun sourceIcon(kind: SourceKind): Int = when (kind) {

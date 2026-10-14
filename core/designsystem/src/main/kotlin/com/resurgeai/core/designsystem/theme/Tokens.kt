@@ -31,6 +31,24 @@ object ColorTokens {
     val water = ThemeToken<Color>("water")
     val heart = ThemeToken<Color>("heart")
 
+    // Resurge Tide: the daily game layer.
+    /** Links, selected labels and tide percentages on light grounds. */
+    val brandInk = ThemeToken<Color>("brand_ink")
+    /** Leading edge of a rising tide. Decorative only. */
+    val foam = ThemeToken<Color>("foam")
+    /** Earned moments only: rise count, high tide, a new Ascent chevron. */
+    val glow = ThemeToken<Color>("glow")
+    val onGlow = ThemeToken<Color>("on_glow")
+    val glowInk = ThemeToken<Color>("glow_ink")
+    val glowTint = ThemeToken<Color>("glow_tint")
+    /** Anchor (streak freeze) days. */
+    val frost = ThemeToken<Color>("frost")
+    val frostInk = ThemeToken<Color>("frost_ink")
+    /** Missed days: low tide, never red. */
+    val ebb = ThemeToken<Color>("ebb")
+    /** The Commander coach's red. A persona colour, never a warning. */
+    val commander = ThemeToken<Color>("commander")
+
     // Floating navigation bar / raised surfaces: white (light) or charcoal (dark), with a high-contrast active circle.
     val navBar = ThemeToken<Color>("nav_bar")
     val navActive = ThemeToken<Color>("nav_active")
@@ -41,9 +59,13 @@ object ColorTokens {
 }
 
 object TypeTokens {
-    /** Marketing / personality text only (greeting, sign-in, onboarding headings). Bricolage Grotesque. */
+    /** Personality text (greeting, sign-in, onboarding, high tide) and big numbers. Bricolage Grotesque. */
     val brand = ThemeToken<TextStyle>("brand")
     val brandLarge = ThemeToken<TextStyle>("brand_large")
+    /** The tide percentage inside the Today ring. One per screen. */
+    val tide = ThemeToken<TextStyle>("tide")
+    /** Uppercase section labels. */
+    val overline = ThemeToken<TextStyle>("overline")
     val display = ThemeToken<TextStyle>("display")
     val metric = ThemeToken<TextStyle>("metric")
     val title = ThemeToken<TextStyle>("title")
