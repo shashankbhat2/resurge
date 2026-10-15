@@ -1,5 +1,7 @@
 package com.resurgeai.feature.dashboard
 
+import com.resurgeai.core.designsystem.components.OverviewFooterHeight
+import com.resurgeai.core.designsystem.components.OverviewBodyHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import kotlinx.coroutines.launch
 import androidx.compose.ui.layout.onSizeChanged
@@ -87,8 +89,8 @@ import java.util.Locale
 internal fun TideCard(
     tide: Tide,
     modifier: Modifier = Modifier,
-    rise: Int? = null,
-    ascent: Ascent? = null,
+    rise: Int = 0,
+    ascent: Ascent = Ascent(0, 1, 0, fresh = false),
     onOpenDetail: (TideDetail) -> Unit = {},
 ) {
     Column(
@@ -98,17 +100,15 @@ internal fun TideCard(
             .background(Resurge.colors.surface),
     ) {
         TideRow(tide)
-        if (rise != null && ascent != null) {
-            Divider()
-            TideFooter(rise, ascent, onOpenDetail)
-        }
+        Divider()
+        TideFooter(rise, ascent, onOpenDetail)
     }
 }
 
 @Composable
 private fun TideRow(tide: Tide) {
     val percent by animateIntAsState(tide.percent, tween(TIDE_RISE_MS, easing = TideEasing), label = "percent")
-    Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().height(OverviewBodyHeight).padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
         TideRing(
             done = tide.done,
             total = tide.total,
@@ -140,9 +140,11 @@ private fun TideRow(tide: Tide) {
             Overline("Today's tide")
             // What's left first: those are the taps that move the ring.
             val ordered = tide.segments.filterNot { it.done } + tide.segments.filter { it.done }
-            ordered.take(LEGEND_ROWS).forEach { TideLegendRow(it) }
-            if (ordered.size > LEGEND_ROWS) {
-                Text("+${ordered.size - LEGEND_ROWS} more", style = Resurge.type.caption, color = Resurge.colors.textSubtle)
+            // Five rows fit the card's height; with more, four rows and a "+N more" line.
+            val rows = if (ordered.size > LEGEND_ROWS) LEGEND_ROWS - 1 else LEGEND_ROWS
+            ordered.take(rows).forEach { TideLegendRow(it) }
+            if (ordered.size > rows) {
+                Text("+${ordered.size - rows} more", style = Resurge.type.caption, color = Resurge.colors.textSubtle)
             }
         }
     }
@@ -176,7 +178,7 @@ private const val LEGEND_ROWS = 5
  */
 @Composable
 private fun TideFooter(streak: Int, week: Ascent, onOpen: (TideDetail) -> Unit) {
-    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+    Row(Modifier.fillMaxWidth().height(OverviewFooterHeight)) {
         StatCell(
             icon = ResurgeIcons.HabitStreak,
             iconTint = if (streak > 0) Resurge.colors.onGlow else Resurge.colors.textMuted,
@@ -265,17 +267,12 @@ internal fun HabitGrid(
     }
 }
 
-@Composable
-private fun habitFill(key: String): Color =
-    if (key in CATEGORY_KEYS) HabitVisuals.color(key) else Resurge.colors.brandInk
-
-private val CATEGORY_KEYS = setOf("sleep", "activity", "energy", "water", "heart")
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun HabitTile(item: TodayHabit, onToggle: (String) -> Unit, onOpen: (String) -> Unit, modifier: Modifier) {
     val haptics = LocalHapticFeedback.current
-    val fill = habitFill(item.habit.color)
+    val fill = HabitVisuals.fill(item.habit.color)
     val bg by animateColorAsState(if (item.done) fill else Resurge.colors.surface, tween(240), label = "tile")
     val content by animateColorAsState(if (item.done) Resurge.colors.onAccent else Resurge.colors.text, tween(240), label = "tileText")
     val shape = Resurge.shape.md

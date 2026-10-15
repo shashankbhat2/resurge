@@ -1,5 +1,7 @@
 package com.resurgeai.feature.food
 
+import com.resurgeai.core.designsystem.components.OverviewFooterHeight
+import com.resurgeai.core.designsystem.components.OverviewBodyHeight
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -145,7 +147,7 @@ private fun FuelCard(state: FoodUiState, onAddWater: (Int) -> Unit) {
     val left = target - eaten.kcal.roundToInt()
     val mealsToday = state.days.firstOrNull { it.date == state.today }?.slots?.sumOf { it.second.size } ?: 0
     Column(Modifier.fillMaxWidth().clip(Resurge.shape.lg).background(Resurge.colors.surface)) {
-        Column(Modifier.padding(20.dp)) {
+        Column(Modifier.fillMaxWidth().height(OverviewBodyHeight).padding(20.dp)) {
             Overline("Fuel today")
             Spacer(Modifier.height(14.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -162,7 +164,7 @@ private fun FuelCard(state: FoodUiState, onAddWater: (Int) -> Unit) {
                     }
                 }
                 Spacer(Modifier.width(20.dp))
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         if (left >= 0) "%,d left".format(left) else "%,d over".format(-left),
                         style = Resurge.type.headline,
@@ -175,7 +177,7 @@ private fun FuelCard(state: FoodUiState, onAddWater: (Int) -> Unit) {
             }
         }
         Divider()
-        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+        Row(Modifier.fillMaxWidth().height(OverviewFooterHeight)) {
             StatCell(
                 icon = ResurgeIcons.Bowl,
                 iconTint = Resurge.colors.energy,

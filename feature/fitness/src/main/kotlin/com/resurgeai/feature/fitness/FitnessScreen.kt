@@ -1,5 +1,7 @@
 package com.resurgeai.feature.fitness
 
+import com.resurgeai.core.designsystem.components.OverviewFooterHeight
+import com.resurgeai.core.designsystem.components.OverviewBodyHeight
 import androidx.compose.foundation.layout.IntrinsicSize
 import com.resurgeai.core.designsystem.components.Divider
 import com.resurgeai.core.designsystem.components.StatDivider
@@ -169,7 +171,7 @@ internal fun MoveWeek(week: WeekSummary, today: LocalDate) {
             .clip(Resurge.shape.lg)
             .background(Resurge.colors.surface),
     ) {
-        Column(Modifier.padding(20.dp)) {
+        Column(Modifier.fillMaxWidth().height(OverviewBodyHeight).padding(20.dp)) {
             Overline("Move week")
             Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.Bottom) {
@@ -181,12 +183,12 @@ internal fun MoveWeek(week: WeekSummary, today: LocalDate) {
                 Spacer(Modifier.width(6.dp))
                 Text("/ $target active min", style = Resurge.type.label, color = Resurge.colors.textMuted, modifier = Modifier.padding(bottom = 6.dp))
             }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.weight(1f))
             DayColumns(week, today)
         }
         // Same footer as the tide card: two cells end to end.
         Divider()
-        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+        Row(Modifier.fillMaxWidth().height(OverviewFooterHeight)) {
             StatCell(
                 icon = ResurgeIcons.Dumbbell,
                 iconTint = Resurge.colors.activity,
@@ -218,7 +220,7 @@ private fun DayColumns(week: WeekSummary, today: LocalDate) {
         "${weekStart.plusDays(i.toLong()).dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault())} $m min"
     }
     Column(Modifier.semantics(mergeDescendants = true) { contentDescription = "Active minutes: $description" }) {
-        Box(Modifier.fillMaxWidth().height(72.dp)) {
+        Box(Modifier.fillMaxWidth().height(56.dp)) {
             Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 week.dailyMinutes.forEachIndexed { i, minutes ->
                     val future = i > week.todayIndex

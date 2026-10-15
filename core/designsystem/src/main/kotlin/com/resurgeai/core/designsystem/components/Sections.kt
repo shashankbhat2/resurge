@@ -1,5 +1,6 @@
 package com.resurgeai.core.designsystem.components
 
+import androidx.compose.ui.unit.Dp
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -25,6 +26,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composeunstyled.Text
 import com.resurgeai.core.designsystem.theme.Resurge
+
+/**
+ * The overview cards that lead Today (tide), Fitness (move week) and Food (fuel) share one shape:
+ * a body of this height, a hairline, then a two-cell footer of [OverviewFooterHeight].
+ */
+val OverviewBodyHeight: Dp = 200.dp
+val OverviewFooterHeight: Dp = 68.dp
 
 /** Uppercase section label (`overline`). */
 @Composable

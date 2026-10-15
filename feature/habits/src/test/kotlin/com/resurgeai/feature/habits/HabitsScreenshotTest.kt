@@ -21,7 +21,7 @@ import java.time.LocalDate
 /** Record with :feature:habits:recordRoborazziDebug. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35], qualifiers = "w400dp-h880dp-xhdpi")
+@Config(sdk = [35], qualifiers = "w400dp-h1300dp-xhdpi")
 class HabitsScreenshotTest {
     @get:Rule val compose = createComposeRule()
 

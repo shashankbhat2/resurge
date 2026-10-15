@@ -134,8 +134,8 @@ fun TodayScreen(
         Box {
             TideCard(
                 state.tide,
-                rise = state.riseCount.takeIf { withHabits },
-                ascent = state.ascent.takeIf { withHabits },
+                rise = state.riseCount,
+                ascent = state.ascent,
                 onOpenDetail = { detail = it },
             )
             state.pinnedInsight?.let { insight ->

@@ -8,10 +8,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,7 +22,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -33,25 +36,26 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composeunstyled.Text
 import com.composeunstyled.UnstyledButton
 import com.resurgeai.core.designsystem.components.Button
 import com.resurgeai.core.designsystem.components.ButtonVariant
-import com.resurgeai.core.designsystem.components.Card
 import com.resurgeai.core.designsystem.components.HabitVisuals
 import com.resurgeai.core.designsystem.components.Icon
 import com.resurgeai.core.designsystem.components.IconButton
 import com.resurgeai.core.designsystem.components.InputField
+import com.resurgeai.core.designsystem.components.Overline
 import com.resurgeai.core.designsystem.components.ResurgeIcons
-import com.resurgeai.core.designsystem.components.SectionHeader
-import com.resurgeai.core.designsystem.components.Stat
+import com.resurgeai.core.designsystem.components.SectionLabel
+import com.resurgeai.core.designsystem.components.StatDivider
 import com.resurgeai.core.designsystem.components.TopBar
 import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.model.DayState
@@ -62,7 +66,7 @@ import java.time.format.TextStyle
 import java.util.Locale
 import kotlin.math.roundToInt
 
-/** Streak history (12-week heatmap), stats, edit and archive for one habit. */
+/** One habit: its streak, best and consistency, 12 weeks of days, the freeze rule, and archive. */
 @Composable
 fun HabitDetailRoute(
     habitId: String,
@@ -75,7 +79,6 @@ fun HabitDetailRoute(
     // Archived (or deleted elsewhere): leave once data has loaded.
     LaunchedEffect(state.loading, item == null) { if (!state.loading && item == null) onBack() }
     if (item == null) return
-    val tint = HabitVisuals.color(item.habit.color)
     var confirmArchive by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize()) {
@@ -89,44 +92,35 @@ fun HabitDetailRoute(
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Card(Modifier.fillMaxWidth()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        ResurgeIcons.HabitStreak,
-                        contentDescription = null,
-                        tint = if (item.stats.current > 0) Resurge.colors.glowInk else Resurge.colors.textSubtle,
-                        size = 32.dp,
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Text("${item.stats.current}", style = Resurge.type.display)
-                    Spacer(Modifier.width(6.dp))
-                    Text("day streak", style = Resurge.type.label, color = Resurge.colors.textMuted)
-                }
-                Spacer(Modifier.height(20.dp))
-                Row {
-                    Stat("Best streak", if (item.stats.best == 1) "1 day" else "${item.stats.best} days", Modifier.weight(1f))
-                    Stat("Last 30 days", "${(item.stats.completion30 * 100).roundToInt()}%", Modifier.weight(1f))
-                    Stat("Freeze", if (item.stats.freezesLeftThisWeek > 0) "Ready" else "Used", Modifier.weight(1f))
+            StreakHero(item)
+            SectionLabel("Last 12 weeks", Modifier.padding(top = 4.dp))
+            Column(
+                Modifier.fillMaxWidth().clip(Resurge.shape.md).background(Resurge.colors.surface).padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Heatmap(item.stats.days, state.today, item.habit.color)
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    LegendItem(DayState.DONE, item.habit.color, "Done")
+                    LegendItem(DayState.FROZEN, item.habit.color, "Freeze")
+                    LegendItem(DayState.MISSED, item.habit.color, "Missed")
                 }
             }
-            SectionHeader("Last 12 weeks")
-            Card(Modifier.fillMaxWidth()) {
-                Heatmap(item.stats.days, state.today, tint)
-                Spacer(Modifier.height(14.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Legend(Modifier.background(tint), "Done")
-                    Legend(Modifier.background(Resurge.colors.water.copy(alpha = 0.5f)), "Freeze")
-                    Legend(Modifier.background(Resurge.colors.surfaceMuted).border(1.dp, Resurge.colors.border, Resurge.shape.sm), "Not done")
-                }
+            // The freeze rule, in the anchor's own colours.
+            Row(
+                Modifier.fillMaxWidth().clip(Resurge.shape.sm).background(Resurge.colors.frost).padding(12.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Icon(ResurgeIcons.Snowflake, contentDescription = null, tint = Resurge.colors.frostInk, size = 18.dp)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Miss a day and one freeze a week (Sunday to Saturday) keeps your streak going, automatically.",
+                    style = Resurge.type.label,
+                    color = Resurge.colors.frostInk,
+                )
             }
-            Spacer(Modifier.height(20.dp))
-            Text(
-                "Freezes: if you miss a day, one freeze a week (Sunday–Saturday) keeps your streak alive automatically.",
-                style = Resurge.type.caption,
-                color = Resurge.colors.textSubtle,
-            )
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(8.dp))
             val canArchive = state.items.size > 1
             Button(
                 text = when {
@@ -152,9 +146,50 @@ fun HabitDetailRoute(
     }
 }
 
+/** The streak in big type with its badge, then best, last 30 days and this week's freeze. */
+@Composable
+private fun StreakHero(item: HabitItem) {
+    val running = item.stats.current > 0
+    Column(Modifier.fillMaxWidth().clip(Resurge.shape.lg).background(Resurge.colors.surface)) {
+        Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(56.dp).clip(Resurge.shape.pill).background(if (running) Resurge.colors.glow else Resurge.colors.surfaceMuted),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(ResurgeIcons.HabitStreak, contentDescription = null, tint = if (running) Resurge.colors.onGlow else Resurge.colors.textMuted, size = 28.dp)
+            }
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Overline("Habit streak")
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text("${item.stats.current}", style = Resurge.type.tide.copy(fontSize = 44.sp, lineHeight = 46.sp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (item.stats.current == 1) "day" else "days", style = Resurge.type.label, color = Resurge.colors.textMuted, modifier = Modifier.padding(bottom = 6.dp))
+                }
+            }
+        }
+        com.resurgeai.core.designsystem.components.Divider()
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            HeroStat(if (item.stats.best == 1) "1 day" else "${item.stats.best} days", "Best streak", Modifier.weight(1f))
+            StatDivider()
+            HeroStat("${(item.stats.completion30 * 100).roundToInt()}%", "Last 30 days", Modifier.weight(1f))
+            StatDivider()
+            HeroStat(if (item.stats.freezesLeftThisWeek > 0) "Ready" else "Used", "Freeze this week", Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun HeroStat(value: String, label: String, modifier: Modifier) {
+    Column(modifier.fillMaxHeight().padding(horizontal = 16.dp, vertical = 14.dp)) {
+        Text(value, style = Resurge.type.metric.copy(fontSize = 18.sp, lineHeight = 22.sp), maxLines = 1)
+        Text(label, style = Resurge.type.caption, color = Resurge.colors.textSubtle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
 /** 12 Sunday-start weeks as columns, Sun…Sat rows; the current week is the rightmost column. */
 @Composable
-private fun Heatmap(days: Map<LocalDate, DayState>, today: LocalDate, tint: Color) {
+private fun Heatmap(days: Map<LocalDate, DayState>, today: LocalDate, colorKey: String) {
     val lastWeek = HabitStreaks.weekStart(today)
     val firstWeek = lastWeek.minusWeeks(11)
     Row {
@@ -174,20 +209,16 @@ private fun Heatmap(days: Map<LocalDate, DayState>, today: LocalDate, tint: Colo
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     (0 until 7).forEach { d ->
                         val date = firstWeek.plusWeeks(w.toLong()).plusDays(d.toLong())
-                        val state = if (date.isAfter(today)) null else days[date]
-                        val cell = Modifier
-                            .fillMaxWidth()
-                            .height(18.dp)
-                            .clip(Resurge.shape.sm)
-                        Box(
-                            when (state) {
-                                DayState.DONE -> cell.background(tint)
-                                DayState.FROZEN -> cell.background(Resurge.colors.water.copy(alpha = 0.5f))
-                                DayState.MISSED -> cell.background(Resurge.colors.surfaceMuted).border(1.dp, Resurge.colors.border, Resurge.shape.sm)
-                                DayState.PENDING -> cell.border(1.dp, Resurge.colors.border, Resurge.shape.sm)
-                                DayState.NONE, null -> cell
-                            },
-                        )
+                        val state = if (date.isAfter(today)) DayState.NONE else days[date] ?: DayState.NONE
+                        val cell = Modifier.fillMaxWidth().height(18.dp)
+                        val shape = RoundedCornerShape(4.dp)
+                        when (state) {
+                            DayState.DONE -> Box(cell.clip(shape).background(HabitVisuals.fill(colorKey)))
+                            DayState.FROZEN -> Box(cell.clip(shape).background(Resurge.colors.frost))
+                            DayState.MISSED -> Box(cell.clip(shape).background(Resurge.colors.ebb))
+                            DayState.PENDING -> Box(cell.dashedBorder(Resurge.colors.textSubtle, 4.dp, 1.dp))
+                            DayState.NONE -> Box(cell.clip(shape).background(Resurge.colors.surfaceMuted.copy(alpha = 0.5f)))
+                        }
                     }
                 }
             }
@@ -196,15 +227,15 @@ private fun Heatmap(days: Map<LocalDate, DayState>, today: LocalDate, tint: Colo
 }
 
 @Composable
-private fun Legend(swatch: Modifier, label: String) {
+private fun LegendItem(state: DayState, colorKey: String, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(12.dp).clip(Resurge.shape.sm).then(swatch))
+        DayCell(state, colorKey, size = 14.dp, radius = 4.dp)
         Spacer(Modifier.width(6.dp))
         Text(label, style = Resurge.type.caption, color = Resurge.colors.textMuted)
     }
 }
 
-/** Add (habitId = null) or edit a habit: name, icon and colour. */
+/** Add (habitId = null) or edit a habit: a live preview, its name, icon and colour. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HabitEditorRoute(
@@ -242,52 +273,98 @@ fun HabitEditorRoute(
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            PreviewTile(name.text.toString(), icon, color)
+            SectionLabel("Name", Modifier.padding(top = 4.dp))
             InputField(name, placeholder = "e.g. Walk after dinner", onDone = save)
-            SectionHeader("Icon")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+
+            SectionLabel("Colour", Modifier.padding(top = 4.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                HabitVisuals.colorKeys.forEach { key ->
+                    val selected = key == color
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        UnstyledButton(
+                            onClick = { color = key },
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(Resurge.shape.pill)
+                                .border(if (selected) 2.dp else 0.dp, if (selected) Resurge.colors.text else Resurge.colors.surface, Resurge.shape.pill)
+                                .padding(if (selected) 4.dp else 0.dp)
+                                .clip(Resurge.shape.pill)
+                                .background(HabitVisuals.fill(key))
+                                .semantics {
+                                    contentDescription = HabitVisuals.colorLabel(key)
+                                    this.selected = selected
+                                },
+                            indication = LocalIndication.current,
+                        ) {
+                            if (selected) Icon(ResurgeIcons.Check, contentDescription = null, tint = Resurge.colors.onAccent, size = 18.dp)
+                        }
+                        Text(
+                            HabitVisuals.colorLabel(key),
+                            style = Resurge.type.caption,
+                            color = if (selected) Resurge.colors.text else Resurge.colors.textSubtle,
+                        )
+                    }
+                }
+            }
+
+            SectionLabel("Icon", Modifier.padding(top = 4.dp))
+            FlowRow(
+                Modifier.fillMaxWidth().clip(Resurge.shape.md).background(Resurge.colors.surface).padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                maxItemsInEachRow = 5,
+            ) {
                 HabitVisuals.icons.forEach { (key, res) ->
                     val selected = key == icon
                     UnstyledButton(
                         onClick = { icon = key },
                         modifier = Modifier
-                            .size(52.dp)
-                            .clip(Resurge.shape.pill)
-                            .background(if (selected) HabitVisuals.color(color).copy(alpha = 0.16f) else Resurge.colors.surface)
-                            .border(if (selected) 2.dp else 1.dp, if (selected) HabitVisuals.color(color) else Resurge.colors.border, Resurge.shape.pill)
-                            .semantics { contentDescription = key.replace('_', ' '); this.selected = selected },
+                            .weight(1f)
+                            .height(52.dp)
+                            .clip(Resurge.shape.sm)
+                            .background(if (selected) HabitVisuals.fill(color) else Resurge.colors.surfaceMuted)
+                            .semantics {
+                                contentDescription = key.replace('_', ' ')
+                                this.selected = selected
+                            },
                         indication = LocalIndication.current,
-                    ) { Icon(res, contentDescription = null, tint = if (selected) HabitVisuals.color(color) else Resurge.colors.textMuted, size = 22.dp) }
+                    ) { Icon(res, contentDescription = null, tint = if (selected) Resurge.colors.onAccent else Resurge.colors.textMuted, size = 22.dp) }
                 }
             }
-            SectionHeader("Colour")
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                HabitVisuals.colorKeys.forEach { key ->
-                    val selected = key == color
-                    UnstyledButton(
-                        onClick = { color = key },
-                        modifier = Modifier
-                            .size(40.dp)
-                            .aspectRatio(1f)
-                            .clip(Resurge.shape.pill)
-                            .border(if (selected) 3.dp else 0.dp, Resurge.colors.text, Resurge.shape.pill)
-                            .padding(if (selected) 5.dp else 0.dp)
-                            .clip(Resurge.shape.pill)
-                            .background(HabitVisuals.color(key))
-                            .semantics { contentDescription = key; this.selected = selected },
-                        indication = LocalIndication.current,
-                    ) {}
-                }
-            }
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(16.dp))
+        }
+        // Docked, so saving stays reachable above the keyboard and the icon grid.
+        Box(Modifier.fillMaxWidth().background(Resurge.colors.bg).windowInsetsPadding(WindowInsets.navigationBars).padding(horizontal = 16.dp, vertical = 12.dp)) {
             Button(
                 text = if (habitId == null) "Add habit" else "Save",
                 onClick = save,
                 enabled = canSave,
+                variant = ButtonVariant.Accent,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
-            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+/** How the habit will look on Today once done: its colour fill, icon, name and a check. */
+@Composable
+private fun PreviewTile(name: String, icon: String, color: String) {
+    val fill = HabitVisuals.fill(color)
+    Row(
+        Modifier.fillMaxWidth().clip(Resurge.shape.lg).background(fill).padding(20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(HabitVisuals.icon(icon), contentDescription = null, tint = Resurge.colors.onAccent, size = 32.dp)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text("Preview", style = Resurge.type.caption, color = Resurge.colors.onAccent.copy(alpha = 0.8f))
+            Text(name.ifBlank { "Your habit" }, style = Resurge.type.headline, color = Resurge.colors.onAccent, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+        Box(Modifier.size(32.dp).clip(Resurge.shape.pill).background(Resurge.colors.onAccent), contentAlignment = Alignment.Center) {
+            Icon(ResurgeIcons.Check, contentDescription = null, tint = fill, size = 18.dp)
         }
     }
 }

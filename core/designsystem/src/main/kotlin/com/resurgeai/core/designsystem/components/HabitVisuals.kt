@@ -46,4 +46,21 @@ object HabitVisuals {
         "heart" -> Resurge.colors.heart
         else -> Resurge.colors.accent
     }
+
+    /**
+     * The colour a done habit fills with, under `onAccent` text and icons. Brand uses `brandInk`,
+     * since the lighter brand fill is too pale for white text.
+     */
+    @Composable
+    fun fill(key: String): Color = if (key in setOf("sleep", "activity", "energy", "water", "heart")) color(key) else Resurge.colors.brandInk
+
+    /** The name shown under each colour swatch. */
+    fun colorLabel(key: String): String = when (key) {
+        "sleep" -> "Sleep"
+        "activity" -> "Move"
+        "energy" -> "Fuel"
+        "water" -> "Water"
+        "heart" -> "Heart"
+        else -> "Brand"
+    }
 }

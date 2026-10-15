@@ -1,5 +1,6 @@
 package com.resurgeai.feature.habits
 
+import androidx.compose.ui.draw.shadow
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -74,10 +75,12 @@ internal fun HabitDeck(
 
     Column(modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
-            "${pending.size} left today · ${state.doneToday} done",
-            style = Resurge.type.label,
+            "Check in · ${pending.size} left · ${state.doneToday} done".uppercase(),
+            style = Resurge.type.overline,
             color = Resurge.colors.textMuted,
         )
+        Spacer(Modifier.height(4.dp))
+        Text("Swipe right if you did it, left if not.", style = Resurge.type.caption, color = Resurge.colors.textSubtle)
         Spacer(Modifier.height(20.dp))
         Box(
             Modifier
@@ -107,10 +110,10 @@ internal fun HabitDeck(
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             RoundAction(ResurgeIcons.Close, "Not done", Resurge.colors.surface, Resurge.colors.text) { fling.value = false }
             RoundAction(ResurgeIcons.Undo, "Undo", Resurge.colors.surfaceMuted, Resurge.colors.textMuted, size = 48, enabled = state.lastSwiped != null, onClick = onUndo)
-            RoundAction(ResurgeIcons.Check, "Done", Resurge.colors.accent, Resurge.colors.onAccent) { fling.value = true }
+            RoundAction(ResurgeIcons.Check, "Done", Resurge.colors.brandInk, Resurge.colors.onAccent) { fling.value = true }
         }
         Spacer(Modifier.height(8.dp))
-        Button("View streaks", onClick = onShowStreaks, variant = ButtonVariant.Ghost)
+        Button("See all habits", onClick = onShowStreaks, variant = ButtonVariant.Ghost)
     }
 }
 
@@ -175,22 +178,23 @@ private fun SwipeCard(item: HabitItem, fling: MutableState<Boolean?>, onSwipe: (
 @Composable
 private fun HabitCardFace(item: HabitItem, modifier: Modifier = Modifier, swipeProgress: Float = 0f) {
     val tint = HabitVisuals.color(item.habit.color)
-    val doneTint = Resurge.colors.success
+    // Done is the habit's own colour; not done is the calm grey, never red.
+    val doneTint = HabitVisuals.fill(item.habit.color)
     val shape = Resurge.shape.lg
     Box(
         modifier
             .fillMaxWidth()
             .height(380.dp)
+            .shadow(12.dp, shape, ambientColor = Color.Black.copy(alpha = 0.12f), spotColor = Color.Black.copy(alpha = 0.12f))
             .clip(shape)
-            .background(Resurge.colors.surface)
-            .border(1.dp, Resurge.colors.border, shape),
+            .background(Resurge.colors.surface),
     ) {
         // Drag feedback wash.
         if (swipeProgress != 0f) {
             Box(
                 Modifier
                     .matchParentSize()
-                    .background((if (swipeProgress > 0) doneTint else Resurge.colors.textSubtle).copy(alpha = abs(swipeProgress) * 0.16f)),
+                    .background((if (swipeProgress > 0) doneTint else Resurge.colors.ebb).copy(alpha = abs(swipeProgress) * if (swipeProgress > 0) 0.18f else 0.5f)),
             )
         }
         Column(
@@ -203,10 +207,10 @@ private fun HabitCardFace(item: HabitItem, modifier: Modifier = Modifier, swipeP
             Box(
                 Modifier
                     .size(88.dp)
-                    .clip(Resurge.shape.pill)
-                    .background(tint.copy(alpha = 0.14f)),
+                    .clip(Resurge.shape.lg)
+                    .background(Resurge.colors.surfaceMuted),
                 contentAlignment = Alignment.Center,
-            ) { Icon(HabitVisuals.icon(item.habit.icon), contentDescription = null, tint = tint, size = 40.dp) }
+            ) { Icon(HabitVisuals.icon(item.habit.icon), contentDescription = null, tint = tint, size = 44.dp) }
             Spacer(Modifier.height(24.dp))
             Text(item.habit.name, style = Resurge.type.title, textAlign = TextAlign.Center)
             Spacer(Modifier.height(16.dp))
@@ -224,7 +228,7 @@ private fun HabitCardFace(item: HabitItem, modifier: Modifier = Modifier, swipeP
                     .padding(horizontal = 14.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                val fg = if (done) Color.White else Resurge.colors.text
+                val fg = if (done) Resurge.colors.onAccent else Resurge.colors.text
                 Icon(if (done) ResurgeIcons.Check else ResurgeIcons.Close, contentDescription = null, tint = fg, size = 16.dp)
                 Spacer(Modifier.width(6.dp))
                 Text(if (done) "Done" else "Not done", style = Resurge.type.label, color = fg)
@@ -269,9 +273,9 @@ private fun RoundAction(
         role = Role.Button,
         modifier = Modifier
             .size(size.dp)
+            .shadow(if (size >= 64) 6.dp else 0.dp, Resurge.shape.pill, ambientColor = Color.Black.copy(alpha = 0.12f), spotColor = Color.Black.copy(alpha = 0.12f))
             .clip(Resurge.shape.pill)
             .background(background)
-            .border(1.dp, Resurge.colors.border, Resurge.shape.pill)
             .semantics { contentDescription = label },
         indication = LocalIndication.current,
     ) {
