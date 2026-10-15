@@ -1,5 +1,11 @@
 package com.resurgeai.feature.food
 
+import java.time.LocalDate
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.filterIsInstance
+import com.resurgeai.core.model.Targets
+import com.resurgeai.core.model.SessionState
+import com.resurgeai.core.data.session.SessionRepository
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -40,11 +46,18 @@ data class MealReviewState(
     val thumbnail: ByteArray? = null,
     /** Photo to show at the top: the full image for a fresh scan, else the stored thumbnail. */
     val preview: ByteArray? = null,
+    /** What the user typed, for a text estimate (shown while it's analysed). */
+    val description: String? = null,
     val source: MealSource = MealSource.MANUAL,
     val loggedAt: Instant = Instant.now(),
     /** Adding an item by description is in flight. */
     val addingItem: Boolean = false,
     val done: Boolean = false,
+    /** Calories already eaten today, not counting this meal (for "your day"). */
+    val eatenBefore: Double = 0.0,
+    /** Meals already logged today, not counting this one (for the tide's meals segment). */
+    val mealsBefore: Int = 0,
+    val targetKcal: Int = Targets.DEFAULT_CALORIES,
 ) {
     val isNew: Boolean get() = mealId == null
     val totals: Nutrition get() = items.fold(Nutrition.Zero) { acc, e -> acc + e.item.nutrition }
@@ -60,6 +73,7 @@ class MealReviewViewModel @Inject constructor(
     private val repository: MealsRepository,
     draftStore: MealDraftStore,
     savedState: SavedStateHandle,
+    sessionRepository: SessionRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(MealReviewState())
     val state: StateFlow<MealReviewState> = _state.asStateFlow()
@@ -71,6 +85,20 @@ class MealReviewViewModel @Inject constructor(
 
     init {
         val mealId = savedState.get<String>("mealId")
+        // Today so far (minus this meal when editing) and the calorie target, for the "your day" bar.
+        viewModelScope.launch {
+            runCatching {
+                val today = LocalDate.now()
+                repository.meals(today).first().filter { it.date == today && it.id != mealId }
+            }.getOrNull()?.let { earlier ->
+                _state.update { it.copy(eatenBefore = earlier.sumOf { m -> m.totals.kcal }, mealsBefore = earlier.size) }
+            }
+        }
+        viewModelScope.launch {
+            sessionRepository.session.filterIsInstance<SessionState.Ready>().collect { s ->
+                _state.update { it.copy(targetKcal = s.profile.targets.calories) }
+            }
+        }
         if (mealId != null) {
             viewModelScope.launch {
                 val meal = runCatching { repository.meal(mealId) }.getOrNull()
@@ -98,6 +126,7 @@ class MealReviewViewModel @Inject constructor(
                     loading = false,
                     thumbnail = draft.photo?.thumbnail,
                     preview = draft.photo?.jpeg,
+                    description = draft.text,
                     source = if (draft.photo != null) MealSource.SCAN else MealSource.TEXT,
                 )
             }

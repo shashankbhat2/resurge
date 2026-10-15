@@ -1,11 +1,15 @@
 package com.resurgeai.feature.food
 
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,28 +22,33 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composeunstyled.Text
+import com.composeunstyled.UnstyledButton
 import com.resurgeai.core.designsystem.components.Button
 import com.resurgeai.core.designsystem.components.ButtonVariant
-import com.resurgeai.core.designsystem.components.Card
+import com.resurgeai.core.designsystem.components.Divider
 import com.resurgeai.core.designsystem.components.Icon
-import com.resurgeai.core.designsystem.components.IconBadge
 import com.resurgeai.core.designsystem.components.LocalFloatingBarInset
 import com.resurgeai.core.designsystem.components.LocalHeaderInset
 import com.resurgeai.core.designsystem.components.MacroVisuals
-import com.resurgeai.core.designsystem.components.MagnitudeBar
+import com.resurgeai.core.designsystem.components.Overline
 import com.resurgeai.core.designsystem.components.ResurgeIcons
 import com.resurgeai.core.designsystem.components.Ring
 import com.resurgeai.core.designsystem.components.RingSegment
-import com.resurgeai.core.designsystem.components.SectionHeader
+import com.resurgeai.core.designsystem.components.SectionLabel
 import com.resurgeai.core.designsystem.components.SkeletonBox
 import com.resurgeai.core.designsystem.components.SkeletonGroup
+import com.resurgeai.core.designsystem.components.StatCell
+import com.resurgeai.core.designsystem.components.StatDivider
 import com.resurgeai.core.designsystem.components.SwipeToDelete
 import com.resurgeai.core.designsystem.components.UndoBar
 import com.resurgeai.core.designsystem.theme.Resurge
@@ -69,7 +78,10 @@ fun FoodRoute(
     )
 }
 
-/** Food tab: today's ring, macros and water, then meals by day and slot. */
+/** Meals that fill the tide's meals segment (TideMath.MEALS_GOAL on Today). */
+private const val TIDE_MEALS = 2
+
+/** Food tab: today's fuel (calories, macros, meals and water), then meals by day. Swipe left deletes. */
 @Composable
 fun FoodScreen(
     state: FoodUiState,
@@ -86,37 +98,29 @@ fun FoodScreen(
         if (state.loading) {
             SkeletonGroup {
                 Column(Modifier.padding(start = 16.dp, end = 16.dp, top = top), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SkeletonBox(Modifier.fillMaxWidth().height(200.dp), Resurge.shape.lg)
-                    repeat(2) { SkeletonBox(Modifier.fillMaxWidth().height(96.dp), Resurge.shape.lg) }
+                    SkeletonBox(Modifier.fillMaxWidth().height(300.dp), Resurge.shape.lg)
+                    repeat(3) { SkeletonBox(Modifier.fillMaxWidth().height(84.dp), Resurge.shape.md) }
                 }
             }
         } else {
             LazyColumn(
                 Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = top, bottom = bottom),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                item(key = "summary") { SummaryCard(state) }
-                item(key = "water") { WaterCard(state.waterMl, state.targets.waterMl, onAddWater) }
+                item(key = "fuel") { FuelCard(state, onAddWater) }
                 if (state.days.isEmpty()) item(key = "empty") { EmptyFeed(onLogMeal) }
                 state.days.forEach { day ->
+                    val meals = day.slots.flatMap { it.second }
                     item(key = "d${day.date}") {
-                        SectionHeader(
+                        SectionLabel(
                             dayLabel(day.date, state.today),
-                            trailing = { Text(kcal(day.totals.kcal), style = Resurge.type.caption, color = Resurge.colors.textMuted) },
+                            Modifier.padding(top = 8.dp),
+                            trailing = "${meals.size} ${if (meals.size == 1) "meal" else "meals"} · ${kcal(day.totals.kcal)}",
                         )
                     }
-                    day.slots.forEach { (type, meals) ->
-                        item(key = "s${day.date}$type") {
-                            val slotKcal = meals.sumOf { it.totals.kcal }
-                            Row(Modifier.padding(start = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(type.label, style = Resurge.type.label, modifier = Modifier.weight(1f))
-                                Text(kcal(slotKcal), style = Resurge.type.caption, color = Resurge.colors.textMuted)
-                            }
-                        }
-                        items(meals, key = { it.id }) { meal ->
-                            SwipeToDelete(onDelete = { onDelete(meal) }) { MealCard(meal) { onOpenMeal(meal.id) } }
-                        }
+                    items(meals, key = { it.id }) { meal ->
+                        SwipeToDelete(onDelete = { onDelete(meal) }) { MealRow(meal) { onOpenMeal(meal.id) } }
                     }
                 }
             }
@@ -130,113 +134,147 @@ fun FoodScreen(
     }
 }
 
+/**
+ * The tab's hero, like Today's tide card: the calorie ring and macro bars on top, then a footer of
+ * meals (toward the tide's meals segment) and water with a quick +250.
+ */
 @Composable
-private fun SummaryCard(state: FoodUiState) {
+private fun FuelCard(state: FoodUiState, onAddWater: (Int) -> Unit) {
     val eaten = state.todayTotals
     val target = state.targets.calories
     val left = target - eaten.kcal.roundToInt()
-    Card(Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Ring(
-                segments = listOf(RingSegment((eaten.kcal / target).toFloat().coerceIn(0f, 1f), if (left < 0) Resurge.colors.danger else Resurge.colors.energy)),
-                modifier = Modifier.size(120.dp),
-                strokeWidth = 12.dp,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("%,d".format(eaten.kcal.roundToInt()), style = Resurge.type.title.copy(fontFeatureSettings = "tnum"))
-                    Text("of %,d".format(target), style = Resurge.type.caption, color = Resurge.colors.textMuted)
+    val mealsToday = state.days.firstOrNull { it.date == state.today }?.slots?.sumOf { it.second.size } ?: 0
+    Column(Modifier.fillMaxWidth().clip(Resurge.shape.lg).background(Resurge.colors.surface)) {
+        Column(Modifier.padding(20.dp)) {
+            Overline("Fuel today")
+            Spacer(Modifier.height(14.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Ring(
+                    // Over target keeps the fuel colour: going over is information, not an error.
+                    segments = listOf(RingSegment((eaten.kcal / target).toFloat().coerceIn(0f, 1f), Resurge.colors.energy)),
+                    modifier = Modifier.size(128.dp).semantics { contentDescription = "${eaten.kcal.roundToInt()} of $target kcal eaten" },
+                    strokeWidth = 12.dp,
+                    trackColor = Resurge.colors.surfaceMuted,
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(kcalNumber(eaten.kcal), style = Resurge.type.metric.copy(fontSize = 30.sp, lineHeight = 34.sp))
+                        Text("of %,d kcal".format(target), style = Resurge.type.caption, color = Resurge.colors.textSubtle)
+                    }
+                }
+                Spacer(Modifier.width(20.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        if (left >= 0) "%,d left".format(left) else "%,d over".format(-left),
+                        style = Resurge.type.headline,
+                        color = if (left >= 0) Resurge.colors.text else Resurge.colors.energy,
+                    )
+                    MacroBar("Protein", eaten.protein, state.macroTargets.protein, MacroVisuals.protein())
+                    MacroBar("Carbs", eaten.carbs, state.macroTargets.carbs, MacroVisuals.carbs())
+                    MacroBar("Fat", eaten.fat, state.macroTargets.fat, MacroVisuals.fat())
                 }
             }
-            Spacer(Modifier.width(20.dp))
-            Column(Modifier.weight(1f)) {
-                Text(if (left >= 0) "%,d kcal left".format(left) else "%,d kcal over".format(-left), style = Resurge.type.title)
-                Spacer(Modifier.height(2.dp))
-                Text("Today", style = Resurge.type.caption, color = Resurge.colors.textMuted)
+        }
+        Divider()
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            StatCell(
+                icon = ResurgeIcons.Bowl,
+                iconTint = Resurge.colors.energy,
+                iconBackground = Resurge.colors.surfaceMuted,
+                value = "$mealsToday ${if (mealsToday == 1) "meal" else "meals"}",
+                label = if (mealsToday >= TIDE_MEALS) "Done for the tide" else "${TIDE_MEALS - mealsToday} more for the tide",
+                modifier = Modifier.weight(1f),
+            )
+            StatDivider()
+            WaterCell(state.waterMl, state.targets.waterMl, onAdd = { onAddWater(250) }, modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun MacroBar(label: String, grams: Double, target: Int, color: Color) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(label, style = Resurge.type.caption, color = Resurge.colors.textMuted, modifier = Modifier.weight(1f))
+            Text("${grams.roundToInt()} / $target g", style = Resurge.type.caption.copy(fontFeatureSettings = "tnum"), color = Resurge.colors.textSubtle)
+        }
+        Box(Modifier.fillMaxWidth().height(6.dp).clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted)) {
+            Box(Modifier.fillMaxWidth((grams / target.coerceAtLeast(1)).toFloat().coerceIn(0f, 1f)).fillMaxHeight().clip(Resurge.shape.pill).background(color))
+        }
+    }
+}
+
+/** Water so far against the target, with a one-tap +250 ml. */
+@Composable
+private fun WaterCell(ml: Int, target: Int, onAdd: () -> Unit, modifier: Modifier) {
+    Row(modifier.fillMaxHeight().padding(start = 16.dp, end = 10.dp, top = 14.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(ResurgeIcons.Droplet, contentDescription = null, tint = Resurge.colors.water, size = 16.dp)
+                Spacer(Modifier.width(4.dp))
+                Text("%,.1f L".format(ml / 1000.0), style = Resurge.type.metric.copy(fontSize = 18.sp, lineHeight = 22.sp))
             }
+            Text("of %,.1f L water".format(target / 1000.0), style = Resurge.type.caption, color = Resurge.colors.textSubtle, maxLines = 1)
         }
-        Spacer(Modifier.height(18.dp))
-        MacroBar("Protein", eaten.protein, state.macroTargets.protein, ResurgeIcons.Protein, MacroVisuals.protein())
-        Spacer(Modifier.height(12.dp))
-        MacroBar("Carbs", eaten.carbs, state.macroTargets.carbs, ResurgeIcons.Carbs, MacroVisuals.carbs())
-        Spacer(Modifier.height(12.dp))
-        MacroBar("Fat", eaten.fat, state.macroTargets.fat, ResurgeIcons.Fat, MacroVisuals.fat())
+        UnstyledButton(
+            onClick = onAdd,
+            modifier = Modifier.clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted).semantics { contentDescription = "Add 250 ml of water" },
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            indication = LocalIndication.current,
+        ) { Text("+250", style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight), color = Resurge.colors.water) }
     }
 }
 
+/** A logged meal: photo, title, slot and time, calories, and its macro split. Tapping opens it. */
 @Composable
-private fun MacroBar(label: String, grams: Double, target: Int, icon: Int, tint: Color) {
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, tint = tint, size = 16.dp)
-            Spacer(Modifier.width(6.dp))
-            Text(label, style = Resurge.type.label, modifier = Modifier.weight(1f))
-            Text("${grams.roundToInt()} / $target g", style = Resurge.type.caption.copy(fontFeatureSettings = "tnum"), color = Resurge.colors.textMuted)
-        }
-        Spacer(Modifier.height(6.dp))
-        MagnitudeBar(fraction = (grams / target.coerceAtLeast(1)).toFloat(), color = tint, height = 8.dp)
-    }
-}
-
-@Composable
-private fun WaterCard(ml: Int, target: Int, onAdd: (Int) -> Unit) {
-    Card(Modifier.fillMaxWidth(), contentPadding = PaddingValues(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconBadge(ResurgeIcons.Droplet, tint = Resurge.colors.water, size = 40.dp)
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text("%,d / %,d ml".format(ml, target), style = Resurge.type.label.copy(fontFeatureSettings = "tnum"))
-                Spacer(Modifier.height(6.dp))
-                MagnitudeBar(fraction = ml.toFloat() / target.coerceAtLeast(1), color = Resurge.colors.water, height = 6.dp)
-            }
-            Spacer(Modifier.width(12.dp))
-            Button("+250", onClick = { onAdd(250) }, variant = ButtonVariant.Secondary)
-        }
-    }
-}
-
-@Composable
-private fun MealCard(meal: Meal, onClick: () -> Unit) {
+private fun MealRow(meal: Meal, onClick: () -> Unit) {
     val totals = meal.totals
-    Card(Modifier.fillMaxWidth(), onClick = onClick, contentPadding = PaddingValues(14.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            val thumb = meal.thumbnail
-            if (thumb != null) JpegImage(thumb, null, Modifier.size(56.dp))
-            else IconBadge(ResurgeIcons.Bowl, tint = Resurge.colors.energy, size = 56.dp)
+    UnstyledButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().clip(Resurge.shape.md).background(Resurge.colors.surface),
+        indication = LocalIndication.current,
+        contentAlignment = Alignment.TopStart,
+    ) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            MealThumb(meal.thumbnail)
             Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(meal.title, style = Resurge.type.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(2.dp))
-                val time = meal.loggedAt.atZone(ZoneId.systemDefault()).toLocalTime().format(clockFormatter())
-                Text("$time · ${meal.items.size} ${if (meal.items.size == 1) "item" else "items"}", style = Resurge.type.caption, color = Resurge.colors.textMuted)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Column(Modifier.weight(1f)) {
+                        Text(meal.title, style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight, fontSize = Resurge.type.body.fontSize), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        val time = meal.loggedAt.atZone(ZoneId.systemDefault()).toLocalTime().format(clockFormatter())
+                        Text("${meal.type.label} · $time", style = Resurge.type.caption, color = Resurge.colors.textSubtle)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(kcalNumber(totals.kcal), style = Resurge.type.metric.copy(fontSize = 18.sp, lineHeight = 22.sp))
+                        Spacer(Modifier.width(2.dp))
+                        Text("kcal", style = Resurge.type.caption, color = Resurge.colors.textMuted, modifier = Modifier.padding(bottom = 2.dp))
+                    }
+                }
+                MacroSplit(totals)
             }
-            Spacer(Modifier.width(8.dp))
-            Text(kcal(totals.kcal), style = Resurge.type.label.copy(fontFeatureSettings = "tnum"))
         }
-        Spacer(Modifier.height(12.dp))
-        MacroChips(totals)
     }
 }
 
 @Composable
 private fun EmptyFeed(onLogMeal: () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 32.dp, horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        IconBadge(ResurgeIcons.Camera, tint = Resurge.colors.energy, size = 64.dp)
-        Spacer(Modifier.height(16.dp))
-        Text("Log your first meal", style = Resurge.type.title)
-        Spacer(Modifier.height(6.dp))
+    Column(
+        Modifier.fillMaxWidth().padding(top = 8.dp).clip(Resurge.shape.md).background(Resurge.colors.surface).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text("Log your first meal", style = Resurge.type.headline)
         Text(
             "Snap a photo or describe what you ate. You can adjust everything before it's logged.",
             style = Resurge.type.body,
             color = Resurge.colors.textMuted,
-            textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(20.dp))
-        Button("Log a meal", onClick = onLogMeal, leadingIcon = ResurgeIcons.Plus)
+        Button("Log a meal", onClick = onLogMeal, variant = ButtonVariant.Accent, leadingIcon = ResurgeIcons.Camera)
     }
 }
 
 internal fun dayLabel(date: LocalDate, today: LocalDate): String = when (date) {
     today -> "Today"
     today.minusDays(1) -> "Yesterday"
-    else -> date.format(DateTimeFormatter.ofPattern("EEEE, d MMM", Locale.getDefault()))
+    else -> date.format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.getDefault()))
 }

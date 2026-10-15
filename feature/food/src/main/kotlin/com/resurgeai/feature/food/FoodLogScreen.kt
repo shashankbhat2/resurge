@@ -1,5 +1,16 @@
 package com.resurgeai.feature.food
 
+import com.resurgeai.core.designsystem.components.Icon
+import com.resurgeai.core.designsystem.components.SoftNote
+import com.resurgeai.core.designsystem.components.SectionLabel
+import com.composeunstyled.UnstyledButton
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.background
+import androidx.compose.foundation.LocalIndication
 import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -170,40 +181,60 @@ fun FoodLogRoute(
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // The two photo routes, side by side: scanning is the quick path, so it leads.
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                PhotoTile(
+                    icon = ResurgeIcons.Camera,
+                    title = "Scan meal",
+                    body = "Photo of your plate",
+                    primary = true,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    onClick = { openCamera() },
+                )
+                PhotoTile(
+                    icon = ResurgeIcons.Photo,
+                    title = "Choose photo",
+                    body = "From your gallery",
+                    primary = false,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    onClick = { gallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                )
+            }
             if (preparing) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp)) {
                     Spinner(Modifier.size(18.dp))
                     Spacer(Modifier.width(10.dp))
                     Text("Preparing photo…", style = Resurge.type.label, color = Resurge.colors.textMuted)
                 }
             }
-            error?.let { Text(it, style = Resurge.type.body, color = Resurge.colors.danger) }
-            OptionTile(ResurgeIcons.Camera, "Scan meal", "Take a photo of your plate", onClick = { openCamera() }, tint = Resurge.colors.energy)
-            OptionTile(
-                ResurgeIcons.Photo,
-                "Choose a photo",
-                "Use one from your gallery",
-                onClick = { gallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                tint = Resurge.colors.accent,
-            )
+            error?.let { SoftNote(it) }
 
-            SectionHeader("Or type it")
+            SectionLabel("Or describe it", Modifier.padding(top = 4.dp))
             val submit = { viewModel.useText(text.text.toString(), onReview) }
-            InputField(text, placeholder = "e.g. 2 rotis, dal and a bowl of curd", maxLength = 300, onDone = submit, modifier = Modifier.focusRequester(focus))
-            Button(
-                "Estimate nutrition",
-                onClick = submit,
-                enabled = text.text.isNotBlank(),
-                variant = ButtonVariant.Secondary,
-                leadingIcon = ResurgeIcons.Keyboard,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            FoodGroup {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    InputField(text, placeholder = "e.g. 2 rotis, dal and a bowl of curd", maxLength = 300, onDone = submit, modifier = Modifier.focusRequester(focus))
+                    Button(
+                        "Estimate nutrition",
+                        onClick = submit,
+                        enabled = text.text.isNotBlank(),
+                        variant = ButtonVariant.Accent,
+                        leadingIcon = ResurgeIcons.Sparkles,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
 
             if (recent.isNotEmpty()) {
-                SectionHeader("Log again")
-                recent.forEach { meal -> RecentRow(meal) { viewModel.logAgain(meal); onBack() } }
+                SectionLabel("Log again", Modifier.padding(top = 4.dp), trailing = "One tap, logged now")
+                FoodGroup {
+                    recent.forEachIndexed { i, meal ->
+                        if (i > 0) GroupDivider(inset = 76.dp)
+                        RecentRow(meal) { viewModel.logAgain(meal); onBack() }
+                    }
+                }
             }
             Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
             Spacer(Modifier.height(24.dp))
@@ -211,19 +242,49 @@ fun FoodLogRoute(
     }
 }
 
+/** A large tappable tile for a photo route; the primary one is filled with `brand-tint`. */
+@Composable
+private fun PhotoTile(icon: Int, title: String, body: String, primary: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    UnstyledButton(
+        onClick = onClick,
+        modifier = modifier.clip(Resurge.shape.lg).background(if (primary) Resurge.colors.accentMuted else Resurge.colors.surface),
+        indication = LocalIndication.current,
+        contentAlignment = Alignment.TopStart,
+    ) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Box(
+                Modifier.size(48.dp).clip(Resurge.shape.pill).background(if (primary) Resurge.colors.brandInk else Resurge.colors.surfaceMuted),
+                contentAlignment = Alignment.Center,
+            ) { Icon(icon, contentDescription = null, tint = if (primary) Resurge.colors.onAccent else Resurge.colors.text, size = 24.dp) }
+            Column {
+                Text(title, style = Resurge.type.headline, color = if (primary) Resurge.colors.brandInk else Resurge.colors.text)
+                Text(body, style = Resurge.type.caption, color = Resurge.colors.textSubtle)
+            }
+        }
+    }
+}
+
 @Composable
 private fun RecentRow(meal: Meal, onLog: () -> Unit) {
-    Card(Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            val thumb = meal.thumbnail
-            if (thumb != null) JpegImage(thumb, null, Modifier.size(44.dp))
-            else IconBadge(ResurgeIcons.Bowl, tint = Resurge.colors.energy, size = 44.dp)
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(meal.title, style = Resurge.type.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(kcal(meal.totals.kcal), style = Resurge.type.caption, color = Resurge.colors.textMuted)
+    Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        MealThumb(meal.thumbnail, size = 52.dp)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(meal.title, style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("${kcal(meal.totals.kcal)} · ${meal.type.label}", style = Resurge.type.caption, color = Resurge.colors.textSubtle)
+        }
+        Spacer(Modifier.width(8.dp))
+        UnstyledButton(
+            onClick = onLog,
+            modifier = Modifier.clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted).semantics { contentDescription = "Log ${meal.title} again" },
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+            indication = LocalIndication.current,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(ResurgeIcons.Plus, contentDescription = null, tint = Resurge.colors.text, size = 16.dp)
+                Spacer(Modifier.width(4.dp))
+                Text("Log", style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight))
             }
-            Box { Button("Log", onClick = onLog, variant = ButtonVariant.Secondary, leadingIcon = ResurgeIcons.Plus) }
         }
     }
 }

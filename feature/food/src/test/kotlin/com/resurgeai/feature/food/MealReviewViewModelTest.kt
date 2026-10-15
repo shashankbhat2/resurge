@@ -38,7 +38,7 @@ class MealReviewViewModelTest {
 
     private fun vm(draft: MealDraft?): MealReviewViewModel {
         val store = MealDraftStore().apply { draft?.let(::put) }
-        return MealReviewViewModel(repo, store, SavedStateHandle())
+        return MealReviewViewModel(repo, store, SavedStateHandle(), mockk(relaxed = true))
     }
 
     @Test

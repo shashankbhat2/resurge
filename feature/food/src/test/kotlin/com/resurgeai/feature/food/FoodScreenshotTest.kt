@@ -28,7 +28,7 @@ import java.time.ZoneId
 /** Record with :feature:food:recordRoborazziDebug. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35], qualifiers = "w400dp-h880dp-xhdpi")
+@Config(sdk = [35], qualifiers = "w400dp-h1500dp-xhdpi")
 class FoodScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
@@ -71,10 +71,7 @@ class FoodScreenshotTest {
     @Test fun feedDark() = capture("feed_dark", feed(state), ColorScheme.Dark)
     @Test fun empty() = capture("empty", feed(state.copy(days = emptyList(), todayTotals = Nutrition.Zero, waterMl = 0)))
 
-    @Test
-    fun review() {
-        val vm = MealReviewViewModel(mockk<MealsRepository>(relaxed = true), MealDraftStore(), SavedStateHandle())
-        val s = MealReviewState(
+    private val reviewState get() = MealReviewState(
             loading = false,
             title = lunch.title,
             type = MealType.LUNCH,
@@ -83,7 +80,30 @@ class FoodScreenshotTest {
             options = listOf("Yes", "No", "Not sure"),
             notes = "Assumed about a tablespoon of butter in the curry.",
             source = MealSource.SCAN,
+            eatenBefore = 720.0,
+            mealsBefore = 1,
+            targetKcal = 2000,
         )
-        capture("review", { MealReviewScreen(s, vm, onBack = {}) })
+
+    private fun reviewVm() = MealReviewViewModel(mockk<MealsRepository>(relaxed = true), MealDraftStore(), SavedStateHandle(), mockk(relaxed = true))
+
+    @Test fun review() = capture("review", { MealReviewScreen(reviewState, reviewVm(), onBack = {}) })
+
+    @Test fun reviewDark() = capture(
+        "review_dark",
+        { MealReviewScreen(reviewState.copy(question = null, options = emptyList()), reviewVm(), onBack = {}) },
+        ColorScheme.Dark,
+    )
+
+    @Test
+    fun analyzing() {
+        val vm = MealReviewViewModel(mockk<MealsRepository>(relaxed = true), MealDraftStore(), SavedStateHandle(), mockk(relaxed = true))
+        val s = MealReviewState(
+            loading = false,
+            analyzing = MealReviewViewModel.TEXT_STEPS[1],
+            description = "2 rotis, dal and a bowl of curd",
+            source = MealSource.TEXT,
+        )
+        capture("analyzing", { MealReviewScreen(s, vm, onBack = {}) })
     }
 }
