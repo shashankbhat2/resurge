@@ -29,3 +29,6 @@ keystore/
 keystore.properties
 *.jks
 /dist/
+
+# Firebase client config: each developer uses their own project
+app/google-services.json
