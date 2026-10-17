@@ -82,6 +82,7 @@ object ResurgeIcons {
     // Logging
     @DrawableRes val Camera = Tabler.drawable.tabler_ic_camera_outline
     @DrawableRes val Photo = Tabler.drawable.tabler_ic_photo_outline
+    @DrawableRes val Bolt = Tabler.drawable.tabler_ic_bolt_outline
     @DrawableRes val Keyboard = Tabler.drawable.tabler_ic_keyboard_outline
     @DrawableRes val Search = Tabler.drawable.tabler_ic_search_outline
     @DrawableRes val Clock = Tabler.drawable.tabler_ic_clock_outline

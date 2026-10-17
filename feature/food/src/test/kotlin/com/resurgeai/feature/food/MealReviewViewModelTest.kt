@@ -89,4 +89,29 @@ class MealReviewViewModelTest {
     fun `without a draft there is nothing to review`() {
         assertTrue(vm(null).state.value.error != null)
     }
+
+    @Test
+    fun `servings scale every food and carry into a re-estimate`() {
+        coEvery { repo.analyze(any(), any(), any(), any()) } returns MealEstimate("Paneer curry with rice", listOf(rice, curry))
+        val vm = vm(MealDraft(photo, null))
+        vm.setServings(2)
+        assertEquals(1180.0, vm.state.value.totals.kcal, 0.001)
+        vm.setServings(1)
+        assertEquals(590.0, vm.state.value.totals.kcal, 0.001)
+
+        vm.setServings(2)
+        vm.correct(listOf("No oil or ghee"))
+        assertEquals(listOf(400.0, 300.0), vm.state.value.items.map { it.item.grams })
+    }
+
+    @Test
+    fun `corrections are sent with the description and stack`() {
+        coEvery { repo.analyze(any(), any(), any(), any()) } returns MealEstimate("Roti dal", listOf(rice))
+        val vm = vm(MealDraft(null, "2 rotis and dal"))
+        vm.correct(listOf("Smaller portion", " "))
+        coVerify { repo.analyze(null, "2 rotis and dal\nCorrections from the person: Smaller portion.", any(), null) }
+        vm.correct(listOf("No oil or ghee"))
+        coVerify { repo.analyze(null, "2 rotis and dal\nCorrections from the person: Smaller portion; No oil or ghee.", any(), null) }
+        assertTrue(vm.state.value.canCorrect)
+    }
 }

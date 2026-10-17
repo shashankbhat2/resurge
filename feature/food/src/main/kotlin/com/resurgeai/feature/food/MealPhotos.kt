@@ -29,6 +29,13 @@ internal object MealPhotos {
         return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
     }
 
+    /** A fresh file in cache/meal_photos for the in-app camera to write to. */
+    fun newCaptureFile(context: Context): File {
+        val dir = File(context.cacheDir, "meal_photos").apply { mkdirs() }
+        dir.listFiles()?.forEach { it.delete() }
+        return File(dir, "capture_${System.currentTimeMillis()}.jpg")
+    }
+
     /**
      * Decodes, rotates upright, scales and compresses. Runs on a background thread. Some camera apps
      * report success a moment before the file is fully written, so an unreadable image is retried briefly.

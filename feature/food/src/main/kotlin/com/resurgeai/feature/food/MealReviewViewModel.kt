@@ -58,6 +58,12 @@ data class MealReviewState(
     /** Meals already logged today, not counting this one (for the tide's meals segment). */
     val mealsBefore: Int = 0,
     val targetKcal: Int = Targets.DEFAULT_CALORIES,
+    /** How many of this plate were eaten; every food's grams scale with it. */
+    val servings: Int = 1,
+    /** The estimate can be re-run with corrections (a fresh scan or description, not a logged meal). */
+    val canCorrect: Boolean = false,
+    /** The corrections behind the estimate in flight, shown while it's re-read; empty on the first read. */
+    val fixes: List<String> = emptyList(),
 ) {
     val isNew: Boolean get() = mealId == null
     val totals: Nutrition get() = items.fold(Nutrition.Zero) { acc, e -> acc + e.item.nutrition }
@@ -82,6 +88,8 @@ class MealReviewViewModel @Inject constructor(
     private var estimate: MealEstimate? = null
     private var nextKey = 0
     private var job: Job? = null
+    /** What the person said was off, stacked across re-estimates ("smaller portion", "no ghee"). */
+    private val corrections = mutableListOf<String>()
 
     init {
         val mealId = savedState.get<String>("mealId")
@@ -128,6 +136,7 @@ class MealReviewViewModel @Inject constructor(
                     preview = draft.photo?.jpeg,
                     description = draft.text,
                     source = if (draft.photo != null) MealSource.SCAN else MealSource.TEXT,
+                    canCorrect = true,
                 )
             }
             analyze(answer = null)
@@ -139,16 +148,16 @@ class MealReviewViewModel @Inject constructor(
         val d = draft ?: return
         job?.cancel()
         job = viewModelScope.launch {
-            val steps = launch { cycleSteps(if (d.photo != null) PHOTO_STEPS else TEXT_STEPS) }
+            val steps = launch { cycleSteps(stepsFor(_state.value)) }
             try {
-                val result = repository.analyze(d.photo?.jpeg, d.text, _state.value.type, answer)
+                val result = repository.analyze(d.photo?.jpeg, describe(d), _state.value.type, answer)
                 estimate = result
                 _state.update {
                     it.copy(
                         analyzing = null,
                         error = null,
                         title = result.title,
-                        items = result.items.map { item -> EditableItem(nextKey++, item) },
+                        items = result.items.map { item -> EditableItem(nextKey++, item.scaled(it.servings.toDouble())) },
                         question = result.question,
                         options = result.options,
                         notes = result.notes,
@@ -160,6 +169,13 @@ class MealReviewViewModel @Inject constructor(
                 steps.cancel()
             }
         }
+    }
+
+    /** The description sent to the model: what was typed plus any corrections, within its 500 chars. */
+    private fun describe(d: MealDraft): String? {
+        if (corrections.isEmpty()) return d.text
+        val fixes = "Corrections from the person: ${corrections.joinToString("; ")}."
+        return listOfNotNull(d.text?.take(500 - fixes.length - 1), fixes).joinToString("\n").take(500)
     }
 
     private suspend fun cycleSteps(steps: List<String>) {
@@ -179,6 +195,22 @@ class MealReviewViewModel @Inject constructor(
     fun answer(option: String) {
         _state.update { it.copy(question = null, options = emptyList()) }
         analyze(answer = option)
+    }
+
+    /** Re-runs the estimate with what was off ("Smaller portion", "it's brown rice"). */
+    fun correct(fixes: List<String>) {
+        val clean = fixes.map { it.trim() }.filter { it.isNotEmpty() }
+        if (clean.isEmpty() || draft == null) return
+        corrections += clean
+        _state.update { it.copy(error = null, question = null, options = emptyList(), fixes = clean) }
+        analyze(answer = null)
+    }
+
+    /** Scales every food to [n] servings of the plate. */
+    fun setServings(n: Int) = _state.update { s ->
+        val next = n.coerceIn(1, 9)
+        val factor = next.toDouble() / s.servings
+        s.copy(servings = next, items = s.items.map { it.copy(item = it.item.scaled(factor)) })
     }
 
     fun dismissQuestion() = _state.update { it.copy(question = null, options = emptyList()) }
@@ -231,5 +263,14 @@ class MealReviewViewModel @Inject constructor(
     companion object {
         val PHOTO_STEPS = listOf("Identifying foods…", "Estimating portions…", "Working out nutrition…", "Almost there…")
         val TEXT_STEPS = listOf("Reading your description…", "Working out nutrition…", "Almost there…")
+        val FIX_STEPS = listOf("Applying your fixes…", "Working out nutrition…", "Almost there…")
+
+        fun stepsFor(s: MealReviewState): List<String> = when {
+            s.fixes.isNotEmpty() -> FIX_STEPS
+            s.preview != null -> PHOTO_STEPS
+            else -> TEXT_STEPS
+        }
     }
 }
+
+private fun FoodItem.scaled(factor: Double): FoodItem = if (factor == 1.0) this else copy(grams = (grams * factor).coerceIn(1.0, 3000.0))
