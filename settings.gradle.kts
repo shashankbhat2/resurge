@@ -28,5 +28,6 @@ include(
     ":feature:habits",
     ":feature:fitness",
     ":feature:food",
+    ":feature:weight",
     ":feature:profile",
 )

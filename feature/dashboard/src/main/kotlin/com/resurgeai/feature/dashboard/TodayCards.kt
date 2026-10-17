@@ -32,6 +32,8 @@ import com.resurgeai.core.designsystem.theme.clockFormatter
 import com.resurgeai.core.model.DailyHealth
 import com.resurgeai.core.model.HealthMetric
 import com.resurgeai.core.model.Targets
+import com.resurgeai.core.model.WeightMath
+import com.resurgeai.core.model.UnitSystem
 import java.time.Duration
 import java.time.ZoneId
 import java.util.Locale
@@ -41,7 +43,7 @@ import java.util.Locale
  * and a one-line note saying what the number is. Tapping a tile opens its detail.
  */
 @Composable
-internal fun HealthTiles(day: DailyHealth, targets: Targets, onOpen: (HealthMetric) -> Unit) {
+internal fun HealthTiles(day: DailyHealth, targets: Targets, weight: WeightGlance?, units: UnitSystem, onOpen: (HealthMetric) -> Unit) {
     val zone = ZoneId.systemDefault()
     val clock = clockFormatter()
     val night = day.sleep.takeIf { it.isNotEmpty() }
@@ -89,9 +91,7 @@ internal fun HealthTiles(day: DailyHealth, targets: Targets, onOpen: (HealthMetr
         day.distanceMeters?.let { m ->
             add(HealthRow(HealthMetric.DISTANCE, "Distance", ResurgeIcons.Distance, Resurge.colors.water, "${Formatters.kilometres(m)} km", "Walked and run today"))
         }
-        day.weightKg?.let { kg ->
-            add(HealthRow(HealthMetric.WEIGHT, "Weight", ResurgeIcons.Scale, Resurge.colors.textMuted, String.format(Locale.getDefault(), "%.1f kg", kg), "Latest weigh-in"))
-        }
+        add(weightRow(weight, units))
     }
     Column(verticalArrangement = Arrangement.spacedBy(TILE_GAP)) {
         rows.chunked(2).forEach { pair ->
@@ -104,6 +104,35 @@ internal fun HealthTiles(day: DailyHealth, targets: Targets, onOpen: (HealthMetr
 }
 
 private val TILE_GAP = 12.dp
+
+/** Weight is logged in Resurge, so its tile shows without Health Connect too. */
+@Composable
+internal fun WeightTileRow(weight: WeightGlance?, units: UnitSystem, onOpen: (HealthMetric) -> Unit) {
+    val row = weightRow(weight, units)
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(TILE_GAP)) {
+        HealthTile(row, Modifier.weight(1f).fillMaxHeight()) { onOpen(row.metric) }
+        Spacer(Modifier.weight(1f))
+    }
+}
+
+/** The trend and its change this week, or a nudge to log the first weigh-in. */
+@Composable
+private fun weightRow(weight: WeightGlance?, units: UnitSystem): HealthRow {
+    val imperial = units == UnitSystem.IMPERIAL
+    fun conv(kg: Double) = if (imperial) kg / WeightMath.KG_PER_LB else kg
+    val unit = if (imperial) "lb" else "kg"
+    val note = when {
+        weight == null -> "Tap to log a weigh-in"
+        weight.weekChangeKg == null -> "Trend weight"
+        kotlin.math.abs(conv(weight.weekChangeKg)) < 0.05 -> "Steady this week"
+        else -> String.format(Locale.getDefault(), "%s%.1f %s this week", if (weight.weekChangeKg < 0) "−" else "+", kotlin.math.abs(conv(weight.weekChangeKg)), unit)
+    }
+    return HealthRow(
+        HealthMetric.WEIGHT, "Weight", ResurgeIcons.Scale, Resurge.colors.accent,
+        value = weight?.let { String.format(Locale.getDefault(), "%.1f %s", conv(it.kg), unit) },
+        note = note,
+    )
+}
 
 private class HealthRow(
     val metric: HealthMetric,

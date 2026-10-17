@@ -64,6 +64,9 @@ fun TodayRoute(
     val permissionLauncher = rememberLauncherForActivityResult(viewModel.permissionContract) {
         viewModel.onPermissionsResult(it)
     }
+    val writeWeightLauncher = rememberLauncherForActivityResult(viewModel.permissionContract) { granted ->
+        viewModel.importWeights(alsoWrite = viewModel.weightWritePermission in granted)
+    }
     LifecycleResumeEffect(Unit) {
         viewModel.refresh()
         onPauseOrDispose {}
@@ -83,6 +86,10 @@ fun TodayRoute(
         onOpenHabits = onOpenHabits,
         onDismissHighTide = viewModel::dismissHighTide,
         onDismissInsight = viewModel::dismissInsight,
+        onImportWeights = { alsoWrite ->
+            if (alsoWrite) writeWeightLauncher.launch(setOf(viewModel.weightWritePermission)) else viewModel.importWeights(false)
+        },
+        onDismissWeightImport = viewModel::dismissWeightImport,
     )
 }
 
@@ -107,6 +114,8 @@ fun TodayScreen(
     onOpenHabits: () -> Unit = {},
     onDismissHighTide: () -> Unit = {},
     onDismissInsight: (String) -> Unit = {},
+    onImportWeights: (alsoWrite: Boolean) -> Unit = {},
+    onDismissWeightImport: () -> Unit = {},
     today: LocalDate = LocalDate.now(),
 ) {
     val commander = state.profile?.coachStyle == CoachStyle.COMMANDER
@@ -199,9 +208,17 @@ fun TodayScreen(
                 }
             }
         }
+        val units = state.profile?.units ?: UnitSystem.METRIC
+        state.weightImport?.let { count ->
+            WeightImportCard(count, state.importingWeight, onImport = onImportWeights, onDismiss = onDismissWeightImport)
+            Spacer(Modifier.height(12.dp))
+        }
         val day = state.today
         if (state.healthReady) {
-            if (day != null) HealthTiles(day, state.profile?.targets ?: Targets(), onOpenMetric) else if (state.error == null) TodaySkeleton()
+            if (day != null) HealthTiles(day, state.profile?.targets ?: Targets(), state.weight, units, onOpenMetric) else if (state.error == null) TodaySkeleton()
+        } else if (state.availability != null) {
+            Spacer(Modifier.height(12.dp))
+            WeightTileRow(state.weight, units, onOpenMetric)
         }
 
         Feed(

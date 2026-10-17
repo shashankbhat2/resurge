@@ -18,6 +18,7 @@ import androidx.health.connect.client.request.AggregateGroupByPeriodRequest
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
+import androidx.health.connect.client.units.Mass
 import com.resurgeai.core.model.DailyHealth
 import com.resurgeai.core.model.DailyValue
 import com.resurgeai.core.model.DataSource
@@ -168,6 +169,36 @@ class HealthDataSource @Inject constructor(
     suspend fun latestWeight(): Double? =
         if (HealthPermission.getReadPermission(WeightRecord::class) in manager.grantedPermissions()) latestWeightKg(Instant.now())
         else null
+
+    /**
+     * Weigh-ins from other apps and scales since [since], oldest first, for the one-time import.
+     * Leaves out what Resurge wrote itself. Empty without the read permission.
+     */
+    suspend fun weightHistory(since: Instant): List<HealthWeight> {
+        if (HealthPermission.getReadPermission(WeightRecord::class) !in manager.grantedPermissions()) return emptyList()
+        return readAll(WeightRecord::class, TimeRangeFilter.after(since), maxPages = 20)
+            .filter { it.metadata.dataOrigin.packageName != context.packageName }
+            .map { HealthWeight(it.metadata.id, it.weight.inKilograms, it.time) }
+            .sortedBy { it.at }
+    }
+
+    /** Saves a manual weigh-in to Health Connect; returns its record id, or null without permission. */
+    suspend fun writeWeight(kg: Double, at: Instant): String? {
+        if (HealthPermissions.WRITE_WEIGHT !in manager.grantedPermissions()) return null
+        val record = WeightRecord(
+            time = at,
+            zoneOffset = ZoneId.systemDefault().rules.getOffset(at),
+            weight = Mass.kilograms(kg),
+            metadata = Metadata.manualEntry(),
+        )
+        return client.insertRecords(listOf(record)).recordIdsList.firstOrNull()
+    }
+
+    /** Removes a weigh-in Resurge wrote earlier. */
+    suspend fun deleteWeight(recordId: String) {
+        if (HealthPermissions.WRITE_WEIGHT !in manager.grantedPermissions()) return
+        client.deleteRecords(WeightRecord::class, recordIdsList = listOf(recordId), clientRecordIdsList = emptyList())
+    }
 
     /** Daily heart-rate min/max (bpm) for the last [days] days, keyed by local date. */
     suspend fun readHeartRateRanges(days: Int, zone: ZoneId = ZoneId.systemDefault()): Map<LocalDate, Pair<Long, Long>> {
@@ -387,3 +418,6 @@ class HealthDataSource @Inject constructor(
         }
     }
 }
+
+/** A weigh-in read from Health Connect. */
+data class HealthWeight(val recordId: String, val kg: Double, val at: Instant)

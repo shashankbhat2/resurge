@@ -98,6 +98,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.navigation.toRoute
 import kotlinx.serialization.Serializable
+import com.resurgeai.feature.weight.WeightRoute as WeightScreen
 
 // Root graph: the tab shell plus full-screen destinations that cover it (incl. the bottom bar).
 @Serializable data object TabsRoute
@@ -124,6 +125,9 @@ import kotlinx.serialization.Serializable
 
 /** Review a fresh estimate (mealId null) or edit a logged meal. */
 @Serializable data class MealReviewRoute(val mealId: String? = null)
+
+/** Weight trend, goal and weigh-ins; [log] opens the log sheet straight away. */
+@Serializable data class WeightScreenRoute(val log: Boolean = false)
 
 /** Settings, opened from the profile photo. */
 @Serializable data object SettingsRoute
@@ -195,7 +199,10 @@ fun MainScreen(profile: UserProfile, openInsightsSignal: Int = 0, openHabitsSign
         composable<TabsRoute> {
             TabsShell(
                 profile = profile,
-                onOpenMetric = { metric -> rootNav.navigate(MetricDetailRoute(metric.name)) },
+                onOpenMetric = { metric ->
+                    // Weight is logged in Resurge now, with its own screen.
+                    if (metric == HealthMetric.WEIGHT) rootNav.navigate(WeightScreenRoute()) else rootNav.navigate(MetricDetailRoute(metric.name))
+                },
                 onOpenSettings = { rootNav.navigate(SettingsRoute) },
                 onOpenCoach = { rootNav.navigate(CoachScreenRoute(newChat = true)) },
                 onOpenInsights = { rootNav.navigate(InsightsScreenRoute) },
@@ -266,6 +273,9 @@ fun MainScreen(profile: UserProfile, openInsightsSignal: Int = 0, openHabitsSign
                     onBack = { rootNav.popBackStack() },
                 )
             }
+        }
+        composable<WeightScreenRoute> { entry ->
+            FullScreen { WeightScreen(onBack = { rootNav.popBackStack() }, openLog = entry.toRoute<WeightScreenRoute>().log) }
         }
         composable<MealReviewRoute> {
             FullScreen { MealReviewScreen(onDone = { rootNav.popBackStack() }) }

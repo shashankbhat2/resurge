@@ -85,6 +85,27 @@ service cloud.firestore {
         && (!('aiTotals' in m) || (m.aiTotals is map && m.aiTotals.size() <= 6));
     }
 
+    // A weigh-in: manual, or imported from Health Connect (id "hc_<record id>"). Stored in kg.
+    function validWeighIn() {
+      let w = request.resource.data;
+      return w.keys().hasOnly(['kg', 'atMs', 'localDate', 'note', 'source', 'hcId', 'updatedAt'])
+        && w.kg is number && w.kg >= 20 && w.kg <= 400
+        && w.atMs is int
+        && isDay(w.localDate)
+        && (!('note' in w) || w.note == null || (w.note is string && w.note.size() <= 120))
+        && (!('source' in w) || w.source in ['manual', 'health_connect'])
+        && (!('hcId' in w) || (w.hcId is string && w.hcId.size() <= 200));
+    }
+
+    function validWeightGoal() {
+      let g = request.resource.data;
+      return g.keys().hasOnly(['startKg', 'startDate', 'goalKg', 'paceKgPerWeek', 'updatedAt'])
+        && g.startKg is number && g.startKg >= 20 && g.startKg <= 400
+        && g.goalKg is number && g.goalKg >= 20 && g.goalKg <= 400
+        && isDay(g.startDate)
+        && g.paceKgPerWeek is number && g.paceKgPerWeek > 0 && g.paceKgPerWeek <= 2;
+    }
+
     function validWaterDay(date) {
       let d = request.resource.data;
       return isDay(date)
@@ -177,6 +198,16 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      match /weights/{weightId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validWeighIn();
+      }
+
+      match /weightGoal/{doc} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && doc == 'current' && validWeightGoal();
+      }
+
       // FCM registration tokens (doc id = token).
       match /devices/{token} {
         allow read, delete: if isOwner(uid);
@@ -202,7 +233,7 @@ service cloud.firestore {
       match /{collection}/{doc=**} {
         allow read, write: if isOwner(uid)
           && !(collection in ['events', 'devices', 'insights', 'usage', 'coachThreads', 'habits', 'habitDays',
-                              'workouts', 'meals', 'waterDays']);
+                              'workouts', 'meals', 'waterDays', 'weights', 'weightGoal']);
       }
     }
 

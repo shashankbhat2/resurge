@@ -22,6 +22,9 @@ import com.resurgeai.core.data.prefs.PreferencesRepository
 import com.resurgeai.core.model.HabitStatus
 import com.resurgeai.core.model.HabitStreaks
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import com.resurgeai.core.model.WeightMath
+import com.resurgeai.core.data.weight.WeightRepository
 import com.resurgeai.core.data.fitness.WorkoutsRepository
 import com.resurgeai.core.data.food.MealsRepository
 import com.resurgeai.core.model.Meal
@@ -85,6 +88,11 @@ data class DashboardUiState(
     val showHighTide: Boolean = false,
     /** Insights dismissed on this device (also marked seen on the server). */
     val dismissedInsights: Set<String> = emptySet(),
+    /** Weight trend for the Today tile; null before the first weigh-in. */
+    val weight: WeightGlance? = null,
+    /** Health Connect weigh-ins that could be imported; null when there's nothing to offer. */
+    val weightImport: Int? = null,
+    val importingWeight: Boolean = false,
 ) {
     /** The latest insight, pinned above the tide until it's seen. */
     val pinnedInsight: CoachInsight? get() = latestInsight?.takeIf { !it.seen && it.id !in dismissedInsights }
@@ -117,6 +125,9 @@ data class DashboardUiState(
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
+/** The Today weight tile: trend now, its change over the last 7 days, and 14 days of trend. */
+data class WeightGlance(val kg: Double, val weekChangeKg: Double?, val spark: List<Double>)
+
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     sessionRepository: SessionRepository,
@@ -129,6 +140,7 @@ class DashboardViewModel @Inject constructor(
     private val habitsRepository: HabitsRepository,
     private val preferences: PreferencesRepository,
     private val workouts: WorkoutsRepository,
+    private val weights: WeightRepository,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
     private val _state = MutableStateFlow(DashboardUiState())
@@ -159,6 +171,27 @@ class DashboardViewModel @Inject constructor(
         coachRepository.markSeen(id)
         viewModelScope.launch { preferences.dismissInsight(id) }
     }
+
+    /** Imports Health Connect's weight history; [alsoWrite] keeps saving new weigh-ins there too. */
+    fun importWeights(alsoWrite: Boolean) {
+        val uid = _state.value.profile?.uid ?: return
+        _state.update { it.copy(importingWeight = true) }
+        viewModelScope.launch {
+            runCatching { weights.importFromHealthConnect() }.onFailure { Log.w(TAG, "Weight import failed", it) }
+            preferences.setWeightWriteToHealthConnect(alsoWrite)
+            preferences.setWeightImportSettled(uid)
+            _state.update { it.copy(importingWeight = false, weightImport = null) }
+        }
+    }
+
+    fun dismissWeightImport() {
+        val uid = _state.value.profile?.uid ?: return
+        _state.update { it.copy(weightImport = null) }
+        viewModelScope.launch { preferences.setWeightImportSettled(uid) }
+    }
+
+    /** Permission needed to save weigh-ins to Health Connect. */
+    val weightWritePermission: String = HealthPermissions.WRITE_WEIGHT
 
     fun dismissHighTide() {
         val day = _state.value.habitDay
@@ -204,6 +237,22 @@ class DashboardViewModel @Inject constructor(
                 .distinctUntilChanged()
                 .collect { day ->
                     if (day != null && preferences.highTideShownOn() != day) _state.update { it.copy(showHighTide = true) }
+                }
+        }
+        viewModelScope.launch {
+            weights.weighIns()
+                .catch { Log.w(TAG, "Weights listener failed", it); emit(emptyList()) }
+                .collect { list ->
+                    val today = LocalDate.now()
+                    val trend = WeightMath.trend(list, today)
+                    val glance = trend.lastOrNull()?.let { last ->
+                        WeightGlance(
+                            kg = last.kg,
+                            weekChangeKg = if (trend.size > 7) WeightMath.change(trend, today.minusDays(7), today) else null,
+                            spark = trend.takeLast(14).map { it.kg },
+                        )
+                    }
+                    _state.update { it.copy(weight = glance) }
                 }
         }
         viewModelScope.launch {
@@ -261,6 +310,7 @@ class DashboardViewModel @Inject constructor(
                 }
             }
             lastLoadedAt = SystemClock.elapsedRealtime()
+            offerWeightImport()
 
             // Upload daily aggregates for the coach, and (re)schedule background sync.
             viewModelScope.launch {
@@ -274,6 +324,14 @@ class DashboardViewModel @Inject constructor(
             Log.w(TAG, "Failed to read Health Connect", e)
             _state.update { it.copy(loading = false, error = "Couldn't read Health Connect.") }
         }
+    }
+
+    /** Offers the one-time weight import while Health Connect has weigh-ins and it hasn't been settled. */
+    private suspend fun offerWeightImport() {
+        val uid = _state.value.profile?.uid ?: return
+        if (preferences.weightImportSettled(uid).first()) return
+        val count = weights.importableCount()
+        _state.update { it.copy(weightImport = count.takeIf { n -> n > 0 }) }
     }
 
     private companion object {

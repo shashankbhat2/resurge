@@ -38,6 +38,9 @@ object HealthPermissions {
     )
 
     const val BACKGROUND = HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND
+
+    /** Optional: saving Resurge weigh-ins to Health Connect, asked for only when turned on. */
+    val WRITE_WEIGHT: String = HealthPermission.getWritePermission(WeightRecord::class)
 }
 
 @Singleton

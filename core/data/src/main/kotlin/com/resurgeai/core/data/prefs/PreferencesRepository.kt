@@ -122,6 +122,20 @@ class PreferencesRepository @Inject constructor(
     }
 
     /** Habit day whose high-tide celebration was last shown (it plays once per habit day). */
+    /** The Health Connect weight import was done or declined, so Today stops offering it. */
+    fun weightImportSettled(uid: String): Flow<Boolean> = dataStore.data.map { it[booleanPreferencesKey("weight_import_$uid")] == true }
+
+    suspend fun setWeightImportSettled(uid: String) {
+        dataStore.edit { it[booleanPreferencesKey("weight_import_$uid")] = true }
+    }
+
+    /** Save new weigh-ins to Health Connect as well. */
+    val weightWriteToHealthConnect: Flow<Boolean> = dataStore.data.map { it[WEIGHT_WRITE_HC] == true }
+
+    suspend fun setWeightWriteToHealthConnect(on: Boolean) {
+        dataStore.edit { it[WEIGHT_WRITE_HC] = on }
+    }
+
     suspend fun highTideShownOn(): LocalDate? =
         dataStore.data.first()[HIGH_TIDE_SHOWN]?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
 
@@ -131,6 +145,7 @@ class PreferencesRepository @Inject constructor(
 
     private companion object {
         val HIGH_TIDE_SHOWN = stringPreferencesKey("high_tide_shown")
+        val WEIGHT_WRITE_HC = booleanPreferencesKey("weight_write_hc")
         val DISMISSED_INSIGHTS = stringSetPreferencesKey("dismissed_insights")
         const val MAX_DISMISSED = 100
         const val MAX_POSTED = 300

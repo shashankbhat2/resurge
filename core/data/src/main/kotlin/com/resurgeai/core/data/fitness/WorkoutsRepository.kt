@@ -7,6 +7,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.resurgeai.core.data.listen
 import com.resurgeai.core.healthconnect.HealthDataSource
+import com.resurgeai.core.data.weight.WeightRepository
 import com.resurgeai.core.model.ActivityCatalog
 import com.resurgeai.core.model.ExerciseSession
 import com.resurgeai.core.model.StrengthExercise
@@ -53,6 +54,7 @@ class WorkoutsRepository @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val auth: FirebaseAuth,
     private val healthData: HealthDataSource,
+    private val weights: WeightRepository,
 ) {
     private fun user() = auth.currentUser?.uid?.let { firestore.collection("users").document(it) }
 
@@ -84,7 +86,7 @@ class WorkoutsRepository @Inject constructor(
         return merged.firstOrNull { it.id == id } ?: merged.flatMap { it.duplicates }.firstOrNull { it.id == id }
     }
 
-    suspend fun latestWeightKg(): Double? = runCatching { healthData.latestWeight() }.getOrNull()
+    suspend fun latestWeightKg(): Double? = weights.latestKg()
 
     private suspend fun ExerciseSession.toWorkout(): Workout {
         val metrics = metricsCache[id] ?: runCatching { healthData.metricsBetween(start, end) }.getOrNull()?.let { m ->
