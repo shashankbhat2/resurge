@@ -9,6 +9,7 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.functions.FirebaseFunctions
+import com.google.firebase.storage.FirebaseStorage
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -49,6 +50,11 @@ object DataModule {
     @Provides
     @Singleton
     fun functions(): FirebaseFunctions = FirebaseFunctions.getInstance("us-central1")
+
+    /** The project's default bucket, shared with other apps; Resurge's files live under resurge/. */
+    @Provides
+    @Singleton
+    fun storage(): FirebaseStorage = FirebaseStorage.getInstance()
 
     @Provides
     @Singleton

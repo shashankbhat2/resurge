@@ -67,6 +67,7 @@ dependencies {
     implementation(project(":feature:fitness"))
     implementation(project(":feature:food"))
     implementation(project(":feature:weight"))
+    implementation(project(":feature:progress"))
     implementation(project(":feature:dashboard"))
     implementation(project(":feature:profile"))
 

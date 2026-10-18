@@ -57,6 +57,8 @@ fun TodayRoute(
     onOpenHabit: (String) -> Unit = {},
     onAddHabit: () -> Unit = {},
     onOpenHabits: () -> Unit = {},
+    /** A new progress reel, when there is one (supplied by the app). */
+    reelCard: (@Composable () -> Unit)? = null,
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -90,6 +92,7 @@ fun TodayRoute(
             if (alsoWrite) writeWeightLauncher.launch(setOf(viewModel.weightWritePermission)) else viewModel.importWeights(false)
         },
         onDismissWeightImport = viewModel::dismissWeightImport,
+        reelCard = reelCard,
     )
 }
 
@@ -116,6 +119,7 @@ fun TodayScreen(
     onDismissInsight: (String) -> Unit = {},
     onImportWeights: (alsoWrite: Boolean) -> Unit = {},
     onDismissWeightImport: () -> Unit = {},
+    reelCard: (@Composable () -> Unit)? = null,
     today: LocalDate = LocalDate.now(),
 ) {
     val commander = state.profile?.coachStyle == CoachStyle.COMMANDER
@@ -209,6 +213,8 @@ fun TodayScreen(
             }
         }
         val units = state.profile?.units ?: UnitSystem.METRIC
+        // Draws nothing (and takes no space) unless a reel is waiting; it brings its own spacing.
+        reelCard?.invoke()
         state.weightImport?.let { count ->
             WeightImportCard(count, state.importingWeight, onImport = onImportWeights, onDismiss = onDismissWeightImport)
             Spacer(Modifier.height(12.dp))

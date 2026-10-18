@@ -7,6 +7,8 @@ import androidx.work.Configuration
 import com.resurgeai.app.notifications.HabitReminder
 import com.resurgeai.app.notifications.MealReminder
 import com.resurgeai.app.notifications.ResurgeMessagingService
+import com.resurgeai.app.progress.ProgressShortcut
+import com.resurgeai.app.progress.ReelReminder
 import com.resurgeai.core.data.di.WebClientId
 import dagger.Module
 import dagger.Provides
@@ -26,6 +28,9 @@ class ResurgeApplication : Application(), Configuration.Provider {
         ResurgeMessagingService.createChannel(this)
         HabitReminder.createChannel(this)
         MealReminder.createChannel(this)
+        ProgressShortcut.publish(this)
+        ReelReminder.createChannel(this)
+        ReelReminder.schedule(this)
     }
 
     override val workManagerConfiguration: Configuration

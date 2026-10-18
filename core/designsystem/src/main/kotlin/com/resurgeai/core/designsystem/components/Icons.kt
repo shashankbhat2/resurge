@@ -93,6 +93,21 @@ object ResurgeIcons {
     @DrawableRes val Bowl = Tabler.drawable.tabler_ic_bowl_outline
     @DrawableRes val AlertCircle = Tabler.drawable.tabler_ic_alert_circle_outline
 
+    // Progress photos
+    @DrawableRes val CameraRotate = Tabler.drawable.tabler_ic_camera_rotate_outline
+    @DrawableRes val Ghost = Tabler.drawable.tabler_ic_ghost_2_outline
+    @DrawableRes val Timer = Tabler.drawable.tabler_ic_alarm_outline
+    @DrawableRes val PhotoPlus = Tabler.drawable.tabler_ic_photo_plus_outline
+    @DrawableRes val Lock = Tabler.drawable.tabler_ic_lock_outline
+    @DrawableRes val ShieldLock = Tabler.drawable.tabler_ic_shield_lock_outline
+    @DrawableRes val Key = Tabler.drawable.tabler_ic_key_outline
+    @DrawableRes val Copy = Tabler.drawable.tabler_ic_copy_outline
+    @DrawableRes val Trash = Tabler.drawable.tabler_ic_trash_outline
+    @DrawableRes val Settings = Tabler.drawable.tabler_ic_settings_outline
+    @DrawableRes val CloudUpload = Tabler.drawable.tabler_ic_cloud_upload_outline
+    @DrawableRes val Play = TablerFilled.drawable.tabler_ic_player_play_filled
+    @DrawableRes val CompareArrows = Tabler.drawable.tabler_ic_arrows_horizontal_outline
+
     // Macros
     @DrawableRes val Protein = Tabler.drawable.tabler_ic_meat_outline
     @DrawableRes val Carbs = Tabler.drawable.tabler_ic_wheat_outline

@@ -3,6 +3,7 @@ package com.resurgeai.app
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.resurgeai.core.data.prefs.PreferencesRepository
+import com.resurgeai.core.data.progress.ProgressRepository
 import com.resurgeai.core.data.session.SessionRepository
 import com.resurgeai.core.model.SessionState
 import com.resurgeai.core.model.ThemePreference
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.map
 import android.content.Context
 import com.resurgeai.app.main.FoodSignal
+import com.resurgeai.app.main.ProgressSignal
 import com.resurgeai.app.notifications.HabitReminder
 import com.resurgeai.app.notifications.MealReminder
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -29,6 +31,7 @@ import javax.inject.Inject
 class AppViewModel @Inject constructor(
     private val sessionRepository: SessionRepository,
     private val preferencesRepository: PreferencesRepository,
+    private val progressRepository: ProgressRepository,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
     val session: StateFlow<SessionState> = sessionRepository.session
@@ -58,6 +61,12 @@ class AppViewModel @Inject constructor(
 
     fun requestOpenFood(mode: String?) = _openFood.update { FoodSignal(it.count + 1, mode) }
 
+    /** The launcher shortcut (capture = true) or a reel notification: open Progress. */
+    private val _openProgress = MutableStateFlow(ProgressSignal())
+    val openProgress: StateFlow<ProgressSignal> = _openProgress.asStateFlow()
+
+    fun requestOpenProgress(capture: Boolean, reelId: String? = null) = _openProgress.update { ProgressSignal(it.count + 1, capture, reelId) }
+
     /** True until we've asked for the notification permission once. */
     private val _askNotifications = MutableStateFlow(false)
     val askNotifications: StateFlow<Boolean> = _askNotifications.asStateFlow()
@@ -74,6 +83,14 @@ class AppViewModel @Inject constructor(
                     preferencesRepository.saveHabitSettingsMirror(settings)
                     HabitReminder.schedule(appContext, settings)
                 }
+        }
+        // Back up any progress photos still waiting, once per signed-in user per launch.
+        viewModelScope.launch {
+            sessionRepository.session
+                .filterIsInstance<SessionState.Ready>()
+                .map { it.profile.uid }
+                .distinctUntilChanged()
+                .collect { progressRepository.scheduleUpload() }
         }
         // And the meal reminders with the user's meal reminder times.
         viewModelScope.launch {

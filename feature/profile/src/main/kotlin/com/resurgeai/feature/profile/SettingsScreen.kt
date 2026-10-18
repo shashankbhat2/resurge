@@ -79,6 +79,7 @@ private enum class Page(val title: String) {
 fun SettingsScreen(
     onBack: () -> Unit,
     onOpenCatalog: (() -> Unit)? = null,
+    onOpenProgressPhotos: (() -> Unit)? = null,
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -107,6 +108,7 @@ fun SettingsScreen(
                     onOpen = { page = it },
                     onHealthConnect = { runCatching { context.startActivity(viewModel.healthConnectSettingsIntent()) } },
                     onOpenCatalog = onOpenCatalog,
+                    onOpenProgressPhotos = onOpenProgressPhotos,
                     onSignOut = viewModel::signOut,
                 )
                 Page.APPEARANCE -> Options(
@@ -151,6 +153,7 @@ private fun MainMenu(
     onOpen: (Page) -> Unit,
     onHealthConnect: () -> Unit,
     onOpenCatalog: (() -> Unit)?,
+    onOpenProgressPhotos: (() -> Unit)?,
     onSignOut: () -> Unit,
 ) {
     val profile = state.profile
@@ -197,6 +200,10 @@ private fun MainMenu(
         MenuLabel("Data")
         MenuGroup {
             MenuRow("Health Connect", "Permissions", onClick = onHealthConnect)
+            onOpenProgressPhotos?.let {
+                MenuDivider()
+                MenuRow("Snapshots", null, onClick = it)
+            }
             onOpenCatalog?.let {
                 MenuDivider()
                 MenuRow("Design catalog", "Debug", onClick = it)

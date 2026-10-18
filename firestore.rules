@@ -106,6 +106,54 @@ service cloud.firestore {
         && g.paceKgPerWeek is number && g.paceKgPerWeek > 0 && g.paceKgPerWeek <= 2;
     }
 
+    // A progress photo's metadata. The photo itself is end-to-end encrypted in Storage.
+    function validProgressPhoto() {
+      let p = request.resource.data;
+      return p.keys().hasOnly(['takenAtMs', 'localDate', 'pose', 'width', 'height', 'uploaded', 'updatedAt'])
+        && p.takenAtMs is int
+        && isDay(p.localDate)
+        && (!('pose' in p) || p.pose is string) // written by early builds only
+        && p.width is int && p.width > 0 && p.width <= 4000
+        && p.height is int && p.height > 0 && p.height <= 4000
+        && p.uploaded is bool;
+    }
+
+    // The photo key, wrapped by a restore secret that only the user's phones hold (in Block Store), so
+    // the server can't unwrap it. Never swapped in place: starting fresh deletes it and makes a new one.
+    function validProgressKey() {
+      let k = request.resource.data;
+      return k.keys().hasOnly(['wrapped', 'keyId', 'version', 'createdAt', 'updatedAt'])
+        && k.wrapped is bytes && k.wrapped.size() <= 4096
+        && k.keyId is int
+        && k.version is int;
+    }
+
+    // A made progress reel: which photos it plays (ids only), written by the phone's daily check.
+    function validProgressReel() {
+      let r = request.resource.data;
+      return r.keys().hasOnly(['kind', 'createdAtMs', 'from', 'to', 'pose', 'frameIds', 'newFrames',
+                               'milestoneKg', 'watched', 'updatedAt'])
+        && r.kind in ['regular', 'milestone', 'goal']
+        && r.createdAtMs is int
+        && isDay(r.from) && isDay(r.to)
+        && (!('pose' in r) || r.pose is string) // written by early builds only
+        && r.frameIds is list && r.frameIds.size() <= 12
+        && r.newFrames is int
+        && (!('milestoneKg' in r) || r.milestoneKg is number)
+        && r.watched is bool;
+    }
+
+    // Reel schedule: on/off, interval (3 days to 8 weeks) and what's been handled.
+    function validProgressSettings() {
+      let p = request.resource.data;
+      return p.keys().hasOnly(['reelsEnabled', 'intervalDays', 'lastDue', 'lastMilestoneKg', 'goalReelFor', 'updatedAt'])
+        && (!('reelsEnabled' in p) || p.reelsEnabled is bool)
+        && (!('intervalDays' in p) || p.intervalDays in [3, 5, 7, 14, 21, 28, 42, 56])
+        && (!('lastDue' in p) || isDay(p.lastDue))
+        && (!('lastMilestoneKg' in p) || p.lastMilestoneKg is number)
+        && (!('goalReelFor' in p) || isDay(p.goalReelFor));
+    }
+
     function validWaterDay(date) {
       let d = request.resource.data;
       return isDay(date)
@@ -208,6 +256,29 @@ service cloud.firestore {
         allow create, update: if isOwner(uid) && doc == 'current' && validWeightGoal();
       }
 
+      match /progressPhotos/{photoId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validProgressPhoto();
+      }
+
+      match /progressKey/{doc} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && doc == 'current' && validProgressKey();
+        allow update: if false;
+        allow delete: if isOwner(uid);
+      }
+
+      match /progressReels/{reelId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validProgressReel();
+      }
+
+      match /progressSettings/{doc} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid) && doc == 'current' && validProgressSettings();
+        allow delete: if isOwner(uid);
+      }
+
       // FCM registration tokens (doc id = token).
       match /devices/{token} {
         allow read, delete: if isOwner(uid);
@@ -233,7 +304,8 @@ service cloud.firestore {
       match /{collection}/{doc=**} {
         allow read, write: if isOwner(uid)
           && !(collection in ['events', 'devices', 'insights', 'usage', 'coachThreads', 'habits', 'habitDays',
-                              'workouts', 'meals', 'waterDays', 'weights', 'weightGoal']);
+                              'workouts', 'meals', 'waterDays', 'weights', 'weightGoal',
+                              'progressPhotos', 'progressKey', 'progressReels', 'progressSettings']);
       }
     }
 

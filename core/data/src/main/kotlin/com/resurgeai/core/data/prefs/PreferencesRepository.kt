@@ -136,6 +136,27 @@ class PreferencesRepository @Inject constructor(
         dataStore.edit { it[WEIGHT_WRITE_HC] = on }
     }
 
+    /** Block screenshots and the recents preview on progress photo screens. On unless turned off. */
+    val progressScreenshotBlock: Flow<Boolean> = dataStore.data.map { it[PROGRESS_SECURE] != false }
+
+    suspend fun setProgressScreenshotBlock(on: Boolean) {
+        dataStore.edit { it[PROGRESS_SECURE] = on }
+    }
+
+    /** The "track it visually too" prompt on the Weight screen was dismissed. */
+    val progressPromptDismissed: Flow<Boolean> = dataStore.data.map { it[PROGRESS_PROMPT_DISMISSED] == true }
+
+    suspend fun dismissProgressPrompt() {
+        dataStore.edit { it[PROGRESS_PROMPT_DISMISSED] = true }
+    }
+
+    suspend fun resetProgressPrefs() {
+        dataStore.edit {
+            it.remove(PROGRESS_PROMPT_DISMISSED)
+            it.remove(PROGRESS_SECURE)
+        }
+    }
+
     suspend fun highTideShownOn(): LocalDate? =
         dataStore.data.first()[HIGH_TIDE_SHOWN]?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
 
@@ -145,6 +166,8 @@ class PreferencesRepository @Inject constructor(
 
     private companion object {
         val HIGH_TIDE_SHOWN = stringPreferencesKey("high_tide_shown")
+        val PROGRESS_SECURE = booleanPreferencesKey("progress_secure")
+        val PROGRESS_PROMPT_DISMISSED = booleanPreferencesKey("progress_prompt_dismissed")
         val WEIGHT_WRITE_HC = booleanPreferencesKey("weight_write_hc")
         val DISMISSED_INSIGHTS = stringSetPreferencesKey("dismissed_insights")
         const val MAX_DISMISSED = 100

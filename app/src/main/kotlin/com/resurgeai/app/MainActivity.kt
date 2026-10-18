@@ -30,6 +30,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composeunstyled.theme.ColorScheme
 import com.resurgeai.app.main.MainScreen
 import com.resurgeai.app.main.FoodSignal
+import com.resurgeai.app.main.ProgressSignal
+import com.resurgeai.app.progress.ProgressShortcut
+import com.resurgeai.app.progress.ReelReminder
 import com.resurgeai.app.notifications.HabitReminder
 import com.resurgeai.app.notifications.MealReminder
 import com.resurgeai.app.notifications.ResurgeMessagingService
@@ -83,6 +86,7 @@ class MainActivity : ComponentActivity() {
                     val openInsights by viewModel.openInsights.collectAsStateWithLifecycle()
                     val openHabits by viewModel.openHabits.collectAsStateWithLifecycle()
                     val openFood by viewModel.openFood.collectAsStateWithLifecycle()
+                    val openProgress by viewModel.openProgress.collectAsStateWithLifecycle()
                     val askNotifications by viewModel.askNotifications.collectAsStateWithLifecycle()
                     Screen {
                         AppRoot(
@@ -90,6 +94,7 @@ class MainActivity : ComponentActivity() {
                             openInsightsSignal = openInsights,
                             openHabitsSignal = openHabits,
                             openFoodSignal = openFood,
+                            openProgressSignal = openProgress,
                             askNotifications = askNotifications,
                             onNotificationPromptShown = viewModel::onNotificationPromptShown,
                         )
@@ -112,6 +117,9 @@ class MainActivity : ComponentActivity() {
             MealReminder.OPEN_SCAN -> viewModel.requestOpenFood("scan")
             MealReminder.OPEN_TYPE -> viewModel.requestOpenFood("type")
             MealReminder.OPEN_FOOD -> viewModel.requestOpenFood(null)
+            ProgressShortcut.OPEN_CAPTURE -> viewModel.requestOpenProgress(capture = true)
+            ProgressShortcut.OPEN_PROGRESS -> viewModel.requestOpenProgress(capture = false)
+            ReelReminder.OPEN_REEL -> viewModel.requestOpenProgress(capture = false, reelId = intent.getStringExtra(ReelReminder.EXTRA_REEL))
             else -> return
         }
         intent.removeExtra(ResurgeMessagingService.EXTRA_OPEN)
@@ -139,6 +147,7 @@ private fun AppRoot(
     openInsightsSignal: Int,
     openHabitsSignal: Int,
     openFoodSignal: FoodSignal,
+    openProgressSignal: ProgressSignal,
     askNotifications: Boolean,
     onNotificationPromptShown: () -> Unit,
 ) {
@@ -160,6 +169,7 @@ private fun AppRoot(
                     openInsightsSignal = openInsightsSignal,
                     openHabitsSignal = openHabitsSignal,
                     openFoodSignal = openFoodSignal,
+                    openProgressSignal = openProgressSignal,
                 )
             }
         }

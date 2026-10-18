@@ -94,6 +94,12 @@ import com.resurgeai.feature.fitness.WorkoutEditorRoute as WorkoutEditorScreen
 import com.resurgeai.feature.food.FoodLogRoute as FoodLogScreen
 import com.resurgeai.feature.food.FoodRoute as FoodScreenRoute
 import com.resurgeai.feature.food.MealReviewRoute as MealReviewScreen
+import com.resurgeai.feature.progress.ProgressStrip
+import com.resurgeai.feature.progress.ReelReadyCard
+import com.resurgeai.feature.progress.ReelPlayerRoute as ReelPlayerScreen
+import com.resurgeai.feature.progress.ProgressCaptureRoute as ProgressCaptureScreen
+import com.resurgeai.feature.progress.ProgressRoute as ProgressScreen
+import com.resurgeai.feature.progress.ProgressSettingsRoute as ProgressSettingsScreen
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.navigation.toRoute
@@ -128,6 +134,18 @@ import com.resurgeai.feature.weight.WeightRoute as WeightScreen
 
 /** Weight trend, goal and weigh-ins; [log] opens the log sheet straight away. */
 @Serializable data class WeightScreenRoute(val log: Boolean = false)
+
+/** Progress photos: compare, grid, viewer. Reached from Weight, Settings and the launcher shortcut. */
+@Serializable data object ProgressScreenRoute
+
+/** The progress camera. */
+@Serializable data object ProgressCaptureRoute
+
+/** Plays a progress reel. */
+@Serializable data class ReelRoute(val id: String)
+
+/** Backup, recovery key and privacy for progress photos. */
+@Serializable data object ProgressSettingsRoute
 
 /** Settings, opened from the profile photo. */
 @Serializable data object SettingsRoute
@@ -173,7 +191,13 @@ private val popExit: AnimatedContentTransitionScope<NavBackStackEntry>.() -> Exi
 }
 
 @Composable
-fun MainScreen(profile: UserProfile, openInsightsSignal: Int = 0, openHabitsSignal: Int = 0, openFoodSignal: FoodSignal = FoodSignal()) {
+fun MainScreen(
+    profile: UserProfile,
+    openInsightsSignal: Int = 0,
+    openHabitsSignal: Int = 0,
+    openFoodSignal: FoodSignal = FoodSignal(),
+    openProgressSignal: ProgressSignal = ProgressSignal(),
+) {
     val rootNav = rememberNavController()
     // A tapped insight notification opens Coach on the Insights tab.
     LaunchedEffect(openInsightsSignal) {
@@ -185,6 +209,15 @@ fun MainScreen(profile: UserProfile, openInsightsSignal: Int = 0, openHabitsSign
         if (openFoodSignal.count > 0 && mode != null) {
             rootNav.popBackStack(TabsRoute, inclusive = false)
             rootNav.navigate(FoodLogRoute(mode))
+        }
+    }
+    // Launcher shortcut: straight to the camera; a reel notification: the Progress screen.
+    LaunchedEffect(openProgressSignal.count) {
+        if (openProgressSignal.count > 0) {
+            rootNav.popBackStack(TabsRoute, inclusive = false)
+            rootNav.navigate(ProgressScreenRoute)
+            if (openProgressSignal.capture) rootNav.navigate(ProgressCaptureRoute)
+            openProgressSignal.reelId?.let { rootNav.navigate(ReelRoute(it)) }
         }
     }
     NavHost(
@@ -213,6 +246,7 @@ fun MainScreen(profile: UserProfile, openInsightsSignal: Int = 0, openHabitsSign
                 onLogMeal = { rootNav.navigate(FoodLogRoute()) },
                 onScanMeal = { rootNav.navigate(FoodLogRoute(mode = "scan")) },
                 onOpenMeal = { id -> rootNav.navigate(MealReviewRoute(mealId = id)) },
+                onOpenReel = { id -> rootNav.navigate(ReelRoute(id)) },
                 openFoodTabSignal = if (openFoodSignal.mode == null) openFoodSignal.count else 0,
                 openHabitsSignal = openHabitsSignal,
                 onReturnToTabs = { rootNav.popBackStack(TabsRoute, inclusive = false) },
@@ -275,7 +309,50 @@ fun MainScreen(profile: UserProfile, openInsightsSignal: Int = 0, openHabitsSign
             }
         }
         composable<WeightScreenRoute> { entry ->
-            FullScreen { WeightScreen(onBack = { rootNav.popBackStack() }, openLog = entry.toRoute<WeightScreenRoute>().log) }
+            FullScreen {
+                WeightScreen(
+                    onBack = { rootNav.popBackStack() },
+                    openLog = entry.toRoute<WeightScreenRoute>().log,
+                    progressStrip = {
+                        ProgressStrip(
+                            onOpen = { rootNav.navigate(ProgressScreenRoute) },
+                            onCapture = { rootNav.navigate(ProgressScreenRoute); rootNav.navigate(ProgressCaptureRoute) },
+                        )
+                    },
+                )
+            }
+        }
+        composable<ProgressScreenRoute> {
+            FullScreen {
+                ProgressScreen(
+                    onBack = { rootNav.popBackStack() },
+                    onCapture = { rootNav.navigate(ProgressCaptureRoute) { launchSingleTop = true } },
+                    onOpenSettings = { rootNav.navigate(ProgressSettingsRoute) },
+                    onOpenReel = { id -> rootNav.navigate(ReelRoute(id)) },
+                )
+            }
+        }
+        composable<ProgressCaptureRoute> {
+            FullScreen {
+                ProgressCaptureScreen(
+                    onDone = { rootNav.popBackStack() },
+                    // No key on this phone yet: the Progress screen sets it up or unlocks.
+                    onNeedsKey = { rootNav.popBackStack() },
+                )
+            }
+        }
+        composable<ReelRoute> {
+            FullScreen { ReelPlayerScreen(onClose = { rootNav.popBackStack() }) }
+        }
+        composable<ProgressSettingsRoute> {
+            FullScreen {
+                ProgressSettingsScreen(
+                    onBack = { rootNav.popBackStack() },
+                    onReset = if (BuildConfig.DEBUG) {
+                        { rootNav.popBackStack(TabsRoute, inclusive = false) }
+                    } else null,
+                )
+            }
         }
         composable<MealReviewRoute> {
             FullScreen { MealReviewScreen(onDone = { rootNav.popBackStack() }) }
@@ -287,6 +364,7 @@ fun MainScreen(profile: UserProfile, openInsightsSignal: Int = 0, openHabitsSign
                     onOpenCatalog = if (BuildConfig.DEBUG) {
                         { rootNav.navigate(CatalogRoute) }
                     } else null,
+                    onOpenProgressPhotos = { rootNav.navigate(ProgressSettingsRoute) },
                 )
             }
         }
@@ -341,6 +419,7 @@ private fun TabsShell(
     onLogMeal: () -> Unit,
     onScanMeal: () -> Unit,
     onOpenMeal: (String) -> Unit,
+    onOpenReel: (String) -> Unit,
     openFoodTabSignal: Int,
     openHabitsSignal: Int,
     onReturnToTabs: () -> Unit,
@@ -389,6 +468,7 @@ private fun TabsShell(
                         onOpenHabit = onOpenHabit,
                         onAddHabit = onAddHabit,
                         onOpenHabits = { tabsNav.switchTab(HabitsRoute) },
+                        reelCard = { ReelReadyCard(onPlay = onOpenReel, modifier = Modifier.padding(bottom = 12.dp)) },
                     )
                 }
                 composable<FitnessRoute> { FitnessScreenRoute(onOpenWorkout = onOpenWorkout, onLogWorkout = onLogWorkout) }
@@ -466,6 +546,9 @@ private const val PICKED_ACTIVITY = "pickedActivity"
 
 /** Request from a meal reminder: [mode] "scan" / "type" opens the log screen, null opens the Food tab. */
 data class FoodSignal(val count: Int = 0, val mode: String? = null)
+
+/** Open Progress; [capture] goes on to the camera, [reelId] plays that reel. */
+data class ProgressSignal(val count: Int = 0, val capture: Boolean = false, val reelId: String? = null)
 
 private fun greeting(profile: UserProfile, now: LocalTime = LocalTime.now()): String {
     val part = when (now.hour) {

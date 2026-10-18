@@ -29,5 +29,6 @@ include(
     ":feature:fitness",
     ":feature:food",
     ":feature:weight",
+    ":feature:progress",
     ":feature:profile",
 )

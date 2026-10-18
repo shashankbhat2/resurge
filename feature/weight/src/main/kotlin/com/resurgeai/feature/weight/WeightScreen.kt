@@ -63,7 +63,12 @@ import java.time.temporal.ChronoUnit
 import kotlin.math.abs
 
 @Composable
-fun WeightRoute(onBack: () -> Unit, openLog: Boolean = false, viewModel: WeightViewModel = hiltViewModel()) {
+fun WeightRoute(
+    onBack: () -> Unit,
+    openLog: Boolean = false,
+    progressStrip: (@Composable () -> Unit)? = null,
+    viewModel: WeightViewModel = hiltViewModel(),
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     WeightScreen(
         state = state,
@@ -75,6 +80,7 @@ fun WeightRoute(onBack: () -> Unit, openLog: Boolean = false, viewModel: WeightV
         onSetGoal = viewModel::setGoal,
         onClearGoal = viewModel::clearGoal,
         openLog = openLog,
+        progressStrip = progressStrip,
     )
 }
 
@@ -99,6 +105,8 @@ internal fun WeightScreen(
     onSetGoal: (goalKg: Double, pace: Double) -> Unit,
     onClearGoal: () -> Unit,
     openLog: Boolean = false,
+    /** Progress photos' entry row, under the goal (supplied by the app). */
+    progressStrip: (@Composable () -> Unit)? = null,
 ) {
     val units = remember(state.units) { WeightUnits(state.units) }
     var sheet by remember { mutableStateOf<WeightSheetState?>(if (openLog) WeightSheetState.Log(null) else null) }
@@ -147,6 +155,7 @@ internal fun WeightScreen(
                 Stats(state, units)
                 MilestoneNote(state, units)
                 GoalCard(state, units) { sheet = WeightSheetState.Goal }
+                progressStrip?.invoke()
 
                 val newestFirst = state.weighIns.asReversed()
                 SectionLabel("Weigh-ins", Modifier.padding(top = 6.dp), trailing = "${newestFirst.size} logged")

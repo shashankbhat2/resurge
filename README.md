@@ -31,6 +31,7 @@ Resurge pulls your day together and keeps it light. Everything you do fills one 
 - **Fitness.** Workouts from Health Connect and ones you log yourself (runs, rides, strength sets, swims and more), merged and de-duplicated, with weekly active minutes.
 - **Food.** Point the in-app camera at your plate, pick a gallery photo or describe the meal. The coach identifies each food, estimates portions and nutrition, and asks one question when it would change the numbers. Fix anything in a tap before logging.
 - **Weight.** Weigh-ins are smoothed into a trend, so one salty dinner doesn't erase a good week. Measure the change over any period, set a goal and pace, and import your history from Health Connect.
+- **Snapshots.** Progress photos you take when you like, lined up against a faint copy of the last one. They're end-to-end encrypted on the phone before backup, and every few weeks (3 days to 8 weeks, your choice) a reel of them arrives on its own, like a photos app's memories.
 - **Coach.** Chat with a coach that can see your recent data, get a short insight after each workout or night of sleep, and a weekly report on Saturday. Choose a warm *Friend* or a no-nonsense *Commander*.
 
 Health data is read through [Health Connect](https://developer.android.com/health-and-fitness/guides/health-connect), so it works with Fitbit, Samsung Health, Garmin, Google Fit and most other apps that write there.
@@ -52,11 +53,13 @@ feature/
   fitness/           Workouts, activity picker, workout editor
   food/              Meal scanner (CameraX), estimate review, food log
   weight/            Weight trend, weigh-ins, goal
+  progress/          Progress photos (CameraX), before/after, reels
   coach/             Chat and insights
   profile/           Settings
   auth/              Google sign-in, onboarding
 functions/           Cloud Functions (TypeScript): coach chat, meal analysis, insights
 firestore.rules      Per-user security rules for the `resurge` database
+storage.rules        Resurge's block of the shared bucket's Storage rules (progress photo ciphertext)
 ```
 
 | | |

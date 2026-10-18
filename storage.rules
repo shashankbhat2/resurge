@@ -1,0 +1,16 @@
+rules_version = '2';
+
+// Storage rules for the project's default bucket. Anything not matched here is denied.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Progress photos: ciphertext only (encrypted on the phone with a key the server never sees).
+    match /resurge/users/{uid}/progress/{photoId}/{file} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && file in ['full.bin', 'thumb.bin']
+        && request.resource.size < 4 * 1024 * 1024
+        && request.resource.contentType == 'application/octet-stream';
+    }
+  }
+}
