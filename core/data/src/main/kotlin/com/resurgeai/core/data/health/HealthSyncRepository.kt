@@ -75,6 +75,8 @@ class HealthSyncRepository @Inject constructor(
             put("kcalTotal", day.caloriesTotal?.let { Math.round(it) })
             put("kcalActive", day.caloriesActive?.let { Math.round(it) })
             put("sleepMin", day.sleepDuration?.toMinutes())
+            // Time actually asleep, which is what the sleep goal checks.
+            put("asleepMin", day.asleepDuration?.toMinutes())
             put(
                 "sleepStages",
                 listOf(SleepStage.DEEP, SleepStage.LIGHT, SleepStage.REM, SleepStage.AWAKE)

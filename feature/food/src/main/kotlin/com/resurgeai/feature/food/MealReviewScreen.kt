@@ -93,7 +93,6 @@ fun MealReviewRoute(onDone: () -> Unit, viewModel: MealReviewViewModel = hiltVie
 }
 
 /** Meals that fill the tide's meals segment (TideMath.MEALS_GOAL on Today). */
-private const val TIDE_MEALS = 2
 
 /** One-tap corrections in Fix results; each is sent to the estimate as said. */
 private val QUICK_FIXES = listOf("Smaller portion", "Bigger portion", "No oil or ghee", "Cooked in more oil", "Add a drink")
@@ -552,9 +551,9 @@ private fun DayCard(state: MealReviewState) {
                 Spacer(Modifier.weight(1f))
                 Text("of %,d".format(state.targetKcal), style = Resurge.type.caption.copy(fontFeatureSettings = "tnum"), color = Resurge.colors.textSubtle)
             }
-            if (state.isNew && state.mealsBefore < TIDE_MEALS) {
-                val note = if (state.mealsBefore + 1 >= TIDE_MEALS) "Logging this completes today's meals for the tide."
-                else "${TIDE_MEALS - state.mealsBefore - 1} more meal after this fills the tide's meals."
+            if (state.isNew && state.mealsBefore < state.mealsGoal) {
+                val left = state.mealsGoal - state.mealsBefore - 1
+                val note = if (left == 0) "This completes today's meals for your streak." else "$left more after this for your streak."
                 Row(
                     Modifier.fillMaxWidth().clip(Resurge.shape.sm).background(Resurge.colors.accentMuted).padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,

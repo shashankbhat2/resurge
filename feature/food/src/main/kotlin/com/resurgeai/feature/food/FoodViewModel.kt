@@ -33,6 +33,8 @@ data class FoodUiState(
     val today: LocalDate = LocalDate.now(),
     val todayTotals: Nutrition = Nutrition.Zero,
     val targets: Targets = Targets(),
+    /** Meals the day streak asks for (0 when meals don't count). */
+    val mealsGoal: Int = 2,
     val macroTargets: MacroTargets = MacroTargets.from(Targets.DEFAULT_CALORIES),
     val waterMl: Int = 0,
     val days: List<FoodDay> = emptyList(),
@@ -49,11 +51,11 @@ class FoodViewModel @Inject constructor(
     private val since = LocalDate.now(zone).minusDays(DAYS)
     private val deleted = MutableStateFlow<Meal?>(null)
 
-    private val targets = sessionRepository.session.filterIsInstance<SessionState.Ready>().map { it.profile.targets }
+    private val targets = sessionRepository.session.filterIsInstance<SessionState.Ready>().map { it.profile.targets to it.profile.dayGoals.meals }
     private val meals = repository.meals(since).catch { emit(emptyList()) }
     private val water = repository.water(LocalDate.now(zone)).catch { emit(emptyMap()) }
 
-    val state: StateFlow<FoodUiState> = combine(meals, water, targets, deleted) { list, waterByDay, t, del ->
+    val state: StateFlow<FoodUiState> = combine(meals, water, targets, deleted) { list, waterByDay, (t, mealsGoal), del ->
         val today = LocalDate.now(zone)
         val days = list.groupBy { it.date }.map { (date, dayMeals) ->
             FoodDay(
@@ -68,6 +70,7 @@ class FoodViewModel @Inject constructor(
             today = today,
             todayTotals = days.firstOrNull { it.date == today }?.totals ?: Nutrition.Zero,
             targets = t,
+            mealsGoal = mealsGoal,
             macroTargets = MacroTargets.from(t.calories),
             waterMl = waterByDay[today] ?: 0,
             days = days,

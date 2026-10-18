@@ -68,8 +68,6 @@ import com.resurgeai.core.designsystem.components.Icon
 import com.resurgeai.core.designsystem.components.ResurgeIcons
 import com.resurgeai.core.designsystem.components.RiseBadge
 import com.resurgeai.core.designsystem.components.TIDE_RISE_MS
-import com.resurgeai.core.designsystem.components.TideEasing
-import com.resurgeai.core.designsystem.components.TideRing
 import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.model.CoachInsight
 import com.resurgeai.core.model.CoachStyle
@@ -79,145 +77,9 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 
-// --- Tide ---
-
-/**
- * Hero card: today's tide ring with what's left and what's done, and, when there are habits, a
- * footer with the streak and the weekly goal.
- */
-@Composable
-internal fun TideCard(
-    tide: Tide,
-    modifier: Modifier = Modifier,
-    rise: Int = 0,
-    ascent: Ascent = Ascent(0, 1, 0, fresh = false),
-    onOpenDetail: (TideDetail) -> Unit = {},
-) {
-    Column(
-        modifier
-            .fillMaxWidth()
-            .clip(Resurge.shape.lg)
-            .background(Resurge.colors.surface),
-    ) {
-        TideRow(tide)
-        Divider()
-        TideFooter(rise, ascent, onOpenDetail)
-    }
-}
-
-@Composable
-private fun TideRow(tide: Tide) {
-    val percent by animateIntAsState(tide.percent, tween(TIDE_RISE_MS, easing = TideEasing), label = "percent")
-    Row(Modifier.fillMaxWidth().height(OverviewBodyHeight).padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
-        TideRing(
-            done = tide.done,
-            total = tide.total,
-            modifier = Modifier
-                .size(140.dp)
-                .semantics(mergeDescendants = true) {
-                    contentDescription = "Tide ${tide.percent} percent, ${tide.done} of ${tide.total} done"
-                },
-            strokeWidth = 12.dp,
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(percent.toString(), style = Resurge.type.tide.copy(fontSize = Resurge.type.tide.fontSize * 0.82f, lineHeight = Resurge.type.tide.lineHeight * 0.82f))
-                    Text("%", style = Resurge.type.brand, color = Resurge.colors.textMuted, modifier = Modifier.padding(bottom = 4.dp))
-                }
-                Text(
-                    when {
-                        tide.high -> "High tide"
-                        tide.left == 1 -> "1 to high tide"
-                        else -> "${tide.left} to high tide"
-                    },
-                    style = Resurge.type.caption,
-                    color = if (tide.high) Resurge.colors.brandInk else Resurge.colors.textSubtle,
-                )
-            }
-        }
-        Spacer(Modifier.width(20.dp))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Overline("Today's tide")
-            // What's left first: those are the taps that move the ring.
-            val ordered = tide.segments.filterNot { it.done } + tide.segments.filter { it.done }
-            // Five rows fit the card's height; with more, four rows and a "+N more" line.
-            val rows = if (ordered.size > LEGEND_ROWS) LEGEND_ROWS - 1 else LEGEND_ROWS
-            ordered.take(rows).forEach { TideLegendRow(it) }
-            if (ordered.size > rows) {
-                Text("+${ordered.size - rows} more", style = Resurge.type.caption, color = Resurge.colors.textSubtle)
-            }
-        }
-    }
-}
-
-@Composable
-private fun TideLegendRow(segment: TideSegment) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier
-                .size(10.dp)
-                .clip(RoundedCornerShape(3.dp))
-                .background(if (segment.done) Resurge.colors.accent else Resurge.colors.ebb),
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            segment.label,
-            style = Resurge.type.label,
-            color = if (segment.done) Resurge.colors.text else Resurge.colors.textMuted,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-private const val LEGEND_ROWS = 5
-
-/**
- * The tide card's footer: two equal cells, end to end, split by a hairline. Left is the streak
- * (days in a row with every habit done); right is the weekly goal (full days this week).
- */
-@Composable
-private fun TideFooter(streak: Int, week: Ascent, onOpen: (TideDetail) -> Unit) {
-    Row(Modifier.fillMaxWidth().height(OverviewFooterHeight)) {
-        StatCell(
-            icon = ResurgeIcons.HabitStreak,
-            iconTint = if (streak > 0) Resurge.colors.onGlow else Resurge.colors.textMuted,
-            iconBackground = if (streak > 0) Resurge.colors.glow else Resurge.colors.surfaceMuted,
-            value = when (streak) {
-                0 -> "Start today"
-                1 -> "1 day"
-                else -> "$streak days"
-            },
-            label = "Habit streak",
-            description = if (streak > 0) "Streak: $streak days in a row with every habit done" else "No streak yet. Do every habit today to start one.",
-            onClick = { onOpen(TideDetail.STREAK) },
-            modifier = Modifier.weight(1f),
-        )
-        StatDivider()
-        val days = week.fullDaysThisWeek.coerceAtMost(TideMath.STRONG_WEEK_DAYS)
-        StatCell(
-            icon = null,
-            iconTint = Resurge.colors.onGlow,
-            iconBackground = Resurge.colors.glow,
-            // Same flame as beside the profile photo: fills from the bottom as full days add up.
-            iconContent = { WeeklyFlameIcon(days / TideMath.STRONG_WEEK_DAYS.toFloat(), size = 20.dp) },
-            value = "$days/${TideMath.STRONG_WEEK_DAYS} days",
-            label = when {
-                week.metThisWeek -> "Weekly goal met"
-                week.weeksWon > 0 -> "Weekly goal · ${week.weeksWon} won"
-                else -> "Weekly goal"
-            },
-            description = "Weekly goal: $days of ${TideMath.STRONG_WEEK_DAYS} days with every habit done this week" +
-                if (week.weeksWon > 0) ". ${week.weeksWon} weeks won so far." else ".",
-            onClick = { onOpen(TideDetail.WEEK) },
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-
 // --- Habits ---
 
-/** Most habits shown on Today; the rest are a tap away on the Habits tab (all still count toward the tide). */
+/** Most habits shown on Today; the rest are a tap away on the Habits tab (all still count toward the day streak). */
 internal const val TODAY_HABITS = 4
 
 /**
@@ -357,7 +219,7 @@ internal fun FirstHabitCard(onAdd: () -> Unit) {
     ) {
         Text("Add your first habit", style = Resurge.type.headline)
         Spacer(Modifier.height(4.dp))
-        Text("Each habit becomes a share of today's tide. Small ones count the same as big ones.", style = Resurge.type.body, color = Resurge.colors.textMuted)
+        Text("Each habit counts toward your day streak. Small ones count the same as big ones.", style = Resurge.type.body, color = Resurge.colors.textMuted)
         Spacer(Modifier.height(12.dp))
         Button("Add habit", onClick = onAdd, variant = ButtonVariant.Accent, leadingIcon = ResurgeIcons.Plus)
     }
@@ -400,9 +262,9 @@ internal fun CoachNote(insight: CoachInsight?, commander: Boolean, onClick: () -
 }
 
 /**
- * The latest insight, laid over the tide card until it's seen: persona styling like [CoachNote],
+ * The latest insight, laid over the day streak card until it's seen: persona styling like [CoachNote],
  * "New from your coach", the headline and note. Swipe it left or tap ✕ to mark it seen; it slides
- * away and reveals the tide underneath. Tapping it opens Insights. [modifier] sizes it to the tide card.
+ * away and reveals the card underneath. Tapping it opens Insights. [modifier] sizes it to the card.
  */
 @Composable
 internal fun PinnedInsight(
@@ -466,7 +328,7 @@ internal fun PinnedInsight(
                 Text(insight.body, style = Resurge.type.body, color = Resurge.colors.textMuted, overflow = TextOverflow.Ellipsis)
             }
             Text(
-                "Swipe left or tap ✕ to see today's tide. This note moves to your feed.",
+                "Swipe left or tap ✕ to see your streak. This note moves to your feed.",
                 style = Resurge.type.caption,
                 color = Resurge.colors.textSubtle,
                 modifier = Modifier.padding(top = 8.dp, end = 12.dp),
@@ -481,20 +343,20 @@ internal fun insightLabel(kind: InsightKind): String = when (kind) {
     InsightKind.ACTIVITY -> "Activity"
 }
 
-// --- High tide ---
+// --- Day complete ---
 
-/** The day's one celebration, as a bottom sheet. */
+/** The day's one celebration, once everything today is done. */
 @Composable
-internal fun HighTideDialog(state: DashboardUiState, onDismiss: () -> Unit) {
+internal fun DayCompleteDialog(state: DashboardUiState, onDismiss: () -> Unit) {
     val haptics = LocalHapticFeedback.current
     LaunchedEffect(Unit) { haptics.performHapticFeedback(HapticFeedbackType.Confirm) }
-    BottomSheetDialog(onDismiss) { HighTideSheet(state, onDismiss) }
+    BottomSheetDialog(onDismiss) { DayCompleteSheet(state, onDismiss) }
 }
 
 @Composable
-internal fun HighTideSheet(state: DashboardUiState, onDone: () -> Unit, modifier: Modifier = Modifier) {
-    val tide = state.tide
-    val day = state.habitDay.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
+internal fun DayCompleteSheet(state: DashboardUiState, onDone: () -> Unit, modifier: Modifier = Modifier) {
+    val streak = state.streak
+    val day = streak.day.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
     val commander = state.profile?.coachStyle == CoachStyle.COMMANDER
     Column(
         modifier
@@ -509,12 +371,12 @@ internal fun HighTideSheet(state: DashboardUiState, onDone: () -> Unit, modifier
                 .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Overline("$day · ${tide.done} of ${tide.total}", color = Resurge.colors.glowInk)
-            Text("High tide", style = Resurge.type.brandLarge)
+            Overline("$day · ${streak.done} of ${streak.total}", color = Resurge.colors.glowInk)
+            Text("Day complete", style = Resurge.type.brandLarge)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (state.riseCount > 0) RiseBadge(state.riseCount)
+                if (streak.streak.current > 0) RiseBadge(streak.streak.current)
                 Text(
-                    "${state.ascent.fullDaysThisWeek.coerceAtMost(TideMath.STRONG_WEEK_DAYS)} of ${TideMath.STRONG_WEEK_DAYS} full days this week",
+                    "${streak.week.metDays} of ${streak.week.target} days this week",
                     style = Resurge.type.label,
                     color = Resurge.colors.textMuted,
                     modifier = Modifier

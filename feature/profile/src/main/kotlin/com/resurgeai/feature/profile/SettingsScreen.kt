@@ -362,7 +362,7 @@ private fun TargetsPage(targets: Targets, onChange: (Targets) -> Unit) {
                 step = 250, range = 1000..5000, format = { "%,d".format(it) },
             )
         }
-        GroupLabel("Counts toward your tide")
+        GroupLabel("Sleep and steps")
         TargetGroup {
             StepperRow(
                 label = "Sleep", hint = "Asleep per night", icon = ResurgeIcons.Bed, iconTint = Resurge.colors.sleep,
@@ -380,7 +380,7 @@ private fun TargetsPage(targets: Targets, onChange: (Targets) -> Unit) {
             )
         }
         Text(
-            "When last night's sleep or today's steps reach these goals, they fill a share of today's tide.",
+            "Choose which of these count toward your day streak from the streak card on Today.",
             style = Resurge.type.caption,
             color = Resurge.colors.textSubtle,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),

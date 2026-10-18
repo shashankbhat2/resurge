@@ -57,6 +57,8 @@ data class MealReviewState(
     val eatenBefore: Double = 0.0,
     /** Meals already logged today, not counting this one (for the tide's meals segment). */
     val mealsBefore: Int = 0,
+    /** Meals the day streak asks for (0 when meals don't count). */
+    val mealsGoal: Int = 2,
     val targetKcal: Int = Targets.DEFAULT_CALORIES,
     /** How many of this plate were eaten; every food's grams scale with it. */
     val servings: Int = 1,
@@ -104,7 +106,7 @@ class MealReviewViewModel @Inject constructor(
         }
         viewModelScope.launch {
             sessionRepository.session.filterIsInstance<SessionState.Ready>().collect { s ->
-                _state.update { it.copy(targetKcal = s.profile.targets.calories) }
+                _state.update { it.copy(targetKcal = s.profile.targets.calories, mealsGoal = s.profile.dayGoals.meals) }
             }
         }
         if (mealId != null) {

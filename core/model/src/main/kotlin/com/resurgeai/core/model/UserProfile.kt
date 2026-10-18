@@ -12,6 +12,8 @@ data class UserProfile(
     val coachStyle: CoachStyle = CoachStyle.FRIEND,
     val units: UnitSystem = UnitSystem.METRIC,
     val mealReminders: MealReminders = MealReminders(),
+    /** What a day needs for the day streak. */
+    val dayGoals: DayGoals = DayGoals(),
 ) {
     val firstName: String?
         get() = displayName?.substringBefore(' ')?.takeIf { it.isNotBlank() }

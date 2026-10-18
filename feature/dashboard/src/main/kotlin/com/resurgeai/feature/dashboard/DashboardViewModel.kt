@@ -32,6 +32,8 @@ import com.resurgeai.core.model.Nutrition
 import com.resurgeai.core.model.Workout
 import java.time.Instant
 import com.resurgeai.core.data.session.SessionRepository
+import com.resurgeai.core.data.user.UserRepository
+import com.resurgeai.core.model.DayGoals
 import com.resurgeai.core.healthconnect.HealthConnectAvailability
 import com.resurgeai.core.healthconnect.HealthConnectManager
 import com.resurgeai.core.healthconnect.HealthDataSource
@@ -84,8 +86,10 @@ data class DashboardUiState(
     val habitDay: LocalDate = LocalDate.now(),
     /** Active habits with streak stats; null until the first read. */
     val habits: List<TodayHabit>? = null,
-    /** The day's one celebration: open once per habit day when the tide first reaches 100%. */
-    val showHighTide: Boolean = false,
+    /** The day's one celebration: open once per habit day when everything today is first done. */
+    val showDayComplete: Boolean = false,
+    /** The day streak, shared with the header flame. */
+    val streak: DayStreakState = DayStreakState(),
     /** Insights dismissed on this device (also marked seen on the server). */
     val dismissedInsights: Set<String> = emptySet(),
     /** Weight trend for the Today tile; null before the first weigh-in. */
@@ -100,22 +104,6 @@ data class DashboardUiState(
     val healthReady: Boolean get() = availability == HealthConnectAvailability.AVAILABLE &&
         (permissions == PermissionState.PARTIAL || permissions == PermissionState.ALL)
 
-    val tide: Tide get() = TideMath.tide(
-        habits = habits.orEmpty(),
-        health = healthReady,
-        sleep = today?.asleepDuration,
-        steps = today?.steps,
-        mealsToday = meals.count { it.date == (today?.date ?: LocalDate.now()) },
-        targets = profile?.targets ?: Targets(),
-    )
-
-    /** Everything the tide counts has loaded, so a full tide is real (not a half-loaded screen). */
-    val tideReady: Boolean get() = habits != null && availability != null &&
-        (availability != HealthConnectAvailability.AVAILABLE || permissions != PermissionState.UNKNOWN) &&
-        (!healthReady || today != null)
-
-    val riseCount: Int get() = TideMath.riseCount(habits.orEmpty(), habitDay)
-    val ascent: Ascent get() = TideMath.ascent(habits.orEmpty(), habitDay)
 
     /** Eaten on the day being shown (the Health Connect day, else the calendar day). */
     val eaten: Nutrition get() {
@@ -141,6 +129,8 @@ class DashboardViewModel @Inject constructor(
     private val preferences: PreferencesRepository,
     private val workouts: WorkoutsRepository,
     private val weights: WeightRepository,
+    private val streakEngine: DayStreakEngine,
+    private val users: UserRepository,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
     private val _state = MutableStateFlow(DashboardUiState())
@@ -193,10 +183,16 @@ class DashboardViewModel @Inject constructor(
     /** Permission needed to save weigh-ins to Health Connect. */
     val weightWritePermission: String = HealthPermissions.WRITE_WEIGHT
 
-    fun dismissHighTide() {
-        val day = _state.value.habitDay
-        _state.update { it.copy(showHighTide = false) }
+    fun dismissDayComplete() {
+        val day = _state.value.streak.day
+        _state.update { it.copy(showDayComplete = false) }
         viewModelScope.launch { preferences.setHighTideShown(day) }
+    }
+
+    /** Saves what a day needs for the streak. Settled days keep their result. */
+    fun saveDayGoals(goals: DayGoals) {
+        val uid = _state.value.profile?.uid ?: return
+        viewModelScope.launch { runCatching { users.updateDayGoals(uid, goals) }.onFailure { Log.w(TAG, "Saving day goals failed", it) } }
     }
 
     private var loadJob: Job? = null
@@ -233,10 +229,13 @@ class DashboardViewModel @Inject constructor(
                 .collect { (day, list) -> _state.update { it.copy(habitDay = day, habits = list) } }
         }
         viewModelScope.launch {
-            state.map { s -> s.habitDay.takeIf { s.tideReady && s.tide.high } }
+            streakEngine.state.collect { s -> _state.update { it.copy(streak = s) } }
+        }
+        viewModelScope.launch {
+            streakEngine.state.map { s -> s.day.takeIf { s.loaded && s.todayMet } }
                 .distinctUntilChanged()
                 .collect { day ->
-                    if (day != null && preferences.highTideShownOn() != day) _state.update { it.copy(showHighTide = true) }
+                    if (day != null && preferences.highTideShownOn() != day) _state.update { it.copy(showDayComplete = true) }
                 }
         }
         viewModelScope.launch {
@@ -266,6 +265,7 @@ class DashboardViewModel @Inject constructor(
     fun refresh(force: Boolean = false) {
         val now = SystemClock.elapsedRealtime()
         clock.value = Instant.now()
+        streakEngine.tick()
         if (!force && loadJob?.isActive == true) return
         if (!force && now - lastLoadedAt < MIN_REFRESH_INTERVAL_MS && _state.value.today != null) return
         loadJob = viewModelScope.launch { load() }
@@ -276,7 +276,8 @@ class DashboardViewModel @Inject constructor(
     private suspend fun load() {
         val availability = healthConnect.availability()
         _state.update { it.copy(availability = availability, error = null) }
-        if (availability != HealthConnectAvailability.AVAILABLE) return
+        val noHealth = HealthToday(LocalDate.now(), ready = false, sleepMinutes = null, steps = null)
+        if (availability != HealthConnectAvailability.AVAILABLE) return streakEngine.updateHealth(noHealth)
 
         val granted = healthConnect.grantedPermissions()
         val permissionState = when {
@@ -285,7 +286,7 @@ class DashboardViewModel @Inject constructor(
             else -> PermissionState.NONE
         }
         _state.update { it.copy(permissions = permissionState) }
-        if (permissionState == PermissionState.NONE) return
+        if (permissionState == PermissionState.NONE) return streakEngine.updateHealth(noHealth)
 
         _state.update { it.copy(loading = true) }
         try {
@@ -299,6 +300,8 @@ class DashboardViewModel @Inject constructor(
                 val device = async { runCatching { workouts.deviceWorkouts(feedStart(), Instant.now()) }.getOrDefault(emptyList()) }
                 val activeDays = week.await()
                 deviceWorkouts.value = device.await()
+                val read = day.await()
+                streakEngine.updateHealth(HealthToday(today, ready = true, sleepMinutes = read.asleepDuration?.toMinutes()?.toInt(), steps = read.steps))
                 _state.update {
                     it.copy(
                         loading = false,
@@ -322,6 +325,7 @@ class DashboardViewModel @Inject constructor(
             }
         } catch (e: Exception) {
             Log.w(TAG, "Failed to read Health Connect", e)
+            streakEngine.updateHealth(HealthToday(LocalDate.now(), ready = true, sleepMinutes = null, steps = null))
             _state.update { it.copy(loading = false, error = "Couldn't read Health Connect.") }
         }
     }

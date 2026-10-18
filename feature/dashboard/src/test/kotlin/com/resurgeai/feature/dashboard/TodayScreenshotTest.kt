@@ -14,6 +14,11 @@ import com.resurgeai.core.model.Goal
 import com.resurgeai.core.model.Habit
 import com.resurgeai.core.model.HabitSettings
 import com.resurgeai.core.model.HabitStatus
+import com.resurgeai.core.model.DayGoals
+import com.resurgeai.core.model.DayInputs
+import com.resurgeai.core.model.DayResult
+import com.resurgeai.core.model.DayState
+import com.resurgeai.core.model.DayStreakMath
 import com.resurgeai.core.model.HabitStreaks
 import com.resurgeai.core.model.HealthMetric
 import com.resurgeai.core.model.HeartRateSummary
@@ -122,7 +127,37 @@ class TodayScreenshotTest {
         return TodayHabit(Habit(id, name, icon, color, 0, archived = false, createdDate = created), HabitStreaks.compute(created, day, log))
     }
 
-    private fun capture(name: String, scheme: ColorScheme, ui: DashboardUiState = state) {
+    /** Three weeks of days: met except a forgiven Tuesday and a missed day before the streak. */
+    private fun streak(complete: Boolean): DayStreakState {
+        val goals = DayGoals(meals = 2)
+        val results = (1L..20L).map { back ->
+            DayResult(day.minusDays(back), met = back != 4L && back != 13L, done = 5, total = 6)
+        }
+        val inputs = DayInputs(
+            day,
+            state.habits!!.map { it.habit to if (complete) DayState.DONE else it.stats.today },
+            sleepMinutes = 452,
+            steps = if (complete) 10_480 else 6_240,
+            meals = if (complete) 2 else 1,
+            waterMl = 1_000,
+            health = true,
+        )
+        val items = DayStreakMath.items(inputs, goals, Targets(), isToday = true)
+        val met = items.all { it.done == true }
+        val summary = DayStreakMath.streak(results, day, met, locale = java.util.Locale.US)
+        return DayStreakState(
+            loaded = true,
+            day = day,
+            goals = goals,
+            today = items.filter { it.done != true } + items.filter { it.done == true },
+            streak = summary,
+            week = DayStreakMath.week(summary, day, goals.weeklyDays, java.util.Locale.US),
+            habits = state.habits!!,
+            health = true,
+        )
+    }
+
+    private fun capture(name: String, scheme: ColorScheme, ui: DashboardUiState = state.copy(streak = streak(false))) {
         compose.mainClock.autoAdvance = false // shimmer is an infinite animation
         compose.setContent {
             ResurgeTheme(colorScheme = scheme) {
@@ -139,33 +174,42 @@ class TodayScreenshotTest {
 
     @Test fun todayDark() = capture("dark", ColorScheme.Dark)
 
-    @Test fun highTideLight() = captureSheet("light", ColorScheme.Light)
+    /** The insight dismissed, so the day streak card shows. */
+    private val noNote get() = state.copy(streak = streak(false), dismissedInsights = setOfNotNull(state.latestInsight?.id))
 
-    @Test fun highTideDark() = captureSheet("dark", ColorScheme.Dark)
+    @Test fun streakCardLight() = capture("streak_light", ColorScheme.Light, noNote)
+
+    @Test fun streakCardDark() = capture("streak_dark", ColorScheme.Dark, noNote)
+
+    @Test fun dayCompleteLight() = captureSheet("light", ColorScheme.Light)
+
+    @Test fun dayCompleteDark() = captureSheet("dark", ColorScheme.Dark)
 
     /** Every segment done: all habits, sleep, 10k+ steps and two meals. */
     private val highTide = state.copy(
         today = state.today!!.copy(steps = 10_480),
         meals = state.meals + state.meals.first().copy(id = "m2", type = MealType.LUNCH, title = "Dal, rice and salad"),
         habits = state.habits!!.map { habit(it.habit.id, it.habit.name, it.habit.icon, it.habit.color, streakDays = 12, doneToday = true) },
-    )
+    ).let { it.copy(streak = streak(true)) }
 
     private fun captureSheet(name: String, scheme: ColorScheme) {
         compose.setContent {
             ResurgeTheme(colorScheme = scheme) {
                 Screen {
                     androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.padding(12.dp)) {
-                        HighTideSheet(highTide, onDone = {})
+                        DayCompleteSheet(highTide, onDone = {})
                     }
                 }
             }
         }
-        compose.onRoot().captureRoboImage("src/test/screenshots/today_high_tide_$name.png")
+        compose.onRoot().captureRoboImage("src/test/screenshots/today_day_complete_$name.png")
     }
 
-    @Test fun streakSheet() = captureDetail("streak", ColorScheme.Light) { StreakSheet(state.habits!!, day, HabitSettings(), onDone = {}) }
+    @Test fun streakSheet() = captureDetail("streak", ColorScheme.Light) { StreakSheet(streak(false), HabitSettings(), onDone = {}) }
 
-    @Test fun weekSheetDark() = captureDetail("week_dark", ColorScheme.Dark) { WeekSheet(state.habits!!, day, onDone = {}) }
+    @Test fun weekSheetDark() = captureDetail("week_dark", ColorScheme.Dark) { WeekSheet(streak(false), onDone = {}) }
+
+    @Test fun goalsSheet() = captureDetail("goals", ColorScheme.Light) { GoalsSheet(streak(false), onSave = {}) }
 
     private fun captureDetail(name: String, scheme: ColorScheme, sheet: @androidx.compose.runtime.Composable () -> Unit) {
         compose.setContent {

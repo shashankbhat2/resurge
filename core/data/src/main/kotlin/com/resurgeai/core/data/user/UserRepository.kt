@@ -7,6 +7,7 @@ import com.google.firebase.firestore.SetOptions
 import com.resurgeai.core.data.auth.AuthUser
 import com.resurgeai.core.data.habits.HabitsRepository
 import com.resurgeai.core.model.CoachStyle
+import com.resurgeai.core.model.DayGoals
 import com.resurgeai.core.model.Goal
 import com.resurgeai.core.model.HabitDraft
 import com.resurgeai.core.model.HabitSettings
@@ -126,6 +127,22 @@ class UserRepository @Inject constructor(
         ).await()
     }
 
+    suspend fun updateDayGoals(uid: String, goals: DayGoals) {
+        doc(uid).update(
+            mapOf(
+                "dayGoals" to mapOf(
+                    "excludedHabits" to goals.excludedHabits.toList(),
+                    "sleep" to goals.sleep,
+                    "steps" to goals.steps,
+                    "meals" to goals.meals,
+                    "water" to goals.water,
+                    "weeklyDays" to goals.weeklyDays,
+                ),
+                "updatedAt" to FieldValue.serverTimestamp(),
+            ),
+        ).await()
+    }
+
     private fun Targets.toMap() = mapOf("calories" to calories, "waterMl" to waterMl, "sleepMinutes" to sleepMinutes, "steps" to steps)
 
     private fun DocumentSnapshot.toProfile(): UserProfile {
@@ -153,6 +170,22 @@ class UserRepository @Inject constructor(
             coachStyle = CoachStyle.fromWire(getString("coachStyle")),
             units = UnitSystem.fromWire(getString("units")),
             mealReminders = mealReminders(),
+            dayGoals = dayGoals(),
+        )
+    }
+
+    private fun DocumentSnapshot.dayGoals(): DayGoals {
+        @Suppress("UNCHECKED_CAST")
+        val m = get("dayGoals") as? Map<String, Any?> ?: return DayGoals()
+        val d = DayGoals()
+        @Suppress("UNCHECKED_CAST")
+        return DayGoals(
+            excludedHabits = (m["excludedHabits"] as? List<String>).orEmpty().toSet(),
+            sleep = m["sleep"] as? Boolean ?: d.sleep,
+            steps = m["steps"] as? Boolean ?: d.steps,
+            meals = ((m["meals"] as? Number)?.toInt() ?: d.meals).coerceIn(DayGoals.MEALS_RANGE),
+            water = m["water"] as? Boolean ?: d.water,
+            weeklyDays = ((m["weeklyDays"] as? Number)?.toInt() ?: d.weeklyDays).coerceIn(DayGoals.WEEKLY_RANGE),
         )
     }
 

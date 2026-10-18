@@ -20,44 +20,18 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewModelScope
-import com.resurgeai.core.data.habits.HabitsRepository
-import com.resurgeai.core.data.session.SessionRepository
 import com.resurgeai.core.designsystem.components.ProgressFlame
 import com.resurgeai.core.designsystem.theme.Resurge
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import java.time.Instant
-import java.time.LocalDate
 import javax.inject.Inject
 
-/** This week's progress toward the weekly goal, for the flame beside the profile photo. */
-data class WeeklyFlameState(val day: LocalDate = LocalDate.now(), val habits: List<TodayHabit> = emptyList()) {
-    val fullDays: Int get() = TideMath.ascent(habits, day).fullDaysThisWeek.coerceAtMost(TideMath.STRONG_WEEK_DAYS)
-    val fraction: Float get() = fullDays / TideMath.STRONG_WEEK_DAYS.toFloat()
-}
-
 @HiltViewModel
-class WeeklyFlameViewModel @Inject constructor(
-    sessionRepository: SessionRepository,
-    habitsRepository: HabitsRepository,
-) : ViewModel() {
-    private val clock = MutableStateFlow(Instant.now())
-
-    val state: StateFlow<WeeklyFlameState> = todayHabits(sessionRepository, habitsRepository, clock)
-        .map { (day, habits) -> WeeklyFlameState(day, habits) }
-        .catch { emit(WeeklyFlameState()) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WeeklyFlameState())
+class WeeklyFlameViewModel @Inject constructor(private val engine: DayStreakEngine) : ViewModel() {
+    val state: StateFlow<DayStreakState> = engine.state
 
     /** Re-reads the habit day on resume, so the week rolls over at the reset time. */
-    fun tick() {
-        clock.value = Instant.now()
-    }
+    fun tick() = engine.tick()
 }
 
 /**
@@ -78,20 +52,20 @@ fun WeeklyGoalFlame(modifier: Modifier = Modifier, size: Dp = 38.dp, viewModel: 
             .clip(Resurge.shape.pill)
             .background(Resurge.colors.glow)
             .clickable(onClickLabel = "Show weekly goal") { open = true }
-            .semantics { contentDescription = "Weekly goal: ${state.fullDays} of ${TideMath.STRONG_WEEK_DAYS} full days" },
+            .semantics { contentDescription = "Weekly goal: ${state.week.metDays} of ${state.week.target} days" },
         contentAlignment = Alignment.Center,
     ) {
-        WeeklyFlameIcon(state.fraction, size = size * 0.55f)
+        WeeklyFlameIcon((state.week.metDays.coerceAtMost(state.week.target) / state.week.target.toFloat()), size = size * 0.55f)
     }
     if (open) {
-        BottomSheetDialog(onDismiss = { open = false }) { WeekSheet(state.habits, state.day, onDone = { open = false }) }
+        BottomSheetDialog(onDismiss = { open = false }) { WeekSheet(state, onDone = { open = false }) }
     }
 }
 
 /**
  * The weekly goal's flame, drawn for a `glow` circle: dark fill rising with [fraction], and a faint
- * outline for the part of the week still to fill (so 4 of 5 doesn't read as full). The header,
- * the tide card and the weekly goal sheet all use it.
+ * outline for the part of the week still to fill (so 4 of 5 doesn't read as full). The header
+ * and the weekly goal sheet use it.
  */
 @Composable
 internal fun WeeklyFlameIcon(fraction: Float, size: Dp) {

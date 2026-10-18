@@ -81,7 +81,6 @@ fun FoodRoute(
 }
 
 /** Meals that fill the tide's meals segment (TideMath.MEALS_GOAL on Today). */
-private const val TIDE_MEALS = 2
 
 /** Food tab: today's fuel (calories, macros, meals and water), then meals by day. Swipe left deletes. */
 @Composable
@@ -183,7 +182,11 @@ private fun FuelCard(state: FoodUiState, onAddWater: (Int) -> Unit) {
                 iconTint = Resurge.colors.energy,
                 iconBackground = Resurge.colors.surfaceMuted,
                 value = "$mealsToday ${if (mealsToday == 1) "meal" else "meals"}",
-                label = if (mealsToday >= TIDE_MEALS) "Done for the tide" else "${TIDE_MEALS - mealsToday} more for the tide",
+                label = when {
+                    state.mealsGoal == 0 -> "Logged today"
+                    mealsToday >= state.mealsGoal -> "Done for your streak"
+                    else -> "${state.mealsGoal - mealsToday} more for your streak"
+                },
                 modifier = Modifier.weight(1f),
             )
             StatDivider()

@@ -42,6 +42,8 @@ import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.designsystem.theme.ResurgeTheme
 import com.resurgeai.core.healthconnect.HealthConnectAvailability
 import com.resurgeai.core.model.CoachStyle
+import com.resurgeai.core.model.DayGoals
+import com.resurgeai.core.model.HabitSettings
 import com.resurgeai.core.model.HealthMetric
 import com.resurgeai.core.model.SourceKind
 import com.resurgeai.core.model.Targets
@@ -86,7 +88,8 @@ fun TodayRoute(
         onOpenHabit = onOpenHabit,
         onAddHabit = onAddHabit,
         onOpenHabits = onOpenHabits,
-        onDismissHighTide = viewModel::dismissHighTide,
+        onDismissDayComplete = viewModel::dismissDayComplete,
+        onSaveDayGoals = viewModel::saveDayGoals,
         onDismissInsight = viewModel::dismissInsight,
         onImportWeights = { alsoWrite ->
             if (alsoWrite) writeWeightLauncher.launch(setOf(viewModel.weightWritePermission)) else viewModel.importWeights(false)
@@ -97,7 +100,7 @@ fun TodayRoute(
 }
 
 /**
- * Today, built around one daily tide: the tide card (with streak and weekly goal), one-tap habits,
+ * Today, built around the day streak: the streak card (with the week and today's goals), one-tap habits,
  * today's health numbers as compact tiles, then a feed of today's and yesterday's meals, workouts,
  * sleep and coach notes.
  */
@@ -115,7 +118,8 @@ fun TodayScreen(
     onOpenHabit: (String) -> Unit = {},
     onAddHabit: () -> Unit = {},
     onOpenHabits: () -> Unit = {},
-    onDismissHighTide: () -> Unit = {},
+    onDismissDayComplete: () -> Unit = {},
+    onSaveDayGoals: (DayGoals) -> Unit = {},
     onDismissInsight: (String) -> Unit = {},
     onImportWeights: (alsoWrite: Boolean) -> Unit = {},
     onDismissWeightImport: () -> Unit = {},
@@ -129,11 +133,11 @@ fun TodayScreen(
         workouts = state.workouts,
         sleep = state.today?.sleep.orEmpty(),
         insights = state.insights,
-        // The pinned insight sits above the tide, so the feed leaves it out until it's seen.
+        // The pinned insight sits above the streak card, so the feed leaves it out until it's seen.
         lead = state.pinnedInsight,
     )
     val habits = state.habits
-    var detail by rememberSaveable { mutableStateOf<TideDetail?>(null) }
+    var detail by rememberSaveable { mutableStateOf<StreakDetail?>(null) }
     Column(
         Modifier
             .fillMaxSize()
@@ -142,14 +146,14 @@ fun TodayScreen(
     ) {
         Spacer(Modifier.height(LocalHeaderInset.current + 12.dp))
         val withHabits = !habits.isNullOrEmpty()
-        // The latest unseen insight lies over the tide card, stopping short of its bottom so the tide's
-        // edge peeks out underneath like the next card in a stack; dismissing reveals it.
+        // The latest unseen insight lies over the streak card, stopping short of its bottom so the
+        // card's edge peeks out underneath like the next card in a stack; dismissing reveals it.
         Box {
-            TideCard(
-                state.tide,
-                rise = state.riseCount,
-                ascent = state.ascent,
-                onOpenDetail = { detail = it },
+            DayStreakCard(
+                state.streak,
+                onOpenStreak = { detail = StreakDetail.STREAK },
+                onOpenWeek = { detail = StreakDetail.WEEK },
+                onOpenSettings = { detail = StreakDetail.GOALS },
             )
             state.pinnedInsight?.let { insight ->
                 key(insight.id) {
@@ -242,8 +246,8 @@ fun TodayScreen(
         Spacer(Modifier.height(32.dp + LocalFloatingBarInset.current))
     }
 
-    if (state.showHighTide) HighTideDialog(state, onDismissHighTide)
-    detail?.let { TideDetailDialog(it, state) { detail = null } }
+    if (state.showDayComplete) DayCompleteDialog(state, onDismissDayComplete)
+    detail?.let { StreakDetailDialog(it, state.streak, state.profile?.habitSettings ?: HabitSettings(), onSaveDayGoals) { detail = null } }
 }
 
 @DrawableRes

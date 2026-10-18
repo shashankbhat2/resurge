@@ -17,7 +17,7 @@ service cloud.firestore {
     function validProfile() {
       let allowed = ['displayName', 'email', 'photoUrl', 'goals', 'targets',
                      'onboardingComplete', 'onboardedAt', 'updatedAt', 'timezone',
-                     'habitResetTime', 'habitReminder', 'coachStyle', 'units', 'mealReminders'];
+                     'habitResetTime', 'habitReminder', 'coachStyle', 'units', 'mealReminders', 'dayGoals'];
       return request.resource.data.keys().hasOnly(allowed)
         && (!('goals' in request.resource.data) || request.resource.data.goals is list)
         && (!('timezone' in request.resource.data) || (request.resource.data.timezone is string
@@ -40,7 +40,27 @@ service cloud.firestore {
         && (!('units' in request.resource.data) || request.resource.data.units in ['metric', 'imperial'])
         && (!('mealReminders' in request.resource.data) || (
               request.resource.data.mealReminders.keys().hasOnly(['breakfast', 'lunch', 'dinner'])
-              && validReminderTimes(request.resource.data.mealReminders)));
+              && validReminderTimes(request.resource.data.mealReminders)))
+        && (!('dayGoals' in request.resource.data) || validDayGoals(request.resource.data.dayGoals));
+    }
+
+    // What a day needs for the day streak.
+    function validDayGoals(g) {
+      return g.keys().hasOnly(['excludedHabits', 'sleep', 'steps', 'meals', 'water', 'weeklyDays'])
+        && g.excludedHabits is list && g.excludedHabits.size() <= 50
+        && g.sleep is bool && g.steps is bool && g.water is bool
+        && g.meals is int && g.meals >= 0 && g.meals <= 4
+        && g.weeklyDays is int && g.weeklyDays >= 1 && g.weeklyDays <= 7;
+    }
+
+    // A settled day for the day streak (doc id = the date).
+    function validDayResult(date) {
+      let r = request.resource.data;
+      return isDay(date)
+        && r.keys().hasOnly(['date', 'met', 'done', 'total', 'updatedAt'])
+        && r.date == date
+        && r.met is bool
+        && r.done is int && r.total is int && r.done >= 0 && r.done <= r.total && r.total <= 60;
     }
 
     function validReminderTimes(m) {
@@ -260,6 +280,12 @@ service cloud.firestore {
         allow create, update: if isOwner(uid) && doc == 'current' && validWeightGoal();
       }
 
+      match /dayResults/{date} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validDayResult(date);
+        allow delete: if false;
+      }
+
       match /progressPhotos/{photoId} {
         allow read, delete: if isOwner(uid);
         allow create, update: if isOwner(uid) && validProgressPhoto();
@@ -309,7 +335,7 @@ service cloud.firestore {
         allow read, write: if isOwner(uid)
           && !(collection in ['events', 'devices', 'insights', 'usage', 'coachThreads', 'habits', 'habitDays',
                               'workouts', 'meals', 'waterDays', 'weights', 'weightGoal',
-                              'progressPhotos', 'progressKey', 'progressReels', 'progressSettings']);
+                              'progressPhotos', 'progressKey', 'progressReels', 'progressSettings', 'dayResults']);
       }
     }
 
