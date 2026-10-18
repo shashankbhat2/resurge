@@ -95,6 +95,7 @@ import com.resurgeai.feature.food.FoodLogRoute as FoodLogScreen
 import com.resurgeai.feature.food.FoodRoute as FoodScreenRoute
 import com.resurgeai.feature.food.MealReviewRoute as MealReviewScreen
 import com.resurgeai.feature.progress.ProgressStrip
+import com.resurgeai.feature.weight.GoalCelebrationHost
 import com.resurgeai.feature.progress.ReelReadyCard
 import com.resurgeai.feature.progress.ReelPlayerRoute as ReelPlayerScreen
 import com.resurgeai.feature.progress.ProgressCaptureRoute as ProgressCaptureScreen
@@ -132,8 +133,8 @@ import com.resurgeai.feature.weight.WeightRoute as WeightScreen
 /** Review a fresh estimate (mealId null) or edit a logged meal. */
 @Serializable data class MealReviewRoute(val mealId: String? = null)
 
-/** Weight trend, goal and weigh-ins; [log] opens the log sheet straight away. */
-@Serializable data class WeightScreenRoute(val log: Boolean = false)
+/** Weight trend, goal and weigh-ins; [log] opens the log sheet straight away, [newGoal] the goal editor for a fresh goal. */
+@Serializable data class WeightScreenRoute(val log: Boolean = false, val newGoal: Boolean = false)
 
 /** Progress photos: compare, grid, viewer. Reached from Weight, Settings and the launcher shortcut. */
 @Serializable data object ProgressScreenRoute
@@ -313,6 +314,7 @@ fun MainScreen(
                 WeightScreen(
                     onBack = { rootNav.popBackStack() },
                     openLog = entry.toRoute<WeightScreenRoute>().log,
+                    openNewGoal = entry.toRoute<WeightScreenRoute>().newGoal,
                     progressStrip = {
                         ProgressStrip(
                             onOpen = { rootNav.navigate(ProgressScreenRoute) },
@@ -346,12 +348,7 @@ fun MainScreen(
         }
         composable<ProgressSettingsRoute> {
             FullScreen {
-                ProgressSettingsScreen(
-                    onBack = { rootNav.popBackStack() },
-                    onReset = if (BuildConfig.DEBUG) {
-                        { rootNav.popBackStack(TabsRoute, inclusive = false) }
-                    } else null,
-                )
+                ProgressSettingsScreen(onBack = { rootNav.popBackStack() })
             }
         }
         composable<MealReviewRoute> {
@@ -393,6 +390,11 @@ fun MainScreen(
             }
         }
     }
+    // Milestones and the goal are celebrated wherever the person is when the trend gets there.
+    GoalCelebrationHost(onNewGoal = {
+        rootNav.popBackStack(TabsRoute, inclusive = false)
+        rootNav.navigate(WeightScreenRoute(newGoal = true))
+    })
 }
 
 /** Opaque background so a pushed screen fully covers the shell during transitions. */

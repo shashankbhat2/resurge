@@ -150,13 +150,6 @@ class PreferencesRepository @Inject constructor(
         dataStore.edit { it[PROGRESS_PROMPT_DISMISSED] = true }
     }
 
-    suspend fun resetProgressPrefs() {
-        dataStore.edit {
-            it.remove(PROGRESS_PROMPT_DISMISSED)
-            it.remove(PROGRESS_SECURE)
-        }
-    }
-
     suspend fun highTideShownOn(): LocalDate? =
         dataStore.data.first()[HIGH_TIDE_SHOWN]?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
 

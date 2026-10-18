@@ -51,8 +51,11 @@ data class WeightUiState(
 ) {
     val current: Double? get() = trend.lastOrNull()?.kg
 
-    /** The goal line belongs on long views; on a week or a month it would flatten the trend. */
-    val showsGoalLine: Boolean get() = goal != null && range in setOf(WeightRange.YEAR, WeightRange.ALL, WeightRange.CUSTOM)
+    /** The goal line belongs on long views (on a week or a month it would flatten the trend), and always while maintaining. */
+    val showsGoalLine: Boolean get() = goal != null && (goal.maintaining || range in setOf(WeightRange.YEAR, WeightRange.ALL, WeightRange.CUSTOM))
+
+    /** The plan line, only while working toward a goal. */
+    val plan: WeightGoal? get() = goal?.takeIf { g -> !g.maintaining && current?.let { !g.reached(it) } == true }
     val firstDate: LocalDate? get() = trend.firstOrNull()?.date
 
     /** The span the numbers are about. Fixed ranges are clamped to the first weigh-in. */
@@ -133,12 +136,25 @@ class WeightViewModel @Inject constructor(
 
     fun delete(weighIn: WeighIn) = repository.delete(weighIn)
 
+    /**
+     * Saves the goal. Changing only the target or pace of a goal in progress keeps its start (and
+     * counts milestones already passed as celebrated, so an edit never sets off old celebrations); a
+     * goal after reaching one, or after maintaining, starts fresh from today's trend.
+     */
     fun setGoal(goalKg: Double, paceKgPerWeek: Double) {
         val s = state.value
         val now = s.current ?: return
-        // Keep the original start when only the target or pace changes.
-        val start = s.goal?.takeIf { (it.goalKg < it.startKg) == (goalKg < now) }
-        repository.setGoal(WeightGoal(start?.startKg ?: now, start?.startDate ?: s.today, goalKg, paceKgPerWeek))
+        val start = s.goal?.takeIf { !it.maintaining && !it.reached(now) && (it.goalKg < it.startKg) == (goalKg < now) }
+        val goal = WeightGoal(start?.startKg ?: now, start?.startDate ?: s.today, goalKg, paceKgPerWeek)
+        val passed = WeightMath.milestonesReached(goal, now).coerceAtMost(WeightMath.milestoneSteps(goal).size - 1)
+        repository.setGoal(goal.copy(milestonesCelebrated = if (start == null) 0 else passed))
+    }
+
+    /** Holds the goal weight (after reaching it), or today's trend when there's no goal. */
+    fun maintain() {
+        val s = state.value
+        val kg = s.goal?.goalKg ?: s.current ?: return
+        repository.setGoal(WeightGoal.maintain(kg, s.today))
     }
 
     fun clearGoal() = repository.clearGoal()

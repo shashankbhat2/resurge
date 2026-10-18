@@ -84,4 +84,69 @@ class WeightMathTest {
         assertEquals(2.0, WeightMath.newMilestone(goal, trend, day0.plusDays(24))!!, 1e-9)
         assertNull(WeightMath.newMilestone(goal, trend, day0.plusDays(30)))
     }
+
+    @Test
+    fun `the plan moves at the chosen pace and stops at the goal`() {
+        val goal = WeightGoal(startKg = 80.0, startDate = day0, goalKg = 75.0, paceKgPerWeek = 0.5)
+        assertEquals(80.0, goal.planKgOn(day0.minusDays(3)), 1e-9)
+        assertEquals(79.0, goal.planKgOn(day0.plusDays(14)), 1e-9)
+        assertEquals(75.0, goal.planKgOn(day0.plusDays(400)), 1e-9)
+        assertEquals(day0.plusDays(70), goal.planEndDate)
+        val gain = WeightGoal(startKg = 60.0, startDate = day0, goalKg = 64.0, paceKgPerWeek = 0.25)
+        assertEquals(60.5, gain.planKgOn(day0.plusDays(14)), 1e-9)
+    }
+
+    @Test
+    fun `next milestone is the next 2 kg step, and the last one is the goal`() {
+        // 10.9 kg: steps at 2, 4, 6, 8, then 8 to 10.9 (the 0.9 kg leftover joins the last step).
+        val goal = WeightGoal(startKg = 76.9, startDate = day0, goalKg = 66.0, paceKgPerWeek = 0.5)
+        val first = WeightMath.nextMilestone(goal, 76.7)!!
+        assertEquals(74.9, first.targetKg, 1e-9)
+        assertEquals(76.9, first.fromKg, 1e-9)
+        assertEquals(0.1, first.progress, 1e-9)
+        assertEquals(1.8, first.remainingKg, 1e-9)
+        val third = WeightMath.nextMilestone(goal, 72.0)!!
+        assertEquals(70.9, third.targetKg, 1e-9)
+        assertEquals(5, WeightMath.milestoneSteps(goal).size)
+        val last = WeightMath.nextMilestone(goal, 67.0)!!
+        assertEquals(66.0, last.targetKg, 1e-9)
+        assertEquals(68.9, last.fromKg, 1e-9)
+        assertEquals(1.0, last.remainingKg, 1e-9)
+        // A leftover of a full step or more stays its own step.
+        assertEquals(listOf(0.0 to 2.0, 2.0 to 3.0), WeightMath.milestoneSteps(WeightGoal(80.0, day0, 77.0, 0.5)))
+        assertNull(WeightMath.nextMilestone(goal, 65.8))
+    }
+
+    @Test
+    fun `each milestone is celebrated once, the highest when several pass at once`() {
+        val goal = WeightGoal(startKg = 80.0, startDate = day0, goalKg = 72.0, paceKgPerWeek = 0.5) // steps at 2, 4, 6, then 8
+        assertNull(WeightMath.celebration(goal, 78.5))
+        val first = WeightMath.celebration(goal, 77.9) as GoalCelebration.Milestone
+        assertEquals(1, first.number)
+        assertEquals(3, first.count)
+        assertEquals(2.0, first.kgDone, 1e-9)
+        assertEquals(76.0, first.next!!.targetKg, 1e-9)
+        assertNull(WeightMath.celebration(goal.copy(milestonesCelebrated = 1), 77.9))
+        // A big drop (or an import) passing two milestones gets one celebration, for the higher one.
+        assertEquals(3, (WeightMath.celebration(goal.copy(milestonesCelebrated = 1), 73.5) as GoalCelebration.Milestone).number)
+    }
+
+    @Test
+    fun `reaching the goal is celebrated once and then sticks`() {
+        val goal = WeightGoal(startKg = 80.0, startDate = day0, goalKg = 72.0, paceKgPerWeek = 0.5, milestonesCelebrated = 3)
+        val c = WeightMath.celebration(goal, 71.9) as GoalCelebration.Goal
+        assertEquals(8.0, c.totalKg, 1e-9)
+        assertEquals(3, c.milestones)
+        val done = goal.copy(reachedOn = day0.plusDays(100))
+        assertNull(WeightMath.celebration(done, 71.9))
+        assertTrue(done.reached(73.0)) // drifted back: still reached
+        assertNull(WeightMath.celebration(done, 73.0))
+    }
+
+    @Test
+    fun `maintaining has nothing to celebrate and is never reached`() {
+        val hold = WeightGoal.maintain(72.0, day0)
+        assertNull(WeightMath.celebration(hold, 72.0))
+        assertEquals(false, hold.reached(72.0))
+    }
 }

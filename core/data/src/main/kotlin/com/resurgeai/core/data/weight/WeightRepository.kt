@@ -12,6 +12,7 @@ import com.resurgeai.core.data.prefs.PreferencesRepository
 import com.resurgeai.core.healthconnect.HealthDataSource
 import com.resurgeai.core.model.WeighIn
 import com.resurgeai.core.model.WeighInSource
+import com.resurgeai.core.model.GoalMode
 import com.resurgeai.core.model.WeightGoal
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -32,7 +33,7 @@ import javax.inject.Singleton
 /**
  * Weight log, owned by Resurge (Health Connect is only an optional import source and mirror):
  *   users/{uid}/weights/{id}         kg, atMs, localDate, source, note?, hcId? (imports use id "hc_<record id>")
- *   users/{uid}/weightGoal/current   startKg, startDate, goalKg, paceKgPerWeek
+ *   users/{uid}/weightGoal/current   startKg, startDate, goalKg, paceKgPerWeek, mode, milestonesCelebrated, reachedOn?
  */
 @Singleton
 class WeightRepository @Inject constructor(
@@ -125,8 +126,23 @@ class WeightRepository @Inject constructor(
                 "startDate" to goal.startDate.toString(),
                 "goalKg" to goal.goalKg,
                 "paceKgPerWeek" to goal.paceKgPerWeek,
+                "mode" to goal.mode.wire,
+                "milestonesCelebrated" to goal.milestonesCelebrated,
+                "reachedOn" to goal.reachedOn?.toString(),
                 "updatedAt" to FieldValue.serverTimestamp(),
             ),
+        )
+    }
+
+    /** Records what's been celebrated, so it isn't celebrated again (here or on another phone). */
+    fun markCelebrated(milestones: Int, reachedOn: LocalDate?) {
+        user()?.collection("weightGoal")?.document("current")?.set(
+            buildMap {
+                put("milestonesCelebrated", milestones)
+                reachedOn?.let { put("reachedOn", it.toString()) }
+                put("updatedAt", FieldValue.serverTimestamp())
+            },
+            SetOptions.merge(),
         )
     }
 
@@ -177,6 +193,9 @@ class WeightRepository @Inject constructor(
             startDate = d.getString("startDate")?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return null,
             goalKg = d.getDouble("goalKg") ?: return null,
             paceKgPerWeek = d.getDouble("paceKgPerWeek") ?: 0.5,
+            mode = GoalMode.fromWire(d.getString("mode")),
+            milestonesCelebrated = d.getLong("milestonesCelebrated")?.toInt() ?: 0,
+            reachedOn = d.getString("reachedOn")?.let { runCatching { LocalDate.parse(it) }.getOrNull() },
         )
     }
 

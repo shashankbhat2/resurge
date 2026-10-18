@@ -2,11 +2,14 @@ package com.resurgeai.feature.weight
 
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.composeunstyled.theme.ColorScheme
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.resurgeai.core.designsystem.components.Screen
 import com.resurgeai.core.designsystem.theme.ResurgeTheme
+import com.resurgeai.core.model.GoalCelebration
 import com.resurgeai.core.model.UnitSystem
 import com.resurgeai.core.model.WeighIn
 import com.resurgeai.core.model.WeightGoal
@@ -70,6 +73,51 @@ class WeightScreenshotTest {
     @Test fun custom() = capture("custom", state(WeightRange.CUSTOM))
     @Test fun imperialAll() = capture("all_lb", state(WeightRange.ALL, UnitSystem.IMPERIAL))
     @Test fun empty() = capture("empty", WeightUiState(loading = false, today = today))
+
+    // Trend is about 78.5 here, so 78.6 is just reached; the maintain range is 77.5 to 79.5.
+    @Test fun reached() = capture("reached", state(WeightRange.MONTH).copy(goal = goal.copy(goalKg = 78.6, reachedOn = today.minusDays(3))))
+    @Test fun maintaining() = capture("maintaining", state(WeightRange.MONTH).copy(goal = WeightGoal.maintain(78.0, today.minusDays(20))))
+
+    private fun captureAward(name: String, content: @androidx.compose.runtime.Composable () -> Unit) {
+        compose.setContent { ResurgeTheme(colorScheme = ColorScheme.Light) { Screen { content() } } }
+        compose.onRoot().captureRoboImage("src/test/screenshots/weight_$name.png")
+    }
+
+    private val celebrating = CelebrationState(
+        celebration = GoalCelebration.Milestone(2, 3, 4.0, WeightMath.nextMilestone(goal, 77.9)),
+        goal = goal,
+        units = WeightUnits(UnitSystem.METRIC),
+        commander = false,
+    )
+
+    @Test fun milestoneAward() = captureAward("milestone_award") { MilestoneAward(celebrating.celebration as GoalCelebration.Milestone, celebrating, onDone = {}) }
+
+    /** The confetti mid-burst: the clock is held, then moved [atMs] into the animation. */
+    private fun captureConfetti(name: String, goal: Boolean, atMs: Long) {
+        compose.mainClock.autoAdvance = false
+        val c: GoalCelebration = if (goal) GoalCelebration.Goal(8.1, today.minusDays(109), 3) else celebrating.celebration
+        compose.setContent {
+            ResurgeTheme(colorScheme = ColorScheme.Light) {
+                Screen {
+                    androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.45f)), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                        if (c is GoalCelebration.Goal) GoalReward(c, celebrating.copy(celebration = c), onNewGoal = {}, onMaintain = {}, onLater = {})
+                        else MilestoneAward(c as GoalCelebration.Milestone, celebrating, onDone = {})
+                        com.resurgeai.core.designsystem.components.Confetti(androidx.compose.ui.Modifier.fillMaxSize(), pieces = if (goal) 160 else 60, durationMs = if (goal) 3_600 else 2_400)
+                    }
+                }
+            }
+        }
+        compose.mainClock.advanceTimeBy(atMs)
+        compose.onRoot().captureRoboImage("src/test/screenshots/weight_$name.png")
+    }
+
+    @Test fun milestoneConfetti() = captureConfetti("milestone_confetti", goal = false, atMs = 700)
+    @Test fun goalConfetti() = captureConfetti("goal_confetti", goal = true, atMs = 900)
+
+    @Test fun goalReward() {
+        val c = GoalCelebration.Goal(8.1, today.minusDays(109), 3)
+        captureAward("goal_reward") { GoalReward(c, celebrating.copy(celebration = c, commander = true), onNewGoal = {}, onMaintain = {}, onLater = {}) }
+    }
 
     @Test
     fun `periods clamp to the first weigh-in and custom keeps its ends`() {

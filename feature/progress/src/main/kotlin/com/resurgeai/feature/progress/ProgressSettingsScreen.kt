@@ -29,7 +29,6 @@ import androidx.lifecycle.viewModelScope
 import com.composeunstyled.Text
 import com.composeunstyled.UnstyledButton
 import com.resurgeai.core.data.prefs.PreferencesRepository
-import com.resurgeai.core.data.progress.ProgressReset
 import com.resurgeai.core.data.progress.ReelRepository
 import com.resurgeai.core.designsystem.components.Divider
 import com.resurgeai.core.designsystem.components.Icon
@@ -42,9 +41,6 @@ import com.resurgeai.core.model.ReelSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import android.util.Log
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -54,7 +50,6 @@ import javax.inject.Inject
 internal class ProgressSettingsViewModel @Inject constructor(
     private val reels: ReelRepository,
     private val preferences: PreferencesRepository,
-    private val resetAll: ProgressReset,
 ) : ViewModel() {
     val reelSettings: StateFlow<ReelSettings> = reels.settings().catch { emit(ReelSettings()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReelSettings())
@@ -63,33 +58,16 @@ internal class ProgressSettingsViewModel @Inject constructor(
     fun setReels(on: Boolean) = reels.setEnabled(on)
 
     val secure: StateFlow<Boolean> = preferences.progressScreenshotBlock.stateIn(viewModelScope, SharingStarted.Eagerly, true)
-    private val _resetting = MutableStateFlow(false)
-    val resetting: StateFlow<Boolean> = _resetting.asStateFlow()
-
-    fun reset(onDone: () -> Unit) {
-        viewModelScope.launch {
-            _resetting.value = true
-            runCatching { resetAll() }.onFailure { Log.w("ProgressSettings", "Reset failed", it) }
-            ProgressImages.clear()
-            _resetting.value = false
-            onDone()
-        }
-    }
-
     fun setSecure(on: Boolean) {
         viewModelScope.launch { preferences.setProgressScreenshotBlock(on) }
     }
 }
 
-/**
- * Reels and screenshot blocking for progress photos. [onReset] (debug builds) adds a row that puts the
- * feature back to never-used for this account, then calls it.
- */
+/** Reels and screenshot blocking for progress photos. */
 @Composable
-fun ProgressSettingsRoute(onBack: () -> Unit, onReset: (() -> Unit)? = null) {
+fun ProgressSettingsRoute(onBack: () -> Unit) {
     val viewModel: ProgressSettingsViewModel = hiltViewModel()
     val secure by viewModel.secure.collectAsStateWithLifecycle()
-    val resetting by viewModel.resetting.collectAsStateWithLifecycle()
     val reels by viewModel.reelSettings.collectAsStateWithLifecycle()
 
     SecureWindow(true)
@@ -135,20 +113,6 @@ fun ProgressSettingsRoute(onBack: () -> Unit, onReset: (() -> Unit)? = null) {
                 Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("Block screenshots", style = Resurge.type.body, modifier = Modifier.weight(1f))
                     Switch(secure, viewModel::setSecure, accessibilityLabel = "Block screenshots of snapshots")
-                }
-            }
-
-            onReset?.let { done ->
-                Label("Debug")
-                Group {
-                    UnstyledButton(onClick = { if (!resetting) viewModel.reset(done) }, indication = LocalIndication.current, modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            if (resetting) "Resetting…" else "Reset Snapshots",
-                            style = Resurge.type.body,
-                            color = Resurge.colors.danger,
-                            modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        )
-                    }
                 }
             }
         }

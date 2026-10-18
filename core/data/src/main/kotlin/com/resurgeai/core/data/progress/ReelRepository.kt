@@ -78,11 +78,6 @@ class ReelRepository @Inject constructor(
         ref.collection("progressReels").get().await().documents.forEach { it.reference.delete().await() }
     }
 
-    /** Back to default reel settings and a fresh schedule. For the debug reset. */
-    suspend fun resetSettings() {
-        settingsDoc()?.delete()?.await()
-    }
-
     fun markWatched(id: String) {
         user()?.collection("progressReels")?.document(id)?.update(mapOf("watched" to true, "updatedAt" to FieldValue.serverTimestamp()))
     }
@@ -98,7 +93,8 @@ class ReelRepository @Inject constructor(
             val at = d.getLong("takenAtMs")?.let(Instant::ofEpochMilli) ?: return@mapNotNull null
             ProgressPhoto(d.id, at, 0, 0, d.getBoolean("uploaded") ?: true)
         }.sortedBy { it.takenAt }
-        val goal = runCatching { weights.goal().first() }.getOrNull()
+        // Holding a weight has no milestones or end to make reels of.
+        val goal = runCatching { weights.goal().first() }.getOrNull()?.takeIf { !it.maintaining }
         val trend = WeightMath.trend(runCatching { weights.weighIns().first() }.getOrDefault(emptyList()), today, zone)
         val current = trend.lastOrNull()?.kg
         val lastReelAt = ref.collection("progressReels").orderBy("createdAtMs", Query.Direction.DESCENDING).limit(1).get().await()
@@ -111,7 +107,7 @@ class ReelRepository @Inject constructor(
             lastReelAt = lastReelAt,
             settings = settings,
             milestoneKg = goal?.let { WeightMath.newMilestone(it, trend, today) },
-            goalReached = goal?.takeIf { current != null && it.progress(current) >= 1.0 }?.startDate,
+            goalReached = goal?.takeIf { current != null && it.reached(current) }?.startDate,
             zone = zone,
         )
         val update = mutableMapOf<String, Any>("updatedAt" to FieldValue.serverTimestamp())

@@ -49,6 +49,10 @@ internal class WeightUnits(val system: UnitSystem) {
 private val DAY_MONTH = DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())
 private val DAY_MONTH_YEAR = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.getDefault())
 private val WEEKDAY = DateTimeFormatter.ofPattern("EEEE", Locale.getDefault())
+private val MONTH_YEAR = DateTimeFormatter.ofPattern("MMM yyyy", Locale.getDefault())
+
+/** "Mar 2027" */
+internal fun monthYear(date: LocalDate): String = date.format(MONTH_YEAR)
 
 /** "18 Sep", with the year when it isn't [today]'s year. */
 internal fun shortDate(date: LocalDate, today: LocalDate = LocalDate.now()): String =

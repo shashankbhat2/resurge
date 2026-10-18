@@ -63,6 +63,9 @@ object ResurgeIcons {
     // Personal bests in Fitness. Streaks and the weekly goal use flames (FlameFilled, ProgressFlame).
     @DrawableRes val Medal = TablerFilled.drawable.tabler_ic_award_filled
 
+    // Reaching the weight goal.
+    @DrawableRes val Trophy = TablerFilled.drawable.tabler_ic_trophy_filled
+
     // Metrics
     @DrawableRes val Flame = Tabler.drawable.tabler_ic_flame_outline
     @DrawableRes val Droplet = Tabler.drawable.tabler_ic_droplet_outline

@@ -99,7 +99,11 @@ service cloud.firestore {
 
     function validWeightGoal() {
       let g = request.resource.data;
-      return g.keys().hasOnly(['startKg', 'startDate', 'goalKg', 'paceKgPerWeek', 'updatedAt'])
+      return g.keys().hasOnly(['startKg', 'startDate', 'goalKg', 'paceKgPerWeek', 'mode', 'milestonesCelebrated',
+                               'reachedOn', 'updatedAt'])
+        && (!('mode' in g) || g.mode in ['change', 'maintain'])
+        && (!('milestonesCelebrated' in g) || (g.milestonesCelebrated is int && g.milestonesCelebrated >= 0 && g.milestonesCelebrated <= 200))
+        && (!('reachedOn' in g) || g.reachedOn == null || isDay(g.reachedOn))
         && g.startKg is number && g.startKg >= 20 && g.startKg <= 400
         && g.goalKg is number && g.goalKg >= 20 && g.goalKg <= 400
         && isDay(g.startDate)
@@ -276,7 +280,7 @@ service cloud.firestore {
       match /progressSettings/{doc} {
         allow read: if isOwner(uid);
         allow create, update: if isOwner(uid) && doc == 'current' && validProgressSettings();
-        allow delete: if isOwner(uid);
+        allow delete: if false;
       }
 
       // FCM registration tokens (doc id = token).

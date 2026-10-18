@@ -120,17 +120,6 @@ class PhotoKeys @Inject constructor(
         }
     }
 
-    /** Forgets the key everywhere (cloud doc and this phone), back to [PhotoKeyState.NOT_SET_UP]. For the debug reset. */
-    suspend fun forget() = withContext(Dispatchers.IO) {
-        mutex.withLock {
-            val uid = uid()
-            keyDoc(uid).delete().await()
-            prefs.edit().remove("keyset_$uid").remove("secret_$uid").remove("blockstore_$uid").commit()
-            cached = null
-            _state.value = PhotoKeyState.NOT_SET_UP
-        }
-    }
-
     private suspend fun create(uid: String) {
         val handle = KeysetHandle.generateNew(PredefinedAeadParameters.AES256_GCM)
         val secret = ByteArray(SECRET_BYTES).also(SecureRandom()::nextBytes)
