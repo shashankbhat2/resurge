@@ -8,7 +8,11 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
 
-/** A daily habit. [icon] and [color] are keys resolved by the design system (HabitVisuals). */
+/**
+ * A daily habit. [icon] and [color] are keys resolved by the design system (HabitVisuals). For a
+ * [private] habit, [name] is its cover name, which is all that's ever shown outside the habit's own
+ * page (and all the server sees); the real name is stored encrypted and read on request.
+ */
 data class Habit(
     val id: String,
     val name: String,
@@ -18,10 +22,25 @@ data class Habit(
     val archived: Boolean,
     /** Habit day the habit was created; earlier days don't count against it. */
     val createdDate: LocalDate,
+    val private: Boolean = false,
 )
 
-/** A habit before it's saved (onboarding, add sheet). */
-data class HabitDraft(val name: String, val icon: String, val color: String)
+/**
+ * A habit before it's saved (onboarding, add sheet). With [private], [name] is the cover name and
+ * [realName] the habit itself (null when editing keeps the stored one).
+ */
+data class HabitDraft(
+    val name: String,
+    val icon: String,
+    val color: String,
+    val private: Boolean = false,
+    val realName: String? = null,
+) {
+    companion object {
+        const val DEFAULT_COVER = "Personal goal"
+        const val PRIVATE_ICON = "leaf"
+    }
+}
 
 /** What the user logged for a habit on a habit day. Unlogged days have no entry. */
 enum class HabitStatus(val wire: String) {

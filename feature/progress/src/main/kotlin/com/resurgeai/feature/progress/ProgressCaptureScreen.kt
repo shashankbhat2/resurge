@@ -83,6 +83,7 @@ import com.resurgeai.core.designsystem.components.ButtonVariant
 import com.resurgeai.core.designsystem.components.Icon
 import com.resurgeai.core.designsystem.components.ResurgeIcons
 import com.resurgeai.core.designsystem.components.Spinner
+import com.resurgeai.core.designsystem.components.SecureWindow
 import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.model.PhotoKeyState
 import com.resurgeai.core.model.ProgressPhoto

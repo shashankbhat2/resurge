@@ -80,6 +80,8 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onOpenCatalog: (() -> Unit)? = null,
     onOpenProgressPhotos: (() -> Unit)? = null,
+    /** Shown at the bottom of the menu; the app passes its own version. */
+    versionName: String = "",
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -109,6 +111,7 @@ fun SettingsScreen(
                     onHealthConnect = { runCatching { context.startActivity(viewModel.healthConnectSettingsIntent()) } },
                     onOpenCatalog = onOpenCatalog,
                     onOpenProgressPhotos = onOpenProgressPhotos,
+                    versionName = versionName,
                     onSignOut = viewModel::signOut,
                 )
                 Page.APPEARANCE -> Options(
@@ -154,6 +157,7 @@ private fun MainMenu(
     onHealthConnect: () -> Unit,
     onOpenCatalog: (() -> Unit)?,
     onOpenProgressPhotos: (() -> Unit)?,
+    versionName: String,
     onSignOut: () -> Unit,
 ) {
     val profile = state.profile
@@ -215,7 +219,7 @@ private fun MainMenu(
             MenuRow("Sign out", null, chevron = false, danger = true, onClick = onSignOut)
         }
         Text(
-            "Resurge 0.1.0",
+            "Resurge $versionName",
             style = Resurge.type.caption,
             color = Resurge.colors.textSubtle,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),

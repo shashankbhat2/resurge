@@ -11,6 +11,7 @@ import com.resurgeai.core.model.HabitStreaks
 import com.resurgeai.core.model.SessionState
 import com.resurgeai.core.model.Targets
 import com.resurgeai.core.model.UserProfile
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -101,8 +102,8 @@ class HabitsViewModelTest {
         habits.value = (0 until 8).map { habit("h$it", it) }
         val vm = vm()
         assertFalse(vm.state.value.canAdd)
-        vm.add(HabitDraft("Ninth", "flame", "accent"))
-        verify(exactly = 0) { repo.add(any(), any(), any()) }
+        vm.save(null, HabitDraft("Ninth", "flame", "accent")) {}
+        coVerify(exactly = 0) { repo.add(any(), any(), any()) }
     }
 
     @Test

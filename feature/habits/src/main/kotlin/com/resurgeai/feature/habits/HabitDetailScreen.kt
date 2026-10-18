@@ -57,6 +57,8 @@ import com.resurgeai.core.designsystem.components.ResurgeIcons
 import com.resurgeai.core.designsystem.components.SectionLabel
 import com.resurgeai.core.designsystem.components.StatDivider
 import com.resurgeai.core.designsystem.components.TopBar
+import com.resurgeai.core.designsystem.components.Switch
+import com.resurgeai.core.designsystem.components.SecureWindow
 import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.model.DayState
 import com.resurgeai.core.model.HabitDraft
@@ -95,6 +97,7 @@ fun HabitDetailRoute(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             StreakHero(item)
+            if (item.habit.private) PrivateCard(item.habit.name, read = { viewModel.realName(habitId) })
             SectionLabel("Last 12 weeks", Modifier.padding(top = 4.dp))
             Column(
                 Modifier.fillMaxWidth().clip(Resurge.shape.md).background(Resurge.colors.surface).padding(16.dp),
@@ -143,6 +146,38 @@ fun HabitDetailRoute(
             Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
             Spacer(Modifier.height(24.dp))
         }
+    }
+}
+
+/**
+ * A private habit's real name, hidden until asked for (behind the screen lock) and hidden again
+ * on leaving. Screenshots are blocked while it shows.
+ */
+@Composable
+private fun PrivateCard(cover: String, read: suspend () -> String?) {
+    var shown by remember { mutableStateOf<String?>(null) }
+    var failed by remember { mutableStateOf(false) }
+    val reveal = rememberRevealName(read) { name -> if (name != null) shown = name else failed = true }
+    SecureWindow(shown != null)
+    Row(
+        Modifier.fillMaxWidth().clip(Resurge.shape.md).background(Resurge.colors.surface).padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(ResurgeIcons.Lock, contentDescription = null, tint = Resurge.colors.textMuted, size = 20.dp)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            val name = shown
+            if (name != null) {
+                Text(name, style = Resurge.type.body.copy(fontWeight = Resurge.type.headline.fontWeight))
+                Text("Shown as \"$cover\" everywhere else", style = Resurge.type.caption, color = Resurge.colors.textMuted)
+            } else {
+                Text("Private habit", style = Resurge.type.body)
+                Text(if (failed) "The name can't be opened on this phone." else "Shown as \"$cover\" everywhere else", style = Resurge.type.caption, color = Resurge.colors.textMuted)
+            }
+        }
+        Spacer(Modifier.width(8.dp))
+        if (shown != null) Button("Hide", onClick = { shown = null }, variant = ButtonVariant.Secondary)
+        else if (!failed) Button("Show", onClick = reveal, variant = ButtonVariant.Secondary)
     }
 }
 
@@ -245,27 +280,44 @@ fun HabitEditorRoute(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val existing = habitId?.let { state.item(it)?.habit }
+    // For a private habit, [name] is the real name (left empty while hidden) and [cover] what shows.
     val name = rememberTextFieldState()
+    val cover = rememberTextFieldState(HabitDraft.DEFAULT_COVER)
+    var private by remember { mutableStateOf(false) }
     var icon by remember { mutableStateOf("flame") }
     var color by remember { mutableStateOf("accent") }
     var initialised by remember { mutableStateOf(habitId == null) }
+    var revealFailed by remember { mutableStateOf(false) }
     LaunchedEffect(existing) {
         if (!initialised && existing != null) {
-            name.edit { replace(0, length, existing.name) }
+            if (existing.private) cover.edit { replace(0, length, existing.name) } else name.edit { replace(0, length, existing.name) }
+            private = existing.private
             icon = existing.icon
             color = existing.color
             initialised = true
         }
     }
-    val canSave = name.text.isNotBlank() && (habitId != null || state.canAdd)
+    val reveal = habitId?.let { id ->
+        rememberRevealName(read = { viewModel.realName(id) }) { real ->
+            if (real != null) name.edit { replace(0, length, real) } else revealFailed = true
+        }
+    }
+    val wasPrivate = existing?.private == true
+    // A stored private name can be kept without retyping; anything else needs a name.
+    val nameOk = name.text.isNotBlank() || (private && wasPrivate)
+    val canSave = nameOk && (!private || cover.text.isNotBlank()) && (habitId != null || state.canAdd)
     val save = {
         if (canSave) {
-            val draft = HabitDraft(name.text.toString().trim(), icon, color)
-            if (habitId == null) viewModel.add(draft) else viewModel.update(habitId, draft)
-            onDone()
+            val draft = if (private) {
+                HabitDraft(cover.text.toString().trim(), icon, color, private = true, realName = name.text.toString().trim().ifEmpty { null })
+            } else {
+                HabitDraft(name.text.toString().trim(), icon, color)
+            }
+            viewModel.save(habitId, draft, onDone)
         }
     }
 
+    SecureWindow(private)
     Column(Modifier.fillMaxSize().imePadding()) {
         TopBar(title = if (habitId == null) "New habit" else "Edit habit", onBack = onDone)
         Column(
@@ -275,9 +327,41 @@ fun HabitEditorRoute(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            PreviewTile(name.text.toString(), icon, color)
+            PreviewTile(if (private) cover.text.toString() else name.text.toString(), icon, color)
             SectionLabel("Name", Modifier.padding(top = 4.dp))
-            InputField(name, placeholder = "e.g. Walk after dinner", onDone = save)
+            InputField(name, placeholder = if (wasPrivate) "Hidden. Leave empty to keep it" else "e.g. Walk after dinner", onDone = save)
+            if (wasPrivate && name.text.isEmpty() && reveal != null) {
+                Button("Show name", onClick = reveal, variant = ButtonVariant.Secondary, leadingIcon = ResurgeIcons.Lock, modifier = Modifier.fillMaxWidth())
+                if (revealFailed) Text("The name can't be opened on this phone.", style = Resurge.type.caption, color = Resurge.colors.textSubtle)
+            }
+
+            Row(
+                Modifier.fillMaxWidth().clip(Resurge.shape.md).background(Resurge.colors.surface).padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Private", style = Resurge.type.body)
+                    Text(
+                        "Shows a cover name everywhere else. The real name is encrypted and only shown on this habit's page.",
+                        style = Resurge.type.caption,
+                        color = Resurge.colors.textMuted,
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Switch(private, { on ->
+                    private = on
+                    // A telling icon would give it away.
+                    if (on && icon !in NEUTRAL_ICONS) icon = HabitDraft.PRIVATE_ICON
+                }, accessibilityLabel = "Private habit")
+            }
+            if (private) {
+                SectionLabel("Cover name", Modifier.padding(top = 4.dp))
+                InputField(cover, placeholder = HabitDraft.DEFAULT_COVER, onDone = save)
+            }
+            if (!private && wasPrivate && name.text.isBlank()) {
+                Text("Show or type the real name to make it public again.", style = Resurge.type.caption, color = Resurge.colors.textSubtle)
+            }
+            state.saveError?.let { Text(it, style = Resurge.type.caption, color = Resurge.colors.danger) }
 
             SectionLabel("Colour", Modifier.padding(top = 4.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -348,6 +432,9 @@ fun HabitEditorRoute(
         }
     }
 }
+
+/** Icons that say nothing about what a private habit is. */
+private val NEUTRAL_ICONS = setOf("leaf", "star", "circle", "flame", "sun")
 
 /** How the habit will look on Today once done: its colour fill, icon, name and a check. */
 @Composable

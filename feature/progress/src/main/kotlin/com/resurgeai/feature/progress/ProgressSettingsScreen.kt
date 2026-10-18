@@ -35,6 +35,7 @@ import com.resurgeai.core.designsystem.components.Icon
 import com.resurgeai.core.designsystem.components.ResurgeIcons
 import com.resurgeai.core.designsystem.components.Switch
 import com.resurgeai.core.designsystem.components.TopBar
+import com.resurgeai.core.designsystem.components.SecureWindow
 import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.model.ReelInterval
 import com.resurgeai.core.model.ReelSettings

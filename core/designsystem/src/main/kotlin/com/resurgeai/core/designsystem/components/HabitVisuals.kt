@@ -29,6 +29,10 @@ object HabitVisuals {
         "brain" to Tabler.drawable.tabler_ic_brain_outline,
         "sun" to Tabler.drawable.tabler_ic_sun_outline,
         "music" to Tabler.drawable.tabler_ic_music_outline,
+        // Neutral ones that say nothing about the habit, for private habits.
+        "leaf" to Tabler.drawable.tabler_ic_leaf_outline,
+        "star" to Tabler.drawable.tabler_ic_star_outline,
+        "circle" to Tabler.drawable.tabler_ic_circle_dot_outline,
     )
     private val iconMap = icons.toMap()
 

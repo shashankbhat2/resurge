@@ -193,7 +193,10 @@ service cloud.firestore {
     function validHabit() {
       let h = request.resource.data;
       return h.keys().hasOnly(['name', 'icon', 'color', 'order', 'archived', 'createdDate',
-                               'currentStreak', 'bestStreak', 'createdAt', 'updatedAt'])
+                               'currentStreak', 'bestStreak', 'createdAt', 'updatedAt', 'private', 'nameSealed'])
+        && (!('private' in h) || h.private is bool)
+        // A private habit's real name, encrypted on the phone.
+        && (!('nameSealed' in h) || (h.nameSealed is bytes && h.nameSealed.size() <= 1024))
         && h.name is string && h.name.size() > 0 && h.name.size() <= 60
         && h.icon is string && h.icon.size() <= 32
         && h.color is string && h.color.size() <= 32

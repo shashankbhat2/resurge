@@ -60,6 +60,7 @@ import com.resurgeai.core.designsystem.components.Button
 import com.resurgeai.core.designsystem.components.ButtonVariant
 import com.resurgeai.core.designsystem.components.ResurgeIcons
 import com.resurgeai.core.designsystem.components.Spinner
+import com.resurgeai.core.designsystem.components.SecureWindow
 import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.model.ProgressMath
 import com.resurgeai.core.model.ProgressPhoto

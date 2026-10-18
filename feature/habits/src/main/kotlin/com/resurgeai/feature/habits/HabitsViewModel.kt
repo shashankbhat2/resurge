@@ -45,6 +45,8 @@ data class HabitsUiState(
     val lastSwiped: String? = null,
     /** User chose to look at streaks while habits are still pending. */
     val showStreaksEarly: Boolean = false,
+    /** Saving a habit failed (a private one needs a connection the first time). */
+    val saveError: String? = null,
 ) {
     val pending: List<HabitItem> get() = items.filter { it.todayStatus == null }
     val doneToday: Int get() = items.count { it.todayStatus == HabitStatus.DONE }
@@ -144,16 +146,22 @@ class HabitsViewModel @Inject constructor(
 
     fun showStreaks(show: Boolean) = _state.update { it.copy(showStreaksEarly = show) }
 
-    fun add(draft: HabitDraft) {
+    /** Adds ([habitId] null) or updates a habit, then calls [onDone]; a failure shows on the editor instead. */
+    fun save(habitId: String?, draft: HabitDraft, onDone: () -> Unit) {
         val s = _state.value
-        if (!s.canAdd || draft.name.isBlank()) return
-        repository.add(draft, (s.items.maxOfOrNull { it.habit.order } ?: -1) + 1, s.today)
+        if (draft.name.isBlank() || (habitId == null && !s.canAdd)) return
+        viewModelScope.launch {
+            _state.update { it.copy(saveError = null) }
+            runCatching {
+                if (habitId == null) repository.add(draft, (s.items.maxOfOrNull { it.habit.order } ?: -1) + 1, s.today)
+                else repository.update(habitId, draft)
+            }.onSuccess { onDone() }
+                .onFailure { _state.update { it.copy(saveError = "Couldn't save. Check your connection and try again.") } }
+        }
     }
 
-    fun update(habitId: String, draft: HabitDraft) {
-        if (draft.name.isBlank()) return
-        repository.update(habitId, draft)
-    }
+    /** A private habit's real name, or null when this phone can't read it. */
+    suspend fun realName(habitId: String): String? = runCatching { repository.realName(habitId) }.getOrNull()
 
     /** Archives a habit; at least one active habit must remain. */
     fun archive(habitId: String): Boolean {

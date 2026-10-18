@@ -56,7 +56,9 @@ export function formatInsightList(items: StoredInsight[]): string {
 }
 
 export interface HabitSummary {
+  /** For a private habit, its cover name: the real one is encrypted on the phone and never sent. */
   name: string;
+  private: boolean;
   currentStreak: number;
   bestStreak: number;
   /** Habit day (yyyy-MM-dd) -> "done" | "missed" over the requested window. */
@@ -77,6 +79,7 @@ export async function loadHabits(uid: string, from: string): Promise<HabitSummar
     }
     return {
       name: String(h.get("name") ?? ""),
+      private: h.get("private") === true,
       currentStreak: Number(h.get("currentStreak") ?? 0),
       bestStreak: Number(h.get("bestStreak") ?? 0),
       log,

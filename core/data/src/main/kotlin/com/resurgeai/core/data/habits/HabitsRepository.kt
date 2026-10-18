@@ -1,12 +1,16 @@
 package com.resurgeai.core.data.habits
 
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.Blob
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
+import com.resurgeai.core.data.progress.PhotoKeyLockedException
+import com.resurgeai.core.data.progress.PhotoKeys
 import com.resurgeai.core.model.Habit
+import com.resurgeai.core.model.PhotoKeyState
 import com.resurgeai.core.model.HabitDraft
 import com.resurgeai.core.model.HabitStatus
 import kotlinx.coroutines.channels.awaitClose
@@ -20,14 +24,18 @@ import javax.inject.Singleton
 
 /**
  * Habits and daily check-ins:
- *   users/{uid}/habits/{id}           name, icon, color, order, archived, createdDate, cached streaks
+ *   users/{uid}/habits/{id}           name, icon, color, order, archived, createdDate, cached streaks,
+ *                                     private?, nameSealed? (a private habit's real name, encrypted)
  *   users/{uid}/habitDays/{yyyy-MM-dd} { date, entries: { habitId: "done" | "missed" } }
- * Writes go through Firestore's offline cache, so swipes work without a connection.
+ * Writes go through Firestore's offline cache, so swipes work without a connection. A private
+ * habit's real name is end-to-end encrypted with the same key as progress photos ([PhotoKeys]);
+ * the stored `name` is its cover name.
  */
 @Singleton
 class HabitsRepository @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val auth: FirebaseAuth,
+    private val keys: PhotoKeys,
 ) {
     private fun user() = auth.currentUser?.uid?.let { firestore.collection("users").document(it) }
 
@@ -73,15 +81,44 @@ class HabitsRepository @Inject constructor(
         )
     }
 
-    fun add(draft: HabitDraft, order: Int, today: LocalDate) {
-        user()?.collection("habits")?.document()?.set(newHabitMap(draft, order, today))
+    /** Adds a habit. A private one needs the key, so this can fail (offline the first time). */
+    suspend fun add(draft: HabitDraft, order: Int, today: LocalDate) {
+        val doc = user()?.collection("habits")?.document() ?: return
+        val sealed = if (draft.private) seal(doc.id, draft.realName ?: draft.name) else null
+        doc.set(newHabitMap(draft, order, today) + privacyFields(draft, sealed))
     }
 
-    fun update(habitId: String, draft: HabitDraft) {
-        user()?.collection("habits")?.document(habitId)?.update(
-            mapOf("name" to draft.name.trim(), "icon" to draft.icon, "color" to draft.color, "updatedAt" to FieldValue.serverTimestamp()),
-        )
+    suspend fun update(habitId: String, draft: HabitDraft) {
+        val doc = user()?.collection("habits")?.document(habitId) ?: return
+        val base = mapOf<String, Any>("name" to draft.name.trim(), "icon" to draft.icon, "color" to draft.color, "updatedAt" to FieldValue.serverTimestamp())
+        val real = draft.realName?.trim()
+        val privacy: Map<String, Any> = when {
+            !draft.private -> mapOf("private" to false, "nameSealed" to FieldValue.delete())
+            // Editing a private habit without retyping its name keeps the stored one.
+            real.isNullOrEmpty() -> mapOf("private" to true)
+            else -> mapOf("private" to true, "nameSealed" to Blob.fromBytes(seal(habitId, real)))
+        }
+        doc.update(base + privacy)
     }
+
+    /** A private habit's real name, or null when it can't be read on this phone. */
+    suspend fun realName(habitId: String): String? {
+        val uid = auth.currentUser?.uid ?: return null
+        val sealed = user()?.collection("habits")?.document(habitId)?.get()?.await()?.getBlob("nameSealed")?.toBytes() ?: return null
+        return runCatching { String(keys.aead().decrypt(sealed, ad(uid, habitId)), Charsets.UTF_8) }.getOrNull()
+    }
+
+    /** Encrypts a real name, making the key first if this is the user's first private thing. */
+    private suspend fun seal(habitId: String, name: String): ByteArray {
+        val uid = auth.currentUser?.uid ?: throw PhotoKeyLockedException()
+        if (keys.refresh() == PhotoKeyState.NOT_SET_UP) keys.setUp()
+        return keys.aead().encrypt(name.trim().toByteArray(Charsets.UTF_8), ad(uid, habitId))
+    }
+
+    private fun privacyFields(draft: HabitDraft, sealed: ByteArray?): Map<String, Any> =
+        if (draft.private && sealed != null) mapOf("private" to true, "nameSealed" to Blob.fromBytes(sealed)) else emptyMap()
+
+    private fun ad(uid: String, habitId: String) = "$uid/habit/$habitId/name".toByteArray()
 
     fun setArchived(habitId: String, archived: Boolean) {
         user()?.collection("habits")?.document(habitId)?.update(
@@ -104,6 +141,7 @@ class HabitsRepository @Inject constructor(
             order = (d.getLong("order") ?: 0L).toInt(),
             archived = d.getBoolean("archived") ?: false,
             createdDate = d.getString("createdDate")?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: LocalDate.now(),
+            private = d.getBoolean("private") ?: false,
         )
     }
 

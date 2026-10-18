@@ -1,8 +1,6 @@
 package com.resurgeai.feature.progress
 
-import android.app.Activity
 import android.content.Context
-import android.content.ContextWrapper
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
@@ -10,17 +8,14 @@ import android.media.ExifInterface
 import android.net.Uri
 import android.util.Log
 import android.util.LruCache
-import android.view.WindowManager
 import androidx.compose.foundation.Image
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import com.resurgeai.core.data.progress.PhotoVariant
 import com.resurgeai.core.data.progress.ProgressRepository
 import com.resurgeai.core.designsystem.components.SkeletonBox
@@ -161,28 +156,4 @@ internal fun EncryptedImage(
     } else if (alpha >= 1f) {
         SkeletonBox(modifier, Resurge.shape.sm)
     }
-}
-
-/** Keeps screenshots, screen recording and the recents thumbnail out of progress screens while [on]. */
-@Composable
-internal fun SecureWindow(on: Boolean) {
-    val context = LocalContext.current
-    DisposableEffect(on) {
-        val window = context.findActivity()?.window
-        if (on && window != null) {
-            // Counted, because the next progress screen arrives before the last one leaves.
-            if (secureHolders++ == 0) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        }
-        onDispose {
-            if (on && window != null && --secureHolders == 0) window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        }
-    }
-}
-
-private var secureHolders = 0
-
-private tailrec fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> null
 }

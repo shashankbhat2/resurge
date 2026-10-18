@@ -362,6 +362,7 @@ fun MainScreen(
                         { rootNav.navigate(CatalogRoute) }
                     } else null,
                     onOpenProgressPhotos = { rootNav.navigate(ProgressSettingsRoute) },
+                    versionName = BuildConfig.VERSION_NAME,
                 )
             }
         }

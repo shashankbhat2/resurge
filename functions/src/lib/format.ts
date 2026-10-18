@@ -83,12 +83,13 @@ export function formatEvent(e: ActivityEvent): string {
 }
 
 /** One line per habit: streaks and a compact per-day record (✓ done, ✗ not done, · unlogged). */
-export function formatHabits(habits: { name: string; currentStreak: number; bestStreak: number; log: Record<string, string> }[], dates: string[]): string {
+export function formatHabits(habits: { name: string; private?: boolean; currentStreak: number; bestStreak: number; log: Record<string, string> }[], dates: string[]): string {
   if (habits.length === 0) return "No habits set up.";
   const header = `habit | current streak | best | ${dates[0]}→${dates[dates.length - 1]} (✓ done, ✗ not done, · unlogged)`;
   const lines = habits.map((h) => {
     const marks = dates.map((d) => (h.log[d] === "done" ? "✓" : h.log[d] === "missed" ? "✗" : "·")).join("");
-    return `${h.name} | ${h.currentStreak} | ${h.bestStreak} | ${marks}`;
+    // Private habits only ever arrive as a cover name; marking them keeps the coach from guessing.
+    return `${h.name}${h.private ? " (private)" : ""} | ${h.currentStreak} | ${h.bestStreak} | ${marks}`;
   });
   return [header, ...lines].join("\n");
 }
