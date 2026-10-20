@@ -10,7 +10,24 @@ import com.resurgeai.core.model.UnitSystem
 import com.resurgeai.core.model.WeighIn
 import com.resurgeai.core.model.WeightGoal
 import com.resurgeai.core.model.WeightMath
+import com.resurgeai.core.model.WeighInSource
+import com.resurgeai.core.scale.PairedScale
+import com.resurgeai.core.scale.ScaleBluetooth
+import com.resurgeai.core.scale.ScaleOutcome
+import com.resurgeai.core.scale.ScaleReadiness
+import com.resurgeai.core.scale.ScaleScanner
+import com.resurgeai.core.scale.ScaleStore
+import com.resurgeai.core.scale.WeighInEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -89,6 +106,10 @@ private fun LocalDate.coerceAtMost(max: LocalDate) = if (isAfter(max)) max else 
 class WeightViewModel @Inject constructor(
     private val repository: WeightRepository,
     sessionRepository: SessionRepository,
+    private val scaleStore: ScaleStore,
+    private val bluetooth: ScaleBluetooth,
+    private val scanner: ScaleScanner,
+    private val engine: WeighInEngine,
 ) : ViewModel() {
     private val selection = MutableStateFlow(Triple(WeightRange.MONTH, null as LocalDate?, null as LocalDate?))
 
@@ -158,4 +179,125 @@ class WeightViewModel @Inject constructor(
     }
 
     fun clearGoal() = repository.clearGoal()
+
+    // ---- Smart scale: listening while the screen is visible ----
+
+    private val _scaleStrip = MutableStateFlow<ScaleStrip?>(null)
+    internal val scaleStrip: StateFlow<ScaleStrip?> = _scaleStrip.asStateFlow()
+    private var idleStrip: ScaleStrip.Listening? = null
+    private var pendingUnusual: ScaleOutcome.Unusual? = null
+    private var listenJob: Job? = null
+    private var stripTimeout: Job? = null
+
+    /**
+     * Listens for paired scales while the screen is started (Bluetooth on and allowed), feeding
+     * what it hears to the shared [WeighInEngine]. Marks the UI as watching so the app doesn't
+     * also post a notification for each weigh-in. Pair with [stopScaleListening].
+     */
+    fun startScaleListening() {
+        if (listenJob?.isActive == true) return
+        engine.watchUi()
+        listenJob = viewModelScope.launch {
+            val ready = flow {
+                while (true) {
+                    emit(bluetooth.readiness() == ScaleReadiness.READY)
+                    delay(READINESS_POLL_MS)
+                }
+            }.distinctUntilChanged()
+            launch {
+                combine(scaleStore.settings.map { it.scales }.distinctUntilChanged(), ready) { scales, on -> if (on) scales else emptyList() }
+                    .collectLatest { scales ->
+                        if (scales.isEmpty()) {
+                            idleStrip = null
+                            _scaleStrip.value = null
+                            return@collectLatest
+                        }
+                        val idle = ScaleStrip.Listening(listeningLabel(scales)).also { idleStrip = it }
+                        if (_scaleStrip.value == null || _scaleStrip.value is ScaleStrip.Listening) _scaleStrip.value = idle
+                        scanner.scan(scales.map { it.address }.toSet()).collect { engine.offer(it) }
+                    }
+            }
+            launch {
+                // The current value may be left over from an earlier weigh-in.
+                engine.live.drop(1).filterNotNull().collect { live ->
+                    if (!live.settled && _scaleStrip.value !is ScaleStrip.Unusual) show(ScaleStrip.Weighing(live.scale.model, live.kg), WEIGHING_MS)
+                }
+            }
+            launch { engine.outcomes.collect(::onOutcome) }
+        }
+    }
+
+    fun stopScaleListening() {
+        listenJob?.cancel() ?: return
+        listenJob = null
+        engine.unwatchUi()
+    }
+
+    fun undoScaleReading() {
+        val saved = _scaleStrip.value as? ScaleStrip.Saved ?: return
+        repository.delete(saved.weighIn)
+        backToIdle()
+    }
+
+    /** "Log it": the unusual reading was the person's after all. */
+    fun confirmScaleReading() {
+        val unusual = pendingUnusual ?: return
+        pendingUnusual = null
+        viewModelScope.launch { onOutcome(engine.confirm(unusual)) }
+    }
+
+    /** "Not me": drop the unusual reading. */
+    fun dismissScaleReading() {
+        pendingUnusual = null
+        backToIdle()
+    }
+
+    private fun onOutcome(outcome: ScaleOutcome) {
+        when (outcome) {
+            is ScaleOutcome.Saved -> show(
+                ScaleStrip.Saved(
+                    outcome.scale.model,
+                    WeighIn(outcome.weighInId, outcome.kg, outcome.at, source = WeighInSource.SCALE, device = outcome.scale.model),
+                ),
+                SAVED_MS,
+            )
+            is ScaleOutcome.Unusual -> {
+                pendingUnusual = outcome
+                show(ScaleStrip.Unusual(outcome.scale.model, outcome.kg), UNUSUAL_MS)
+            }
+            is ScaleOutcome.Repeat -> if (_scaleStrip.value is ScaleStrip.Weighing) backToIdle()
+        }
+    }
+
+    /** Shows [strip], falling back to the quiet listening line after [forMs] unless something replaced it. */
+    private fun show(strip: ScaleStrip, forMs: Long) {
+        _scaleStrip.value = strip
+        stripTimeout?.cancel()
+        stripTimeout = viewModelScope.launch {
+            delay(forMs)
+            if (_scaleStrip.value === strip) {
+                if (strip is ScaleStrip.Unusual) pendingUnusual = null
+                backToIdle()
+            }
+        }
+    }
+
+    private fun backToIdle() {
+        stripTimeout?.cancel()
+        _scaleStrip.value = idleStrip.takeIf { listenJob?.isActive == true }
+    }
+
+    override fun onCleared() {
+        stopScaleListening()
+    }
+
+    private companion object {
+        const val READINESS_POLL_MS = 2_000L
+        const val WEIGHING_MS = 8_000L
+        const val SAVED_MS = 12_000L
+        const val UNUSUAL_MS = 120_000L
+
+        fun listeningLabel(scales: List<PairedScale>) =
+            if (scales.size == 1) "Listening for ${scales.single().model}" else "Listening for your scales"
+    }
 }

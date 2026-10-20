@@ -13,6 +13,7 @@ import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import androidx.health.connect.client.records.WeightRecord
+import androidx.health.connect.client.records.metadata.Device
 import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.request.AggregateGroupByPeriodRequest
 import androidx.health.connect.client.request.AggregateRequest
@@ -183,13 +184,23 @@ class HealthDataSource @Inject constructor(
     }
 
     /** Saves a manual weigh-in to Health Connect; returns its record id, or null without permission. */
-    suspend fun writeWeight(kg: Double, at: Instant): String? {
+    suspend fun writeWeight(kg: Double, at: Instant, scale: ScaleOrigin? = null): String? {
         if (HealthPermissions.WRITE_WEIGHT !in manager.grantedPermissions()) return null
+        val metadata = if (scale == null) {
+            Metadata.manualEntry()
+        } else {
+            // Marked as measured by a scale, and keyed by our id so a retry replaces rather than duplicates.
+            Metadata.autoRecorded(
+                device = Device(type = Device.TYPE_SCALE, manufacturer = scale.manufacturer, model = scale.model),
+                clientRecordId = scale.clientRecordId,
+                clientRecordVersion = 1,
+            )
+        }
         val record = WeightRecord(
             time = at,
             zoneOffset = ZoneId.systemDefault().rules.getOffset(at),
             weight = Mass.kilograms(kg),
-            metadata = Metadata.manualEntry(),
+            metadata = metadata,
         )
         return client.insertRecords(listOf(record)).recordIdsList.firstOrNull()
     }
@@ -420,4 +431,7 @@ class HealthDataSource @Inject constructor(
 }
 
 /** A weigh-in read from Health Connect. */
+/** Which smart scale measured a weight being written, for Health Connect's device metadata. */
+data class ScaleOrigin(val manufacturer: String?, val model: String, val clientRecordId: String)
+
 data class HealthWeight(val recordId: String, val kg: Double, val at: Instant)

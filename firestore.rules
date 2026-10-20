@@ -105,15 +105,17 @@ service cloud.firestore {
         && (!('aiTotals' in m) || (m.aiTotals is map && m.aiTotals.size() <= 6));
     }
 
-    // A weigh-in: manual, or imported from Health Connect (id "hc_<record id>"). Stored in kg.
+    // A weigh-in: manual, imported from Health Connect (id "hc_<record id>") or from a smart scale. Stored in kg.
     function validWeighIn() {
       let w = request.resource.data;
-      return w.keys().hasOnly(['kg', 'atMs', 'localDate', 'note', 'source', 'hcId', 'updatedAt'])
+      return w.keys().hasOnly(['kg', 'atMs', 'localDate', 'note', 'source', 'hcId', 'device', 'impedanceOhm', 'updatedAt'])
         && w.kg is number && w.kg >= 20 && w.kg <= 400
         && w.atMs is int
         && isDay(w.localDate)
         && (!('note' in w) || w.note == null || (w.note is string && w.note.size() <= 120))
-        && (!('source' in w) || w.source in ['manual', 'health_connect'])
+        && (!('source' in w) || w.source in ['manual', 'health_connect', 'scale'])
+        && (!('device' in w) || w.device == null || (w.device is string && w.device.size() <= 60))
+        && (!('impedanceOhm' in w) || (w.impedanceOhm is int && w.impedanceOhm > 0 && w.impedanceOhm < 3000))
         && (!('hcId' in w) || (w.hcId is string && w.hcId.size() <= 200));
     }
 

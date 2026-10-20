@@ -22,6 +22,7 @@ include(
     ":core:designsystem",
     ":core:data",
     ":core:healthconnect",
+    ":core:scale",
     ":feature:auth",
     ":feature:coach",
     ":feature:dashboard",
@@ -31,4 +32,5 @@ include(
     ":feature:weight",
     ":feature:progress",
     ":feature:profile",
+    ":feature:scale",
 )

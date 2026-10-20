@@ -9,6 +9,8 @@ import com.resurgeai.app.notifications.MealReminder
 import com.resurgeai.app.notifications.ResurgeMessagingService
 import com.resurgeai.app.progress.ProgressShortcut
 import com.resurgeai.app.progress.ReelReminder
+import com.resurgeai.app.scale.AppScaleControl
+import com.resurgeai.app.scale.ScaleNotifications
 import com.resurgeai.core.data.di.WebClientId
 import dagger.Module
 import dagger.Provides
@@ -21,6 +23,7 @@ import javax.inject.Inject
 @HiltAndroidApp
 class ResurgeApplication : Application(), Configuration.Provider {
     @Inject lateinit var workerFactory: HiltWorkerFactory
+    @Inject lateinit var scaleControl: AppScaleControl
 
     override fun onCreate() {
         super.onCreate()
@@ -31,6 +34,9 @@ class ResurgeApplication : Application(), Configuration.Provider {
         ProgressShortcut.publish(this)
         ReelReminder.createChannel(this)
         ReelReminder.schedule(this)
+        ScaleNotifications.createChannels(this)
+        scaleControl.notifyOutcomes()
+        scaleControl.syncBackgroundListening()
     }
 
     override val workManagerConfiguration: Configuration

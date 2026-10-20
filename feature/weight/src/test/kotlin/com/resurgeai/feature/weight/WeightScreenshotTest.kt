@@ -12,6 +12,7 @@ import com.resurgeai.core.designsystem.theme.ResurgeTheme
 import com.resurgeai.core.model.GoalCelebration
 import com.resurgeai.core.model.UnitSystem
 import com.resurgeai.core.model.WeighIn
+import com.resurgeai.core.model.WeighInSource
 import com.resurgeai.core.model.WeightGoal
 import com.resurgeai.core.model.WeightMath
 import org.junit.Assert.assertEquals
@@ -59,10 +60,10 @@ class WeightScreenshotTest {
         customTo = if (range == WeightRange.CUSTOM) today.minusDays(16) else null,
     )
 
-    private fun capture(name: String, s: WeightUiState, scheme: ColorScheme = ColorScheme.Light) {
+    private fun capture(name: String, s: WeightUiState, scheme: ColorScheme = ColorScheme.Light, strip: ScaleStrip? = null) {
         compose.setContent {
             ResurgeTheme(colorScheme = scheme) {
-                Screen { WeightScreen(s, onBack = {}, onRange = {}, onCustom = { _, _ -> }, onSave = { _, _, _, _ -> }, onDelete = {}, onSetGoal = { _, _ -> }, onClearGoal = {}) }
+                Screen { WeightScreen(s, onBack = {}, onRange = {}, onCustom = { _, _ -> }, onSave = { _, _, _, _ -> }, onDelete = {}, onSetGoal = { _, _ -> }, onClearGoal = {}, scaleStrip = strip) }
             }
         }
         compose.onRoot().captureRoboImage("src/test/screenshots/weight_$name.png")
@@ -73,6 +74,19 @@ class WeightScreenshotTest {
     @Test fun custom() = capture("custom", state(WeightRange.CUSTOM))
     @Test fun imperialAll() = capture("all_lb", state(WeightRange.ALL, UnitSystem.IMPERIAL))
     @Test fun empty() = capture("empty", WeightUiState(loading = false, today = today))
+
+    private val scaleModel = "Mi Body Composition Scale 2"
+
+    /** The newest weigh-in came from a smart scale, so its row says so. */
+    private fun scaleState() = state(WeightRange.MONTH).let { st ->
+        val last = st.weighIns.last()
+        st.copy(weighIns = st.weighIns.dropLast(1) + last.copy(source = WeighInSource.SCALE, device = scaleModel))
+    }
+
+    @Test fun scaleListening() = capture("scale_listening", scaleState(), strip = ScaleStrip.Listening("Listening for $scaleModel"))
+    @Test fun scaleWeighing() = capture("scale_weighing", scaleState(), strip = ScaleStrip.Weighing(scaleModel, 78.2))
+    @Test fun scaleSaved() = capture("scale_saved", scaleState(), strip = ScaleStrip.Saved(scaleModel, scaleState().weighIns.last()))
+    @Test fun scaleUnusual() = capture("scale_unusual", scaleState(), ColorScheme.Dark, strip = ScaleStrip.Unusual(scaleModel, 61.3))
 
     // Trend is about 78.5 here, so 78.6 is just reached; the maintain range is 77.5 to 79.5.
     @Test fun reached() = capture("reached", state(WeightRange.MONTH).copy(goal = goal.copy(goalKg = 78.6, reachedOn = today.minusDays(3))))

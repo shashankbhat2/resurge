@@ -80,6 +80,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onOpenCatalog: (() -> Unit)? = null,
     onOpenProgressPhotos: (() -> Unit)? = null,
+    onOpenSmartScale: (() -> Unit)? = null,
     /** Shown at the bottom of the menu; the app passes its own version. */
     versionName: String = "",
     viewModel: ProfileViewModel = hiltViewModel(),
@@ -111,6 +112,7 @@ fun SettingsScreen(
                     onHealthConnect = { runCatching { context.startActivity(viewModel.healthConnectSettingsIntent()) } },
                     onOpenCatalog = onOpenCatalog,
                     onOpenProgressPhotos = onOpenProgressPhotos,
+                    onOpenSmartScale = onOpenSmartScale,
                     versionName = versionName,
                     onSignOut = viewModel::signOut,
                 )
@@ -157,6 +159,7 @@ private fun MainMenu(
     onHealthConnect: () -> Unit,
     onOpenCatalog: (() -> Unit)?,
     onOpenProgressPhotos: (() -> Unit)?,
+    onOpenSmartScale: (() -> Unit)?,
     versionName: String,
     onSignOut: () -> Unit,
 ) {
@@ -204,6 +207,10 @@ private fun MainMenu(
         MenuLabel("Data")
         MenuGroup {
             MenuRow("Health Connect", "Permissions", onClick = onHealthConnect)
+            onOpenSmartScale?.let {
+                MenuDivider()
+                MenuRow("Smart scale", state.smartScale ?: "Not set up", onClick = it)
+            }
             onOpenProgressPhotos?.let {
                 MenuDivider()
                 MenuRow("Snapshots", null, onClick = it)

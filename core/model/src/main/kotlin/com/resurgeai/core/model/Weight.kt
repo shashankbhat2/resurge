@@ -11,20 +11,24 @@ import kotlin.math.pow
 
 enum class WeighInSource(val wire: String) {
     MANUAL("manual"),
-    HEALTH_CONNECT("health_connect");
+    HEALTH_CONNECT("health_connect"),
+
+    /** Picked up from a Bluetooth smart scale. */
+    SCALE("scale");
 
     companion object {
         fun fromWire(value: String?): WeighInSource = entries.firstOrNull { it.wire == value } ?: MANUAL
     }
 }
 
-/** One reading from the scale, always stored in kg. */
+/** One reading from the scale, always stored in kg. [device] names the smart scale it came from. */
 data class WeighIn(
     val id: String,
     val kg: Double,
     val at: Instant,
     val note: String? = null,
     val source: WeighInSource = WeighInSource.MANUAL,
+    val device: String? = null,
 ) {
     fun date(zone: ZoneId = ZoneId.systemDefault()): LocalDate = at.atZone(zone).toLocalDate()
 }
