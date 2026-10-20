@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Smart scales
+Step on your Bluetooth scale and the weigh-in is logged. No pairing, and no scale app needed.
+- Works with scales that broadcast your weight: Xiaomi Mi Scale and Mi Body Composition Scale, Renpho, FITINDEX and other QN scales, OKOK and Chipsea scales, Etekcity Fit 8S, Eufy C20, Yunmai X, PICOOC Mini Lite, Sinocare, AiLink, AAA-series and Scale Up.
+- Set it up from Settings or the Weight screen: tap Find my scale and step on.
+- Readings are logged even with the app closed. A notification shows each one, with Undo.
+- The Smart scale screen shows whether it's listening right now. If something's in the way, like Bluetooth being off, it says what and gives you the button that fixes it.
+- On a shared scale, a reading far from your recent weight asks "Was this you?" before it's logged.
+- With the Weight screen open, you see the weight settle live.
+- Turn on Save weigh-ins to Health Connect and they reach Google Health, Fitbit and other apps too, marked as measured by your scale.
+
+### Weight widget
+- A home screen widget shows your latest weigh-in and this week's trend. Wider, it adds a month's trend line.
+- Tap Weigh in to listen for your scale, or Log weight if you don't have one. While you're on the scale, the widget shows the weight as it settles.
+- Add it from the widget list, or with one tap in Smart scale settings.
+
 ## 0.3.0 (18 October 2026)
 
 ### Snapshots

@@ -31,6 +31,9 @@ import com.composeunstyled.theme.ColorScheme
 import com.resurgeai.app.main.MainScreen
 import com.resurgeai.app.main.FoodSignal
 import com.resurgeai.app.main.ProgressSignal
+import com.resurgeai.app.main.WeightSignal
+import com.resurgeai.app.scale.ScaleNotifications
+import com.resurgeai.app.widget.WeightWidget
 import com.resurgeai.app.progress.ProgressShortcut
 import com.resurgeai.app.progress.ReelReminder
 import com.resurgeai.app.notifications.HabitReminder
@@ -87,6 +90,7 @@ class MainActivity : ComponentActivity() {
                     val openHabits by viewModel.openHabits.collectAsStateWithLifecycle()
                     val openFood by viewModel.openFood.collectAsStateWithLifecycle()
                     val openProgress by viewModel.openProgress.collectAsStateWithLifecycle()
+                    val openWeight by viewModel.openWeight.collectAsStateWithLifecycle()
                     val askNotifications by viewModel.askNotifications.collectAsStateWithLifecycle()
                     Screen {
                         AppRoot(
@@ -95,6 +99,7 @@ class MainActivity : ComponentActivity() {
                             openHabitsSignal = openHabits,
                             openFoodSignal = openFood,
                             openProgressSignal = openProgress,
+                            openWeightSignal = openWeight,
                             askNotifications = askNotifications,
                             onNotificationPromptShown = viewModel::onNotificationPromptShown,
                         )
@@ -120,6 +125,9 @@ class MainActivity : ComponentActivity() {
             ProgressShortcut.OPEN_CAPTURE -> viewModel.requestOpenProgress(capture = true)
             ProgressShortcut.OPEN_PROGRESS -> viewModel.requestOpenProgress(capture = false)
             ReelReminder.OPEN_REEL -> viewModel.requestOpenProgress(capture = false, reelId = intent.getStringExtra(ReelReminder.EXTRA_REEL))
+            ScaleNotifications.OPEN_WEIGHT -> viewModel.requestOpenWeight()
+            ScaleNotifications.OPEN_SMART_SCALE -> viewModel.requestOpenWeight(smartScale = true)
+            WeightWidget.OPEN_LOG -> viewModel.requestOpenWeight(log = true)
             else -> return
         }
         intent.removeExtra(ResurgeMessagingService.EXTRA_OPEN)
@@ -148,6 +156,7 @@ private fun AppRoot(
     openHabitsSignal: Int,
     openFoodSignal: FoodSignal,
     openProgressSignal: ProgressSignal,
+    openWeightSignal: WeightSignal,
     askNotifications: Boolean,
     onNotificationPromptShown: () -> Unit,
 ) {
@@ -170,6 +179,7 @@ private fun AppRoot(
                     openHabitsSignal = openHabitsSignal,
                     openFoodSignal = openFoodSignal,
                     openProgressSignal = openProgressSignal,
+                    openWeightSignal = openWeightSignal,
                 )
             }
         }

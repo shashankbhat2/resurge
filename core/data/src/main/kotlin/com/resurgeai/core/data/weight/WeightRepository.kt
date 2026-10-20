@@ -7,9 +7,11 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
+import com.google.firebase.firestore.Source
 import com.resurgeai.core.data.listen
 import com.resurgeai.core.data.prefs.PreferencesRepository
 import com.resurgeai.core.healthconnect.HealthDataSource
+import com.resurgeai.core.healthconnect.ScaleOrigin
 import com.resurgeai.core.model.WeighIn
 import com.resurgeai.core.model.WeighInSource
 import com.resurgeai.core.model.GoalMode
@@ -23,6 +25,8 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.math.abs
 import kotlinx.coroutines.tasks.await
 import java.time.Instant
 import java.time.LocalDate
@@ -32,7 +36,8 @@ import javax.inject.Singleton
 
 /**
  * Weight log, owned by Resurge (Health Connect is only an optional import source and mirror):
- *   users/{uid}/weights/{id}         kg, atMs, localDate, source, note?, hcId? (imports use id "hc_<record id>")
+ *   users/{uid}/weights/{id}         kg, atMs, localDate, source, note?, hcId?, device?, impedanceOhm?
+ *                                    (imports use id "hc_<record id>", smart scale readings "scale_<atMs>")
  *   users/{uid}/weightGoal/current   startKg, startDate, goalKg, paceKgPerWeek, mode, milestonesCelebrated, reachedOn?
  */
 @Singleton
@@ -41,6 +46,7 @@ class WeightRepository @Inject constructor(
     private val auth: FirebaseAuth,
     private val healthData: HealthDataSource,
     private val preferences: PreferencesRepository,
+    private val listeners: Set<@JvmSuppressWildcards WeightChangeListener>,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -84,6 +90,7 @@ class WeightRepository @Inject constructor(
             "note" to note?.trim()?.takeIf { it.isNotEmpty() }?.take(NOTE_MAX),
             "updatedAt" to FieldValue.serverTimestamp(),
         )
+        changed()
         if (id == null) {
             doc.set(data + ("source" to WeighInSource.MANUAL.wire))
             scope.launch {
@@ -97,11 +104,62 @@ class WeightRepository @Inject constructor(
         }
     }
 
+    /**
+     * Saves a reading picked up from a smart scale and returns its id, or null when it only
+     * repeats one logged moments ago (a scale broadcasting its final number for a while, or two
+     * phones hearing it).
+     */
+    suspend fun saveFromScale(
+        kg: Double,
+        at: Instant,
+        device: String,
+        manufacturer: String?,
+        impedanceOhm: Int?,
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): String? {
+        val col = user()?.collection("weights") ?: return null
+        val recent = recentWeighIns(at.minusMillis(SCALE_REPEAT_WINDOW_MS))
+        if (recent.any { it.source == WeighInSource.SCALE && abs(it.kg - kg) < SCALE_REPEAT_KG }) return null
+
+        val id = "scale_" + at.toEpochMilli()
+        val doc = col.document(id)
+        doc.set(
+            buildMap {
+                put("kg", kg)
+                put("atMs", at.toEpochMilli())
+                put("localDate", at.atZone(zone).toLocalDate().toString())
+                put("source", WeighInSource.SCALE.wire)
+                put("device", device.take(DEVICE_MAX))
+                impedanceOhm?.let { put("impedanceOhm", it) }
+                put("updatedAt", FieldValue.serverTimestamp())
+            },
+        )
+        changed()
+        scope.launch {
+            if (!preferences.weightWriteToHealthConnect.first()) return@launch
+            val origin = ScaleOrigin(manufacturer = manufacturer, model = device, clientRecordId = "resurge_$id")
+            runCatching { healthData.writeWeight(kg, at, origin) }
+                .onSuccess { hcId -> hcId?.let { doc.update("hcId", it) } }
+                .onFailure { Log.w(TAG, "Writing scale weight to Health Connect failed", it) }
+        }
+        return id
+    }
+
+    /** Weigh-ins since [since], newest first; served from the offline cache when there's no network. */
+    suspend fun recentWeighIns(since: Instant): List<WeighIn> {
+        val query = user()?.collection("weights")?.whereGreaterThanOrEqualTo("atMs", since.toEpochMilli()) ?: return emptyList()
+        val snap = withTimeoutOrNull(SERVER_WAIT_MS) { runCatching { query.get().await() }.getOrNull() }
+            ?: runCatching { query.get(Source.CACHE).await() }.getOrNull()
+            ?: return emptyList()
+        return snap.documents.mapNotNull(::toWeighIn).sortedByDescending { it.at }
+    }
+
     fun delete(weighIn: WeighIn) {
         val doc = user()?.collection("weights")?.document(weighIn.id) ?: return
         scope.launch {
             val hcId = runCatching { doc.get().await().getString("hcId") }.getOrNull()
             doc.delete()
+            changed()
             if (hcId != null) runCatching { healthData.deleteWeight(hcId) }.onFailure { Log.w(TAG, "Removing weight from Health Connect failed", it) }
         }
     }
@@ -114,9 +172,11 @@ class WeightRepository @Inject constructor(
                 "localDate" to weighIn.date().toString(),
                 "note" to weighIn.note,
                 "source" to weighIn.source.wire,
+                "device" to weighIn.device,
                 "updatedAt" to FieldValue.serverTimestamp(),
             ),
         )
+        changed()
     }
 
     fun setGoal(goal: WeightGoal) {
@@ -177,13 +237,14 @@ class WeightRepository @Inject constructor(
             }
             batch.commit()
         }
+        changed()
         return records.size
     }
 
     private fun toWeighIn(d: DocumentSnapshot): WeighIn? {
         val kg = d.getDouble("kg") ?: return null
         val at = d.getLong("atMs")?.let(Instant::ofEpochMilli) ?: return null
-        return WeighIn(d.id, kg, at, d.getString("note"), WeighInSource.fromWire(d.getString("source")))
+        return WeighIn(d.id, kg, at, d.getString("note"), WeighInSource.fromWire(d.getString("source")), d.getString("device"))
     }
 
     private fun toGoal(d: DocumentSnapshot): WeightGoal? {
@@ -199,9 +260,15 @@ class WeightRepository @Inject constructor(
         )
     }
 
+    private fun changed() = listeners.forEach { runCatching { it.onWeightsChanged() } }
+
     private companion object {
         const val TAG = "WeightRepository"
         const val NOTE_MAX = 120
+        const val DEVICE_MAX = 60
+        const val SCALE_REPEAT_WINDOW_MS = 5 * 60_000L
+        const val SCALE_REPEAT_KG = 0.3
+        const val SERVER_WAIT_MS = 4_000L
         /** How far back the import looks. */
         val IMPORT_SINCE: Instant = Instant.parse("2015-01-01T00:00:00Z")
     }

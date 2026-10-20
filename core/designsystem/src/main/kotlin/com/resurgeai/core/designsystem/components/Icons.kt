@@ -78,6 +78,13 @@ object ResurgeIcons {
     @DrawableRes val Heartbeat = Tabler.drawable.tabler_ic_heartbeat_outline
     @DrawableRes val Scale = Tabler.drawable.tabler_ic_scale_outline
 
+    // Smart scale
+    @DrawableRes val Bluetooth = Tabler.drawable.tabler_ic_bluetooth_outline
+    @DrawableRes val BluetoothOff = Tabler.drawable.tabler_ic_bluetooth_off_outline
+    @DrawableRes val Broadcast = Tabler.drawable.tabler_ic_broadcast_outline
+    @DrawableRes val BellOff = Tabler.drawable.tabler_ic_bell_off_outline
+    @DrawableRes val Widget = Tabler.drawable.tabler_ic_layout_grid_outline
+
     // Sources
     @DrawableRes val Watch = Tabler.drawable.tabler_ic_device_watch_outline
     @DrawableRes val Phone = Tabler.drawable.tabler_ic_device_mobile_outline

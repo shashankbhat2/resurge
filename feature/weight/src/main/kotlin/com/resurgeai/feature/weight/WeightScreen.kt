@@ -40,6 +40,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composeunstyled.Text
 import com.composeunstyled.UnstyledButton
@@ -68,9 +69,17 @@ fun WeightRoute(
     openLog: Boolean = false,
     openNewGoal: Boolean = false,
     progressStrip: (@Composable () -> Unit)? = null,
+    /** Opens the smart scale screen (pairing and settings). */
+    onOpenSmartScale: () -> Unit = {},
     viewModel: WeightViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val scaleStrip by viewModel.scaleStrip.collectAsStateWithLifecycle()
+    // Listen for paired scales only while this screen is visible.
+    LifecycleStartEffect(Unit) {
+        viewModel.startScaleListening()
+        onStopOrDispose { viewModel.stopScaleListening() }
+    }
     WeightScreen(
         state = state,
         onBack = onBack,
@@ -84,6 +93,14 @@ fun WeightRoute(
         openLog = openLog,
         openNewGoal = openNewGoal,
         progressStrip = progressStrip,
+        scaleStrip = scaleStrip,
+        scaleActions = ScaleStripActions(
+            onOpen = onOpenSmartScale,
+            onUndo = viewModel::undoScaleReading,
+            onConfirm = viewModel::confirmScaleReading,
+            onDismiss = viewModel::dismissScaleReading,
+        ),
+        onOpenSmartScale = onOpenSmartScale,
     )
 }
 
@@ -115,6 +132,10 @@ internal fun WeightScreen(
     openNewGoal: Boolean = false,
     /** Progress photos' entry row, under the goal (supplied by the app). */
     progressStrip: (@Composable () -> Unit)? = null,
+    /** Live smart scale status while one is paired and listening. */
+    scaleStrip: ScaleStrip? = null,
+    scaleActions: ScaleStripActions = ScaleStripActions(),
+    onOpenSmartScale: () -> Unit = {},
 ) {
     val units = remember(state.units) { WeightUnits(state.units) }
     var sheet by remember {
@@ -139,9 +160,10 @@ internal fun WeightScreen(
                 }
             },
         )
+        scaleStrip?.let { ScaleStripBox(it, units, scaleActions) }
         when {
             state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Spinner() }
-            state.weighIns.isEmpty() -> EmptyWeight { sheet = WeightSheetState.Log(null) }
+            state.weighIns.isEmpty() -> EmptyWeight(onLog = { sheet = WeightSheetState.Log(null) }, onSmartScale = onOpenSmartScale)
             else -> Column(
                 Modifier
                     .fillMaxSize()
@@ -208,6 +230,7 @@ internal fun WeightScreen(
                 },
                 onDelete = editing?.let { w -> { onDelete(w); sheet = null } },
                 onDismiss = { sheet = null },
+                onSmartScale = if (editing == null) ({ sheet = null; onOpenSmartScale() }) else null,
             )
         }
         is WeightSheetState.Goal -> state.current?.let { now ->
@@ -245,7 +268,12 @@ private fun RoundButton(icon: Int, label: String, accent: Boolean, onClick: () -
 }
 
 @Composable
-private fun EmptyWeight(onLog: () -> Unit) {
+private fun ScaleStripBox(strip: ScaleStrip, units: WeightUnits, actions: ScaleStripActions) {
+    Box(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 10.dp)) { ScaleStripView(strip, units, actions) }
+}
+
+@Composable
+private fun EmptyWeight(onLog: () -> Unit, onSmartScale: () -> Unit) {
     Column(
         Modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.Center,
@@ -265,6 +293,8 @@ private fun EmptyWeight(onLog: () -> Unit) {
         )
         Spacer(Modifier.height(20.dp))
         Button("Log weight", onClick = onLog, variant = ButtonVariant.Accent, leadingIcon = ResurgeIcons.Plus)
+        Spacer(Modifier.height(4.dp))
+        Button("Use a smart scale", onClick = onSmartScale, variant = ButtonVariant.Ghost, leadingIcon = ResurgeIcons.Scale)
     }
 }
 
@@ -606,7 +636,7 @@ private fun WeighInRow(w: WeighIn, previous: WeighIn?, units: WeightUnits, today
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(relativeDay(w.date(), today), style = Resurge.type.label)
-                val sub = listOfNotNull(w.note, if (w.source == WeighInSource.HEALTH_CONNECT) "From Health Connect" else null).joinToString(" · ")
+                val sub = listOfNotNull(w.note, sourceLabel(w)).joinToString(" · ")
                 if (sub.isNotEmpty()) Text(sub, style = Resurge.type.caption, color = Resurge.colors.textSubtle, maxLines = 1)
             }
             Text(units.format(w.kg), style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight, fontFeatureSettings = "tnum"))
@@ -619,4 +649,11 @@ private fun WeighInRow(w: WeighIn, previous: WeighIn?, units: WeightUnits, today
             )
         }
     }
+}
+
+/** Where a weigh-in came from, when it wasn't typed in. */
+private fun sourceLabel(w: WeighIn): String? = when (w.source) {
+    WeighInSource.HEALTH_CONNECT -> "From Health Connect"
+    WeighInSource.SCALE -> "From ${w.device ?: "your scale"}"
+    WeighInSource.MANUAL -> null
 }

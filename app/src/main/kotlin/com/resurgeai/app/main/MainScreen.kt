@@ -55,6 +55,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -65,6 +66,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.resurgeai.app.BuildConfig
+import com.resurgeai.app.widget.WeightWidget
 import com.resurgeai.core.designsystem.catalog.DesignCatalog
 import com.resurgeai.core.designsystem.components.FloatingNavBar
 import com.resurgeai.core.designsystem.components.FloatingNavBarHeight
@@ -106,6 +108,7 @@ import androidx.compose.runtime.remember
 import androidx.navigation.toRoute
 import kotlinx.serialization.Serializable
 import com.resurgeai.feature.weight.WeightRoute as WeightScreen
+import com.resurgeai.feature.scale.SmartScaleRoute as SmartScaleScreen
 
 // Root graph: the tab shell plus full-screen destinations that cover it (incl. the bottom bar).
 @Serializable data object TabsRoute
@@ -147,6 +150,9 @@ import com.resurgeai.feature.weight.WeightRoute as WeightScreen
 
 /** Backup, recovery key and privacy for progress photos. */
 @Serializable data object ProgressSettingsRoute
+
+/** Pairing and settings for Bluetooth smart scales. Reached from Weight and Settings. */
+@Serializable data object SmartScaleScreenRoute
 
 /** Settings, opened from the profile photo. */
 @Serializable data object SettingsRoute
@@ -198,6 +204,7 @@ fun MainScreen(
     openHabitsSignal: Int = 0,
     openFoodSignal: FoodSignal = FoodSignal(),
     openProgressSignal: ProgressSignal = ProgressSignal(),
+    openWeightSignal: WeightSignal = WeightSignal(),
 ) {
     val rootNav = rememberNavController()
     // A tapped insight notification opens Coach on the Insights tab.
@@ -219,6 +226,13 @@ fun MainScreen(
             rootNav.navigate(ProgressScreenRoute)
             if (openProgressSignal.capture) rootNav.navigate(ProgressCaptureRoute)
             openProgressSignal.reelId?.let { rootNav.navigate(ReelRoute(it)) }
+        }
+    }
+    LaunchedEffect(openWeightSignal.count) {
+        if (openWeightSignal.count > 0) {
+            rootNav.popBackStack(TabsRoute, inclusive = false)
+            rootNav.navigate(WeightScreenRoute(log = openWeightSignal.log))
+            if (openWeightSignal.smartScale) rootNav.navigate(SmartScaleScreenRoute)
         }
     }
     NavHost(
@@ -315,12 +329,22 @@ fun MainScreen(
                     onBack = { rootNav.popBackStack() },
                     openLog = entry.toRoute<WeightScreenRoute>().log,
                     openNewGoal = entry.toRoute<WeightScreenRoute>().newGoal,
+                    onOpenSmartScale = { rootNav.navigate(SmartScaleScreenRoute) { launchSingleTop = true } },
                     progressStrip = {
                         ProgressStrip(
                             onOpen = { rootNav.navigate(ProgressScreenRoute) },
                             onCapture = { rootNav.navigate(ProgressScreenRoute); rootNav.navigate(ProgressCaptureRoute) },
                         )
                     },
+                )
+            }
+        }
+        composable<SmartScaleScreenRoute> {
+            val context = LocalContext.current
+            FullScreen {
+                SmartScaleScreen(
+                    onBack = { rootNav.popBackStack() },
+                    onAddWidget = if (WeightWidget.canPin(context)) ({ WeightWidget.pin(context) }) else null,
                 )
             }
         }
@@ -362,6 +386,7 @@ fun MainScreen(
                         { rootNav.navigate(CatalogRoute) }
                     } else null,
                     onOpenProgressPhotos = { rootNav.navigate(ProgressSettingsRoute) },
+                    onOpenSmartScale = { rootNav.navigate(SmartScaleScreenRoute) },
                     versionName = BuildConfig.VERSION_NAME,
                 )
             }
@@ -552,6 +577,9 @@ data class FoodSignal(val count: Int = 0, val mode: String? = null)
 
 /** Open Progress; [capture] goes on to the camera, [reelId] plays that reel. */
 data class ProgressSignal(val count: Int = 0, val capture: Boolean = false, val reelId: String? = null)
+
+/** Scale notifications and the weight widget: open Weight, its log sheet, or Smart scale settings. */
+data class WeightSignal(val count: Int = 0, val log: Boolean = false, val smartScale: Boolean = false)
 
 private fun greeting(profile: UserProfile, now: LocalTime = LocalTime.now()): String {
     val part = when (now.hour) {

@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.google.services)
+    alias(libs.plugins.roborazzi)
 }
 
 android {
@@ -54,6 +55,7 @@ android {
         compose = true
         buildConfig = true
     }
+    testOptions { unitTests.isIncludeAndroidResources = true }
 }
 
 dependencies {
@@ -61,6 +63,7 @@ dependencies {
     implementation(libs.haze)
     implementation(project(":core:data"))
     implementation(project(":core:healthconnect"))
+    implementation(project(":core:scale"))
     implementation(project(":feature:auth"))
     implementation(project(":feature:coach"))
     implementation(project(":feature:habits"))
@@ -70,6 +73,7 @@ dependencies {
     implementation(project(":feature:progress"))
     implementation(project(":feature:dashboard"))
     implementation(project(":feature:profile"))
+    implementation(project(":feature:scale"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)
@@ -83,13 +87,22 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.messaging)
+    implementation(libs.firebase.auth)
     implementation(libs.firebase.appcheck.playintegrity)
     debugImplementation(libs.firebase.appcheck.debug)
     implementation(libs.androidx.work.runtime)
+    implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.hilt.work)
     ksp(libs.androidx.hilt.compiler)
 
     debugImplementation(libs.compose.ui.tooling)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.androidx.test.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.roborazzi)
+    debugImplementation(libs.compose.ui.test.manifest)
 }
 
 /**

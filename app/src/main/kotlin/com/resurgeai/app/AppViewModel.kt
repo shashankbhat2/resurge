@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.map
 import android.content.Context
 import com.resurgeai.app.main.FoodSignal
 import com.resurgeai.app.main.ProgressSignal
+import com.resurgeai.app.main.WeightSignal
 import com.resurgeai.app.notifications.HabitReminder
 import com.resurgeai.app.notifications.MealReminder
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -66,6 +67,13 @@ class AppViewModel @Inject constructor(
     val openProgress: StateFlow<ProgressSignal> = _openProgress.asStateFlow()
 
     fun requestOpenProgress(capture: Boolean, reelId: String? = null) = _openProgress.update { ProgressSignal(it.count + 1, capture, reelId) }
+
+    /** Scale notifications and the weight widget. */
+    private val _openWeight = MutableStateFlow(WeightSignal())
+    val openWeight: StateFlow<WeightSignal> = _openWeight.asStateFlow()
+
+    fun requestOpenWeight(log: Boolean = false, smartScale: Boolean = false) =
+        _openWeight.update { WeightSignal(it.count + 1, log, smartScale) }
 
     /** True until we've asked for the notification permission once. */
     private val _askNotifications = MutableStateFlow(false)

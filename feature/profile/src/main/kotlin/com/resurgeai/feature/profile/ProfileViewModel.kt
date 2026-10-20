@@ -16,6 +16,7 @@ import com.resurgeai.core.model.SessionState
 import com.resurgeai.core.model.ThemePreference
 import com.resurgeai.core.model.TimeFormat
 import com.resurgeai.core.model.UserProfile
+import com.resurgeai.core.scale.ScaleStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +30,8 @@ data class ProfileUiState(
     val theme: ThemePreference = ThemePreference.SYSTEM,
     /** Null = follow the device's 12/24-hour setting. */
     val timeFormat: TimeFormat? = null,
+    /** The paired smart scale's model, "2 scales" for several, null when none is set up. */
+    val smartScale: String? = null,
 )
 
 @HiltViewModel
@@ -38,6 +41,7 @@ class ProfileViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val healthConnect: HealthConnectManager,
     private val userRepository: UserRepository,
+    scaleStore: ScaleStore,
 ) : ViewModel() {
     fun healthConnectSettingsIntent() = healthConnect.settingsIntent()
 
@@ -45,8 +49,18 @@ class ProfileViewModel @Inject constructor(
         sessionRepository.session,
         preferencesRepository.themePreference,
         preferencesRepository.timeFormat,
-    ) { session, theme, timeFormat ->
-        ProfileUiState(profile = (session as? SessionState.Ready)?.profile, theme = theme, timeFormat = timeFormat)
+        scaleStore.settings,
+    ) { session, theme, timeFormat, scales ->
+        ProfileUiState(
+            profile = (session as? SessionState.Ready)?.profile,
+            theme = theme,
+            timeFormat = timeFormat,
+            smartScale = when (scales.scales.size) {
+                0 -> null
+                1 -> scales.scales.single().model
+                else -> "${scales.scales.size} scales"
+            },
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProfileUiState())
 
     fun setTheme(theme: ThemePreference) {

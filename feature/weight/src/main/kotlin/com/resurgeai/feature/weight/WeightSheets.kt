@@ -111,6 +111,8 @@ internal fun LogWeightSheet(
     onSave: (kg: Double, at: Instant, note: String?) -> Unit,
     onDelete: (() -> Unit)?,
     onDismiss: () -> Unit,
+    /** Opens smart scale setup; shown on a new weigh-in only. */
+    onSmartScale: (() -> Unit)? = null,
 ) {
     val zone = ZoneId.systemDefault()
     val today = LocalDate.now(zone)
@@ -169,6 +171,7 @@ internal fun LogWeightSheet(
             modifier = Modifier.fillMaxWidth(),
         )
         onDelete?.let { Button("Delete weigh-in", onClick = it, variant = ButtonVariant.Ghost, modifier = Modifier.fillMaxWidth()) }
+        onSmartScale?.let { Button("Smart scale", onClick = it, variant = ButtonVariant.Ghost, leadingIcon = ResurgeIcons.Scale, modifier = Modifier.fillMaxWidth()) }
     }
 }
 

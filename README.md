@@ -30,7 +30,7 @@ Resurge pulls your day together and keeps it light. Everything you do fills one 
 - **Habits.** One-tap check-ins, streaks with freezes for off days, and a calendar of every habit's history.
 - **Fitness.** Workouts from Health Connect and ones you log yourself (runs, rides, strength sets, swims and more), merged and de-duplicated, with weekly active minutes.
 - **Food.** Point the in-app camera at your plate, pick a gallery photo or describe the meal. The coach identifies each food, estimates portions and nutrition, and asks one question when it would change the numbers. Fix anything in a tap before logging.
-- **Weight.** Weigh-ins are smoothed into a trend, so one salty dinner doesn't erase a good week. Measure the change over any period, set a goal and pace, and import your history from Health Connect.
+- **Weight.** Weigh-ins are smoothed into a trend, so one salty dinner doesn't erase a good week. Measure the change over any period, set a goal and pace, and import your history from Health Connect. Step on a Bluetooth smart scale and the reading is logged on its own, even with the app closed, and a home screen widget keeps your latest weight in view. See [docs/smart-scales.md](docs/smart-scales.md).
 - **Snapshots.** Progress photos you take when you like, lined up against a faint copy of the last one. They're end-to-end encrypted on the phone before backup, and every few weeks (3 days to 8 weeks, your choice) a reel of them arrives on its own, like a photos app's memories.
 - **Coach.** Chat with a coach that can see your recent data, get a short insight after each workout or night of sleep, and a weekly report on Saturday. Choose a warm *Friend* or a no-nonsense *Commander*.
 
@@ -46,6 +46,7 @@ core/
   model/             Plain Kotlin models and the maths (tide, streaks, weight trend)
   data/              Firestore repositories, DataStore preferences, background sync
   healthconnect/     Health Connect reads (and optional weight writes)
+  scale/             Bluetooth smart scales: broadcast decoders, background listening, weigh-in engine
   designsystem/      "Tide" design system: tokens, type, components
 feature/
   dashboard/         Today, health metric details
@@ -53,6 +54,7 @@ feature/
   fitness/           Workouts, activity picker, workout editor
   food/              Meal scanner (CameraX), estimate review, food log
   weight/            Weight trend, weigh-ins, goal
+  scale/             Smart scale setup and settings
   progress/          Progress photos (CameraX), before/after, reels
   coach/             Chat and insights
   profile/           Settings
@@ -125,7 +127,7 @@ Screenshot references live next to each feature in `src/test/screenshots/`. Revi
 
 ## Privacy
 
-Your data is stored under your account in Firestore and protected by per-user security rules. Meal photos are sent to the meal analysis function, which passes them to Claude; only a small thumbnail is stored. From Health Connect, only daily summaries and finished workouts and nights of sleep are uploaded, for the coach and its insights. Daily limits on chat turns, insights and meal scans keep API costs bounded (`functions/src/lib/quota.ts`).
+Your data is stored under your account in Firestore and protected by per-user security rules. Meal photos are sent to the meal analysis function, which passes them to Claude; only a small thumbnail is stored. From Health Connect, only daily summaries and finished workouts and nights of sleep are uploaded, for the coach and its insights. Smart scales are only listened to, never connected to; a paired scale's Bluetooth address stays on the phone, and Android 12+ scans with "Nearby devices" declared as never used for location. Daily limits on chat turns, insights and meal scans keep API costs bounded (`functions/src/lib/quota.ts`).
 
 ## Contributing
 
