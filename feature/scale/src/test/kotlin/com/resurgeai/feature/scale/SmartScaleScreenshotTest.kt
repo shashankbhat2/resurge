@@ -37,7 +37,7 @@ class SmartScaleScreenshotTest {
     private fun capture(name: String, s: SmartScaleUiState, nearby: List<FoundScale> = emptyList(), scheme: ColorScheme = ColorScheme.Light) {
         compose.setContent {
             ResurgeTheme(colorScheme = scheme) {
-                Screen { SmartScaleScreen(s, nearby, SmartScaleActions(), today = today) }
+                Screen { SmartScaleScreen(s, nearby, SmartScaleActions(onAddWidget = {}), today = today) }
             }
         }
         compose.onRoot().captureRoboImage("src/test/screenshots/scale_$name.png")
@@ -65,6 +65,13 @@ class SmartScaleScreenshotTest {
             phone = PhoneState(needsNotifications = true),
         ),
     )
+
+    @Test fun pairedBluetoothOff() = capture(
+        "paired_bluetooth_off",
+        base.copy(scales = listOf(miScale), lastReadingAt = today.minusDays(1).atTime(7, 42).atZone(zone).toInstant(), phone = PhoneState(readiness = ScaleReadiness.BLUETOOTH_OFF)),
+    )
+
+    @Test fun pairedOff() = capture("paired_off", base.copy(scales = listOf(miScale), autoLog = false))
 
     @Test fun pairedDark() = capture(
         "paired_dark",

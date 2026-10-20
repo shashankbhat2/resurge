@@ -55,6 +55,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -65,6 +66,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.resurgeai.app.BuildConfig
+import com.resurgeai.app.widget.WeightWidget
 import com.resurgeai.core.designsystem.catalog.DesignCatalog
 import com.resurgeai.core.designsystem.components.FloatingNavBar
 import com.resurgeai.core.designsystem.components.FloatingNavBarHeight
@@ -338,7 +340,13 @@ fun MainScreen(
             }
         }
         composable<SmartScaleScreenRoute> {
-            FullScreen { SmartScaleScreen(onBack = { rootNav.popBackStack() }) }
+            val context = LocalContext.current
+            FullScreen {
+                SmartScaleScreen(
+                    onBack = { rootNav.popBackStack() },
+                    onAddWidget = if (WeightWidget.canPin(context)) ({ WeightWidget.pin(context) }) else null,
+                )
+            }
         }
         composable<ProgressScreenRoute> {
             FullScreen {

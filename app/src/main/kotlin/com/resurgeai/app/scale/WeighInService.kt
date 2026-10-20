@@ -11,6 +11,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.google.firebase.auth.FirebaseAuth
+import com.resurgeai.app.widget.WeightWidget
 import com.resurgeai.core.data.user.UserRepository
 import com.resurgeai.core.model.UnitSystem
 import com.resurgeai.core.scale.ScaleBluetooth
@@ -24,6 +25,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.launch
@@ -76,6 +80,8 @@ class WeighInService : Service() {
             val system = units.current()
             val names = scales.joinToString(" or ") { it.model }
             update("Listening for your $names", if (trigger == Trigger.USER) "Step on when you're ready." else "Hold still for a moment.")
+            _listening.value = true
+            WeightWidget.refresh(this)
 
             var lastShownKg: Double? = null
             withTimeoutOrNull(if (trigger == Trigger.USER) USER_WINDOW_MS else WOKE_WINDOW_MS) {
@@ -85,6 +91,7 @@ class WeighInService : Service() {
                         if (lastShownKg?.let { abs(live.kg - it) < 0.05 } != true) {
                             lastShownKg = live.kg
                             update(ScaleNotifications.weightText(live.kg, system) + "…", "Hold still on your ${live.scale.model}.")
+                            WeightWidget.refresh(this@WeighInService)
                         }
                     }
                     emit(Unit)
@@ -93,6 +100,10 @@ class WeighInService : Service() {
             }
         } finally {
             engine.clearLive()
+            if (_listening.value) {
+                _listening.value = false
+                WeightWidget.refresh(this)
+            }
             ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
@@ -116,6 +127,10 @@ class WeighInService : Service() {
         private const val EXTRA_TRIGGER = "trigger"
         private const val USER_WINDOW_MS = 60_000L
         private const val WOKE_WINDOW_MS = 40_000L
+
+        private val _listening = MutableStateFlow(false)
+        /** True while the service is listening, so the widget can say "Step on your scale". */
+        val listening: StateFlow<Boolean> = _listening.asStateFlow()
 
         fun intent(context: Context, trigger: Trigger): Intent =
             Intent(context, WeighInService::class.java).putExtra(EXTRA_TRIGGER, trigger.name)

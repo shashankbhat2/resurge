@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.google.services)
+    alias(libs.plugins.roborazzi)
 }
 
 android {
@@ -54,6 +55,7 @@ android {
         compose = true
         buildConfig = true
     }
+    testOptions { unitTests.isIncludeAndroidResources = true }
 }
 
 dependencies {
@@ -94,6 +96,13 @@ dependencies {
     ksp(libs.androidx.hilt.compiler)
 
     debugImplementation(libs.compose.ui.tooling)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.androidx.test.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.roborazzi)
+    debugImplementation(libs.compose.ui.test.manifest)
 }
 
 /**

@@ -65,7 +65,12 @@ import java.time.LocalDate
  * and how readings are logged. The app wires navigation; this needs nothing else.
  */
 @Composable
-fun SmartScaleRoute(onBack: () -> Unit, viewModel: SmartScaleViewModel = hiltViewModel()) {
+fun SmartScaleRoute(
+    onBack: () -> Unit,
+    /** Places the weight widget on the home screen; null hides the offer. */
+    onAddWidget: (() -> Unit)? = null,
+    viewModel: SmartScaleViewModel = hiltViewModel(),
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val nearby by viewModel.nearby.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -108,6 +113,7 @@ fun SmartScaleRoute(onBack: () -> Unit, viewModel: SmartScaleViewModel = hiltVie
                 else notificationLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
             },
             onWeighInNow = viewModel::weighInNow,
+            onAddWidget = onAddWidget,
         ),
     )
 }
@@ -129,6 +135,8 @@ internal class SmartScaleActions(
     val onAllowBackground: () -> Unit = {},
     val onAllowNotifications: () -> Unit = {},
     val onWeighInNow: () -> Unit = {},
+    /** Asks the launcher to place the weight widget; null where the launcher can't. */
+    val onAddWidget: (() -> Unit)? = null,
 )
 
 @Composable
@@ -311,38 +319,23 @@ private fun Blocker(readiness: ScaleReadiness, actions: SmartScaleActions, scanD
 
 @Composable
 private fun ColumnScope.Paired(state: SmartScaleUiState, actions: SmartScaleActions, scanDenied: Boolean, today: LocalDate) {
-    if (state.phone.readiness != ScaleReadiness.READY) Blocker(state.phone.readiness, actions, scanDenied)
+    AutoLogCard(state, actions, scanDenied, today)
 
-    val last = state.lastReadingAt?.let { lastWeighIn(it, today, clockFormatter()) }
     GroupLabel(if (state.scales.size == 1) "Your scale" else "Your scales")
     Group {
         state.scales.forEachIndexed { i, scale ->
             if (i > 0) Divider(Modifier.padding(start = 64.dp))
-            ScaleRow(scale, subtitle = if (state.scales.size == 1) last ?: "No weigh-ins yet" else scale.protocol?.family, onForget = { actions.onForget(scale.address) })
+            ScaleRow(scale, subtitle = scale.protocol?.family, onForget = { actions.onForget(scale.address) })
         }
-    }
-    if (state.scales.size > 1 && last != null) Footnote(last)
-
-    Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button("Weigh in now", onClick = actions.onWeighInNow, variant = ButtonVariant.Secondary, leadingIcon = ResurgeIcons.Scale, modifier = Modifier.weight(1f))
-        Button("Add another", onClick = actions.onFind, variant = ButtonVariant.Ghost, leadingIcon = ResurgeIcons.Plus, modifier = Modifier.weight(1f))
+        Divider(Modifier.padding(start = 64.dp))
+        AddRow("Add another scale", actions.onFind)
     }
 
-    GroupLabel("Logging")
+    GroupLabel("Options")
     Group {
-        ToggleRow("Log automatically", "Works with the app closed, while Bluetooth is on.", state.autoLog, actions.onAutoLog)
-        if (state.autoLog && state.phone.needsBackgroundPermission) {
-            Notice(
-                "Android 10 and 11 only let Resurge hear your scale in the background with location set to “Allow all the time”. It doesn't use where you are.",
-                "Allow all the time",
-                actions.onAllowBackground,
-                Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp),
-            )
-        }
-        Divider(Modifier.padding(start = 16.dp))
         ToggleRow(
-            "Ask when a reading looks like someone else's",
-            "For shared scales. A reading far from your recent weight waits until you say it's yours.",
+            "Check readings on a shared scale",
+            "A reading far from your recent weight waits until you say it's yours.",
             state.askWhenUnusual,
             actions.onAskWhenUnusual,
         )
@@ -351,9 +344,190 @@ private fun ColumnScope.Paired(state: SmartScaleUiState, actions: SmartScaleActi
             ToggleRow("Save weigh-ins to Health Connect", "So Google Health, Fitbit and other apps see them too.", state.writeToHealthConnect, actions.onHealthConnect)
         }
     }
-    if (state.phone.needsNotifications) {
-        Spacer(Modifier.height(4.dp))
-        Notice("Allow notifications to see each weigh-in and undo it.", "Allow", actions.onAllowNotifications)
+
+    actions.onAddWidget?.let { onAddWidget ->
+        GroupLabel("Home screen")
+        WidgetCard(onAddWidget)
+    }
+}
+
+/** Whether readings are logged on their own right now: listening, held up by something, or switched off. */
+internal enum class AutoLogState { LISTENING, PAUSED, OFF }
+
+private data class AutoLogStatus(
+    val state: AutoLogState,
+    val title: String,
+    val body: String,
+    /** The one thing that gets it listening again. */
+    val fix: Pair<String, () -> Unit>? = null,
+)
+
+private fun autoLogStatus(state: SmartScaleUiState, actions: SmartScaleActions, scanDenied: Boolean): AutoLogStatus {
+    val oldAndroid = Build.VERSION.SDK_INT < Build.VERSION_CODES.S
+    if (!state.autoLog) {
+        return AutoLogStatus(
+            AutoLogState.OFF,
+            "Automatic logging is off",
+            "Weigh-ins are only saved while the Weight screen is open, or after you tap Weigh in now.",
+        )
+    }
+    return when (state.phone.readiness) {
+        ScaleReadiness.UNSUPPORTED -> AutoLogStatus(AutoLogState.PAUSED, "This phone can't hear smart scales", "It doesn't have Bluetooth Low Energy, which scales use to share their reading.")
+        ScaleReadiness.BLUETOOTH_OFF -> AutoLogStatus(
+            AutoLogState.PAUSED,
+            "Bluetooth is off",
+            "Turn it on and Resurge goes back to listening for your scale.",
+            "Turn on Bluetooth" to actions.onBluetoothSettings,
+        )
+        ScaleReadiness.NEEDS_PERMISSION -> AutoLogStatus(
+            AutoLogState.PAUSED,
+            if (oldAndroid) "Allow location to hear your scale" else "Allow Nearby devices to hear your scale",
+            if (oldAndroid) "This version of Android asks for location to find Bluetooth devices. Resurge doesn't use where you are."
+            else "Resurge only listens for your scale's reading. It never connects to other devices or uses your location.",
+            (if (scanDenied) "Open settings" else "Allow") to actions.onAllowScan,
+        )
+        ScaleReadiness.LOCATION_OFF -> AutoLogStatus(
+            AutoLogState.PAUSED,
+            "Location is off",
+            "This version of Android only finds Bluetooth devices with location on. Resurge doesn't use where you are.",
+            "Location settings" to actions.onLocationSettings,
+        )
+        ScaleReadiness.READY -> if (state.phone.needsBackgroundPermission) {
+            AutoLogStatus(
+                AutoLogState.PAUSED,
+                "Only while Resurge is open",
+                "To hear your scale with the app closed, Android 10 and 11 need location set to “Allow all the time”. Resurge doesn't use where you are.",
+                "Allow all the time" to actions.onAllowBackground,
+            )
+        } else {
+            AutoLogStatus(
+                AutoLogState.LISTENING,
+                "Just step on your scale",
+                "Resurge hears it and logs your weight, even with the app closed.",
+            )
+        }
+    }
+}
+
+/**
+ * The top of the paired screen: is automatic logging working right now, and if not, the one
+ * button that fixes it. The switch lives here so the state and the control read together.
+ */
+@Composable
+private fun AutoLogCard(state: SmartScaleUiState, actions: SmartScaleActions, scanDenied: Boolean, today: LocalDate) {
+    val status = autoLogStatus(state, actions, scanDenied)
+    val last = state.lastReadingAt?.let { lastWeighIn(it, today, clockFormatter()) }
+    Column(Modifier.fillMaxWidth().clip(Resurge.shape.lg).background(Resurge.colors.surface).padding(20.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            StatusPill(status.state)
+            Spacer(Modifier.weight(1f))
+            Switch(state.autoLog, actions.onAutoLog, accessibilityLabel = "Log automatically")
+        }
+        Spacer(Modifier.height(16.dp))
+        Text(status.title, style = Resurge.type.title)
+        Spacer(Modifier.height(6.dp))
+        Text(status.body, style = Resurge.type.body, color = Resurge.colors.textMuted)
+        status.fix?.let { (label, onClick) ->
+            Spacer(Modifier.height(16.dp))
+            Button(label, onClick = onClick, variant = ButtonVariant.Accent, modifier = Modifier.fillMaxWidth())
+        }
+        if (status.state != AutoLogState.PAUSED || state.phone.readiness == ScaleReadiness.READY) {
+            Spacer(Modifier.height(16.dp))
+            Button(
+                "Weigh in now",
+                onClick = actions.onWeighInNow,
+                variant = if (status.fix == null) ButtonVariant.Accent else ButtonVariant.Secondary,
+                leadingIcon = ResurgeIcons.Scale,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        val notificationsOff = state.phone.needsNotifications && status.state == AutoLogState.LISTENING
+        if (last != null || notificationsOff) {
+            Spacer(Modifier.height(16.dp))
+            Divider()
+        }
+        last?.let { MetaRow(ResurgeIcons.Clock, it) }
+        if (notificationsOff) {
+            MetaRow(ResurgeIcons.BellOff, "Notifications are off, so weigh-ins arrive without a chance to undo.", action = "Allow" to actions.onAllowNotifications)
+        }
+    }
+}
+
+@Composable
+private fun StatusPill(state: AutoLogState) {
+    val (label, dot) = when (state) {
+        AutoLogState.LISTENING -> "Listening" to Resurge.colors.success
+        AutoLogState.PAUSED -> "Paused" to Resurge.colors.glowInk
+        AutoLogState.OFF -> "Off" to Resurge.colors.textSubtle
+    }
+    Row(
+        Modifier.clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted).padding(start = 10.dp, end = 12.dp, top = 6.dp, bottom = 6.dp)
+            .semantics { contentDescription = "Automatic logging: $label" },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(8.dp).clip(Resurge.shape.pill).background(dot))
+        Spacer(Modifier.width(8.dp))
+        Text(label, style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight))
+    }
+}
+
+@Composable
+private fun MetaRow(icon: Int, text: String, action: Pair<String, () -> Unit>? = null) {
+    Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, contentDescription = null, tint = Resurge.colors.textSubtle, size = 16.dp)
+        Spacer(Modifier.width(10.dp))
+        Text(text, style = Resurge.type.caption, color = Resurge.colors.textMuted, modifier = Modifier.weight(1f))
+        action?.let { (label, onClick) ->
+            Spacer(Modifier.width(8.dp))
+            UnstyledButton(
+                onClick = onClick,
+                role = Role.Button,
+                indication = LocalIndication.current,
+                modifier = Modifier.clip(Resurge.shape.pill).background(Resurge.colors.accentMuted),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 7.dp),
+            ) {
+                Text(label, style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight), color = Resurge.colors.brandInk)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddRow(label: String, onClick: () -> Unit) {
+    UnstyledButton(
+        onClick = onClick,
+        role = Role.Button,
+        indication = LocalIndication.current,
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+                Icon(ResurgeIcons.Plus, contentDescription = null, tint = Resurge.colors.brandInk, size = 18.dp)
+            }
+            Spacer(Modifier.width(12.dp))
+            Text(label, style = Resurge.type.body, color = Resurge.colors.brandInk)
+        }
+    }
+}
+
+@Composable
+private fun WidgetCard(onAdd: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(Resurge.shape.md).background(Resurge.colors.surface).padding(start = 16.dp, end = 12.dp, top = 14.dp, bottom = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(36.dp).clip(Resurge.shape.pill).background(Resurge.colors.accentMuted), contentAlignment = Alignment.Center) {
+            Icon(ResurgeIcons.Widget, contentDescription = null, tint = Resurge.colors.brandInk, size = 18.dp)
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("Weight widget", style = Resurge.type.body)
+            Text("Your weight and trend, and a Weigh in button.", style = Resurge.type.caption, color = Resurge.colors.textMuted)
+        }
+        Spacer(Modifier.width(12.dp))
+        Button("Add", onClick = onAdd, variant = ButtonVariant.Secondary)
     }
 }
 
@@ -387,30 +561,6 @@ private fun ToggleRow(label: String, footnote: String, checked: Boolean, onChang
         }
         Spacer(Modifier.width(16.dp))
         Switch(checked, onChange, accessibilityLabel = label)
-    }
-}
-
-/** Something to allow, with a button: a gentle tinted note rather than a warning. */
-@Composable
-private fun Notice(text: String, action: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Column(
-        modifier.fillMaxWidth().clip(Resurge.shape.md).background(Resurge.colors.glowTint).padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Row(verticalAlignment = Alignment.Top) {
-            Icon(ResurgeIcons.Bell, contentDescription = null, tint = Resurge.colors.glowInk, size = 18.dp)
-            Spacer(Modifier.width(10.dp))
-            Text(text, style = Resurge.type.caption.copy(lineHeight = Resurge.type.label.lineHeight), color = Resurge.colors.text)
-        }
-        UnstyledButton(
-            onClick = onClick,
-            role = Role.Button,
-            indication = LocalIndication.current,
-            modifier = Modifier.padding(start = 28.dp).clip(Resurge.shape.pill).background(Resurge.colors.surface),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 9.dp),
-        ) {
-            Text(action, style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight), color = Resurge.colors.glowInk)
-        }
     }
 }
 

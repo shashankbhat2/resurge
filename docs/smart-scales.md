@@ -81,6 +81,16 @@ Readings under 20 kg (children, pets, objects) are ignored.
 **Coach**
 - The coach reads `dailySummaries.weightKg`, which comes from Health Connect. With the Health Connect write on, scale readings reach the coach the same way.
 
+## Home screen widget
+
+`WeightWidget` (Glance) in `app/.../widget/`.
+- **2×2:** latest weight, this week's change and the button.
+- **4×2 and wider:** adds the time and source of the last reading, and a 30-day trend sparkline. The sparkline is drawn as a bitmap in white and tinted, so it follows light and dark.
+- **Button:** Weigh in starts `WeighInService` (foreground, allowed from a widget tap). With no scale paired it's Log weight, which opens the log.
+- **Live:** the widget's composition collects the weigh-ins (a Firestore listener), `ScaleStore.settings`, `WeighInService.listening` and `WeighInEngine.live`. While listening it shows "Step on your scale"; while someone's on it, the settling weight. `WeighInService` calls `WeightWidget.refresh` so a session is running to show it.
+- **Placing it:** Smart scale settings has an Add button that calls `requestPinAppWidget` where the launcher supports it.
+- **Screenshots:** `WeightWidgetScreenshotTest` renders the real RemoteViews (`:app:recordRoborazziDebug`). Its `widget_preview.png` doubles as the picker preview, `res/drawable-nodpi/weight_widget_preview.png` (corners masked to transparent).
+
 ## Android details
 
 **Permissions**
