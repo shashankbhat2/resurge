@@ -7,7 +7,7 @@
 **A calm AI health coach for Android.**<br>
 Habits, sleep, movement, food and weight in one daily picture, with a coach that reads it and talks back.
 
-[![License: GPL v3](https://img.shields.io/badge/license-GPLv3-4A41D9.svg)](LICENSE)
+[![License: GPL v3](https://img.shields.io/badge/license-GPLv3-6F66FB.svg)](LICENSE)
 ![Platform: Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.4-7F52FF?logo=kotlin&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-UI-4285F4?logo=jetpackcompose&logoColor=white)
@@ -15,138 +15,85 @@ Habits, sleep, movement, food and weight in one daily picture, with a coach that
 </div>
 
 <p align="center">
-  <img src="docs/screenshots/today.png" width="19%" alt="Today: the daily tide, habits and health tiles">
-  <img src="docs/screenshots/fitness.png" width="19%" alt="Fitness: the week's active minutes and workouts">
-  <img src="docs/screenshots/food.png" width="19%" alt="A scanned meal with calories, macros and the coach's question">
-  <img src="docs/screenshots/weight.png" width="19%" alt="Weight trend with a custom period selected">
-  <img src="docs/screenshots/coach.png" width="19%" alt="Chatting with the coach">
+  <img src="docs/screenshots/today.png" width="24%" alt="Today: day streak, this week and today's habits">
+  <img src="docs/screenshots/habits.png" width="24%" alt="Habits with streaks and a week of check-ins">
+  <img src="docs/screenshots/fitness.png" width="24%" alt="Fitness: active minutes and today's workouts">
+  <img src="docs/screenshots/food.png" width="24%" alt="A scanned meal with calories, macros and the coach's question">
+</p>
+<p align="center">
+  <img src="docs/screenshots/weight.png" width="24%" alt="Weight trend with goal progress">
+  <img src="docs/screenshots/smart-scale.png" width="24%" alt="Smart scale settings, listening for weigh-ins">
+  <img src="docs/screenshots/coach.png" width="24%" alt="Chatting with the coach">
+  <img src="docs/screenshots/insights.png" width="24%" alt="The coach's weekly review">
 </p>
 
-## What it does
+## Features
 
-Resurge pulls your day together and keeps it light. Everything you do fills one daily **tide**; the coach notices patterns and tells you what to do about them.
+- **Today.** A day streak of days you did everything you set out to, a weekly goal, and your habits and health at a glance.
+- **Habits.** One-tap check-ins, streaks with a weekly freeze, and private habits.
+- **Fitness.** Workouts from Health Connect and ones you log yourself, merged into one feed.
+- **Food.** Photograph or describe a meal; the coach estimates calories and macros and asks one question when it matters.
+- **Weight.** A smoothed trend, a goal split into milestones, and history imported from Health Connect.
+- **Smart scales.** Step on a Bluetooth scale and the weigh-in is logged, even with the app closed. [Supported scales](docs/smart-scales.md).
+- **Snapshots.** Progress photos lined up against the last one, encrypted on the phone, with a reel every few weeks.
+- **Coach.** Chat with a coach that sees your data, plus insights after workouts and sleep and a weekly review.
 
-- **Today.** The tide fills as you finish habits, hit your sleep and step goals and log meals. A habit streak, a weekly activity goal and one quiet "high tide" moment a day keep it rewarding without nagging.
-- **Habits.** One-tap check-ins, streaks with freezes for off days, and a calendar of every habit's history.
-- **Fitness.** Workouts from Health Connect and ones you log yourself (runs, rides, strength sets, swims and more), merged and de-duplicated, with weekly active minutes.
-- **Food.** Point the in-app camera at your plate, pick a gallery photo or describe the meal. The coach identifies each food, estimates portions and nutrition, and asks one question when it would change the numbers. Fix anything in a tap before logging.
-- **Weight.** Weigh-ins are smoothed into a trend, so one salty dinner doesn't erase a good week. Measure the change over any period, set a goal and pace, and import your history from Health Connect. Step on a Bluetooth smart scale and the reading is logged on its own, even with the app closed, and a home screen widget keeps your latest weight in view. See [docs/smart-scales.md](docs/smart-scales.md).
-- **Snapshots.** Progress photos you take when you like, lined up against a faint copy of the last one. They're end-to-end encrypted on the phone before backup, and every few weeks (3 days to 8 weeks, your choice) a reel of them arrives on its own, like a photos app's memories.
-- **Coach.** Chat with a coach that can see your recent data, get a short insight after each workout or night of sleep, and a weekly report on Saturday. Choose a warm *Friend* or a no-nonsense *Commander*.
+<p align="center">
+  <img src="docs/screenshots/widget.png" width="360" alt="Weight widget on the home screen with a Weigh in button">
+</p>
 
-Health data is read through [Health Connect](https://developer.android.com/health-and-fitness/guides/health-connect), so it works with Fitbit, Samsung Health, Garmin, Google Fit and most other apps that write there.
+Health data comes through [Health Connect](https://developer.android.com/health-and-fitness/guides/health-connect), so it works with Fitbit, Samsung Health, Garmin and most other apps.
 
 ## How it's built
 
-An Android app in Kotlin and Jetpack Compose, backed by Firebase. The AI features run in Cloud Functions that call Claude, so no API key ever ships in the app.
+Kotlin and Jetpack Compose ([Compose Unstyled](https://composeunstyled.com)), Hilt, Firestore and WorkManager. The AI features run in Firebase Cloud Functions that call Claude, so no API key ships in the app.
 
 ```
-app/                 Entry point, navigation, notifications
-core/
-  model/             Plain Kotlin models and the maths (tide, streaks, weight trend)
-  data/              Firestore repositories, DataStore preferences, background sync
-  healthconnect/     Health Connect reads (and optional weight writes)
-  scale/             Bluetooth smart scales: broadcast decoders, background listening, weigh-in engine
-  designsystem/      "Tide" design system: tokens, type, components
-feature/
-  dashboard/         Today, health metric details
-  habits/            Habits, streaks, habit editor
-  fitness/           Workouts, activity picker, workout editor
-  food/              Meal scanner (CameraX), estimate review, food log
-  weight/            Weight trend, weigh-ins, goal
-  scale/             Smart scale setup and settings
-  progress/          Progress photos (CameraX), before/after, reels
-  coach/             Chat and insights
-  profile/           Settings
-  auth/              Google sign-in, onboarding
-functions/           Cloud Functions (TypeScript): coach chat, meal analysis, insights
-firestore.rules      Per-user security rules for the `resurge` database
-storage.rules        Resurge's block of the shared bucket's Storage rules (progress photo ciphertext)
+app/          Entry point, navigation, notifications, widget
+core/         Models, data, Health Connect, smart scales, design system
+feature/      One module per screen: dashboard, habits, fitness, food, weight, scale, progress, coach, profile, auth
+functions/    Cloud Functions (TypeScript): coach chat, meal analysis, insights
 ```
-
-| | |
-|---|---|
-| UI | Jetpack Compose with [Compose Unstyled](https://composeunstyled.com), Tabler icons, Haze for blur |
-| Architecture | MVVM, Hilt, Kotlin coroutines and Flow, Navigation Compose |
-| Data | Cloud Firestore (offline cache), DataStore, WorkManager |
-| Health | Health Connect client 1.1 |
-| Camera | CameraX |
-| Backend | Firebase Auth (Google), Cloud Functions (Node 22), Cloud Messaging, App Check |
-| AI | Claude via the Anthropic SDK: Haiku for quick chat and insights, Sonnet for deeper chat and meal photos |
-| Tests | JUnit, MockK, Robolectric, [Roborazzi](https://github.com/takahirom/roborazzi) screenshot tests, Vitest |
 
 ## Getting started
 
-### Requirements
+You need Android Studio with JDK 17+, Node.js 22, the [Firebase CLI](https://firebase.google.com/docs/cli), a Firebase project on the Blaze plan and an [Anthropic API key](https://console.anthropic.com).
 
-- Android Studio (latest stable) with JDK 17 or newer
-- An Android 8.0+ device or emulator, with Health Connect for health data
-- Node.js 22 and the [Firebase CLI](https://firebase.google.com/docs/cli) for the backend
-- A Firebase project on the Blaze plan (Cloud Functions need it) and an [Anthropic API key](https://console.anthropic.com)
+1. **Firebase.** Add an Android app for `com.resurgeai.app.debug`, add your debug SHA-1 (`./gradlew :app:signingReport`), enable Google sign-in, and put `google-services.json` in `app/`. Create a Firestore database with the ID `resurge`, then run `firebase use --add`.
+2. **Backend.**
+   ```sh
+   cd functions && npm install
+   firebase functions:secrets:set ANTHROPIC_API_KEY
+   cd .. && firebase deploy --only firestore:rules,firestore:indexes,functions
+   ```
+3. **App.** `./gradlew :app:installDebug`, or run `app` from Android Studio.
 
-### 1. Set up Firebase
-
-1. Create a Firebase project and add an Android app with package name `com.resurgeai.app.debug` (debug builds) and, if you'll build release, `com.resurgeai.app`.
-2. Add your debug signing SHA-1 to the app (`./gradlew :app:signingReport`), then enable **Google** as a sign-in provider in Authentication.
-3. Download `google-services.json` into `app/`. It's gitignored; every contributor uses their own.
-4. Create a Firestore database with the database ID **`resurge`** (the app and rules use this named database).
-5. Point the CLI at your project: `firebase use --add`.
-
-### 2. Deploy the backend
-
-```sh
-cd functions
-npm install
-firebase functions:secrets:set ANTHROPIC_API_KEY   # paste your key
-cd ..
-firebase deploy --only firestore:rules,firestore:indexes,functions
-```
-
-App Check is installed in the app but not enforced by the functions (`ENFORCE_APP_CHECK` in `functions/src/coach/chat.ts`). Debug builds use the App Check debug provider; register the debug token from Logcat in the Firebase console if you turn enforcement on.
-
-### 3. Run the app
-
-```sh
-./gradlew :app:installDebug
-```
-
-Or open the project in Android Studio and run the `app` configuration. Sign in with Google, finish onboarding, and connect Health Connect from Today.
-
-Without the backend you can still use habits, workouts, weight, water and Health Connect data; the coach and meal logging need the functions.
+Without the backend, everything except the coach and meal logging still works.
 
 ## Tests
 
 ```sh
-./gradlew testDebugUnitTest            # unit and screenshot tests
-./gradlew verifyRoborazziDebug         # compare screens against the recorded references
-./gradlew recordRoborazziDebug         # re-record after an intentional UI change
-cd functions && npm test               # backend tests
+./gradlew testDebugUnitTest       # unit and screenshot tests
+./gradlew recordRoborazziDebug    # re-record screenshots after a UI change
+cd functions && npm test          # backend tests
 ```
-
-Screenshot references live next to each feature in `src/test/screenshots/`. Review the image diff before committing a re-recorded screen.
 
 ## Releasing
 
-Pushing a version tag builds a signed release and publishes it on GitHub ([`.github/workflows/release.yml`](.github/workflows/release.yml)).
+1. Bump `versionCode` and `versionName` in `app/build.gradle.kts`.
+2. In `CHANGELOG.md`, rename `## Unreleased` to `## 0.5.0 (date)`. It becomes the release notes.
+3. Commit, then `git tag v0.5.0 && git push origin main v0.5.0`.
 
-1. In `app/build.gradle.kts`, bump `versionCode` by one and set `versionName`.
-2. In `CHANGELOG.md`, rename `## Unreleased` to `## 0.4.0 (20 October 2026)`. That section becomes the release notes.
-3. Commit, then tag and push: `git tag v0.4.0 && git push origin main v0.4.0`.
-
-The release gets the signed APK. The Play bundle (`.aab`) and R8 mapping are attached to the workflow run as an artifact. The workflow needs the signing key and Firebase config as repository secrets; the list is at the top of the workflow file.
+[The release workflow](.github/workflows/release.yml) publishes the signed APK on GitHub and keeps the Play bundle on the workflow run.
 
 ## Privacy
 
-Your data is stored under your account in Firestore and protected by per-user security rules. Meal photos are sent to the meal analysis function, which passes them to Claude; only a small thumbnail is stored. From Health Connect, only daily summaries and finished workouts and nights of sleep are uploaded, for the coach and its insights. Smart scales are only listened to, never connected to; a paired scale's Bluetooth address stays on the phone, and Android 12+ scans with "Nearby devices" declared as never used for location. Daily limits on chat turns, insights and meal scans keep API costs bounded (`functions/src/lib/quota.ts`).
+Your data lives under your account in Firestore, behind per-user security rules. Meal photos go to Claude for analysis and only a thumbnail is kept. Progress photos are encrypted before they leave the phone. Smart scales are only listened to, never connected to.
 
 ## Contributing
 
-Issues and pull requests are welcome. Before opening a PR:
-
-1. Run `./gradlew testDebugUnitTest` and, for backend changes, `npm test` in `functions/`.
-2. Re-record screenshots for UI changes and include the updated images.
-3. Follow the existing style: small composables, design tokens from `Resurge.colors` and `Resurge.type` instead of literal colors, and plain, specific copy.
+Issues and pull requests are welcome. Run the tests, re-record screenshots for UI changes, and use the design tokens in `Resurge.colors` and `Resurge.type` rather than literal colors.
 
 ## License
 
-Resurge is free software, released under the [GNU General Public License v3.0](LICENSE). You can use, study, change and share it; if you distribute a modified version, you must release its source under the same license.
+[GPL v3](LICENSE). You can use, study, change and share Resurge; if you distribute a modified version, release its source under the same license.
