@@ -125,6 +125,16 @@ cd functions && npm test               # backend tests
 
 Screenshot references live next to each feature in `src/test/screenshots/`. Review the image diff before committing a re-recorded screen.
 
+## Releasing
+
+Pushing a version tag builds a signed release and publishes it on GitHub ([`.github/workflows/release.yml`](.github/workflows/release.yml)).
+
+1. In `app/build.gradle.kts`, bump `versionCode` by one and set `versionName`.
+2. In `CHANGELOG.md`, rename `## Unreleased` to `## 0.4.0 (20 October 2026)`. That section becomes the release notes.
+3. Commit, then tag and push: `git tag v0.4.0 && git push origin main v0.4.0`.
+
+The release gets the signed APK. The Play bundle (`.aab`) and R8 mapping are attached to the workflow run as an artifact. The workflow needs the signing key and Firebase config as repository secrets; the list is at the top of the workflow file.
+
 ## Privacy
 
 Your data is stored under your account in Firestore and protected by per-user security rules. Meal photos are sent to the meal analysis function, which passes them to Claude; only a small thumbnail is stored. From Health Connect, only daily summaries and finished workouts and nights of sleep are uploaded, for the coach and its insights. Smart scales are only listened to, never connected to; a paired scale's Bluetooth address stays on the phone, and Android 12+ scans with "Nearby devices" declared as never used for location. Daily limits on chat turns, insights and meal scans keep API costs bounded (`functions/src/lib/quota.ts`).
