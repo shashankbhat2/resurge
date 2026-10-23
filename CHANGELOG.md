@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 (23 October 2026)
 
 ### Smart scales
 Step on your Bluetooth scale and the weigh-in is logged. No pairing, and no scale app needed.
