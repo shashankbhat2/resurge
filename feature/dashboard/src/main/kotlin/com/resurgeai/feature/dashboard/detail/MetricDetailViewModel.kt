@@ -7,7 +7,9 @@ import androidx.lifecycle.viewModelScope
 import com.resurgeai.core.healthconnect.HealthDataSource
 import com.resurgeai.core.healthconnect.HealthMath
 import com.resurgeai.core.model.ExerciseSession
+import com.resurgeai.core.data.session.SessionRepository
 import com.resurgeai.core.model.HealthMetric
+import com.resurgeai.core.model.SessionState
 import com.resurgeai.core.model.MetricSeries
 import com.resurgeai.core.model.SleepSession
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -51,12 +53,15 @@ data class MetricDetailUiState(
     /** Daily min/max bpm, only loaded for heart rate. */
     val heartRanges: Map<LocalDate, Pair<Long, Long>> = emptyMap(),
     val error: String? = null,
+    /** The daily goal in the series' unit (sleep in hours, steps), for metrics that have one. */
+    val goal: Double? = null,
 )
 
 @HiltViewModel
 class MetricDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val healthData: HealthDataSource,
+    sessionRepository: SessionRepository,
 ) : ViewModel() {
     private val metric: HealthMetric = HealthMetric.valueOf(checkNotNull(savedStateHandle.get<String>(ARG_METRIC)))
 
@@ -67,6 +72,17 @@ class MetricDetailViewModel @Inject constructor(
 
     init {
         load(DetailRange.WEEK)
+        viewModelScope.launch {
+            sessionRepository.session.collect { session ->
+                val targets = (session as? SessionState.Ready)?.profile?.targets ?: return@collect
+                val goal = when (metric) {
+                    HealthMetric.SLEEP -> targets.sleepMinutes / 60.0
+                    HealthMetric.STEPS -> targets.steps.toDouble()
+                    else -> null
+                }
+                _state.update { it.copy(goal = goal) }
+            }
+        }
     }
 
     fun setRange(range: DetailRange) {

@@ -8,7 +8,6 @@ import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.HazeState
 import androidx.compose.ui.unit.sp
-import com.resurgeai.feature.dashboard.WeeklyGoalFlame
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -35,14 +34,14 @@ import androidx.compose.ui.unit.dp
 import com.composeunstyled.UnstyledButton
 import com.resurgeai.core.designsystem.components.Avatar
 import com.resurgeai.core.designsystem.components.NavCoach
-import com.resurgeai.core.model.CoachStyle
 import androidx.compose.foundation.layout.size
 import com.resurgeai.core.designsystem.components.LocalHeaderInset
 import com.resurgeai.core.designsystem.components.MainHeader
 import com.resurgeai.core.designsystem.components.MainHeaderHeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.composeunstyled.Text
-import java.time.LocalTime
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -257,6 +256,9 @@ fun MainScreen(
                 onOpenHabit = { id -> rootNav.navigate(HabitDetailRoute(id)) },
                 onAddHabit = { rootNav.navigate(HabitEditorRoute()) },
                 onLogWorkout = { rootNav.navigate(ActivityPickerRoute()) },
+                onStartWorkout = { activityId ->
+                    if (activityId != null) rootNav.navigate(WorkoutEditorRoute(activityId = activityId)) else rootNav.navigate(ActivityPickerRoute())
+                },
                 onOpenWorkout = { id -> rootNav.navigate(WorkoutEditorRoute(workoutId = id)) },
                 onLogMeal = { rootNav.navigate(FoodLogRoute()) },
                 onScanMeal = { rootNav.navigate(FoodLogRoute(mode = "scan")) },
@@ -443,6 +445,7 @@ private fun TabsShell(
     onOpenHabit: (String) -> Unit,
     onAddHabit: () -> Unit,
     onLogWorkout: () -> Unit,
+    onStartWorkout: (String?) -> Unit,
     onOpenWorkout: (String) -> Unit,
     onLogMeal: () -> Unit,
     onScanMeal: () -> Unit,
@@ -496,6 +499,7 @@ private fun TabsShell(
                         onOpenHabit = onOpenHabit,
                         onAddHabit = onAddHabit,
                         onOpenHabits = { tabsNav.switchTab(HabitsRoute) },
+                        onStartWorkout = onStartWorkout,
                         reelCard = { ReelReadyCard(onPlay = onOpenReel, modifier = Modifier.padding(bottom = 12.dp)) },
                     )
                 }
@@ -514,9 +518,9 @@ private fun TabsShell(
                     // Blur tapers evenly to none at the fade's end, so there's no hard edge at the bottom.
                     progressive = HazeProgressive.verticalGradient(easing = LinearEasing, startIntensity = 1f, endIntensity = 0f)
                 },
-            // Today greets the user in the header, left of the profile photo.
+            // Today's header is the date, left of the profile photo.
             leading = if (currentTab == Tab.Today) {
-                { Text(greeting(profile), style = Resurge.type.brand.copy(fontSize = 20.sp, lineHeight = 26.sp), maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                { Text(LocalDate.now().format(TODAY_HEADER), style = Resurge.type.headline, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             } else null,
             trailing = {
                 // Fitness and Food get a "+" to log, left of the profile photo.
@@ -537,10 +541,7 @@ private fun TabsShell(
                 val avatarPress = remember { MutableInteractionSource() }
                 val pressed by avatarPress.collectIsPressedAsState()
                 val scale by animateFloatAsState(if (pressed) 0.88f else 1f, tween(120), label = "avatarPress")
-                // The weekly-goal flame sits left of the photo, partly tucked behind it (drawn first, so
-                // it's underneath). Both read as 38dp; the photo's 2dp ring is the background colour.
-                Box(Modifier.size(width = 70.dp, height = 42.dp)) {
-                    WeeklyGoalFlame(Modifier.align(Alignment.CenterStart), size = 38.dp)
+                Box(Modifier.size(42.dp)) {
                     UnstyledButton(
                         onClick = onOpenSettings,
                         role = Role.Button,
@@ -565,7 +566,7 @@ private fun TabsShell(
             selected = currentTab,
             onSelect = { tab -> tabsNav.switchTab(tab.route) },
             modifier = Modifier.align(Alignment.BottomCenter),
-            center = { NavCoach(commander = profile.coachStyle == CoachStyle.COMMANDER, onClick = onOpenCoach) },
+            center = { NavCoach(onClick = onOpenCoach) },
         )
     }
 }
@@ -581,15 +582,7 @@ data class ProgressSignal(val count: Int = 0, val capture: Boolean = false, val 
 /** Scale notifications and the weight widget: open Weight, its log sheet, or Smart scale settings. */
 data class WeightSignal(val count: Int = 0, val log: Boolean = false, val smartScale: Boolean = false)
 
-private fun greeting(profile: UserProfile, now: LocalTime = LocalTime.now()): String {
-    val part = when (now.hour) {
-        in 5..11 -> "Good morning"
-        in 12..16 -> "Good afternoon"
-        in 17..20 -> "Good evening"
-        else -> "Good night"
-    }
-    return profile.firstName?.let { "$part, $it" } ?: part
-}
+private val TODAY_HEADER = DateTimeFormatter.ofPattern("EEEE, d MMMM")
 
 private fun NavHostController.switchTab(route: Any) = navigate(route) {
     popUpTo(graph.findStartDestination().id) { saveState = true }

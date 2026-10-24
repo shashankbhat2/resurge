@@ -47,6 +47,7 @@ import com.resurgeai.core.designsystem.components.SegmentsBar
 import com.resurgeai.core.designsystem.components.WindowBar
 import com.resurgeai.core.designsystem.components.FloatingNavBar
 import com.resurgeai.core.designsystem.components.IconButton
+import com.resurgeai.core.designsystem.components.NavCoach
 import com.resurgeai.core.designsystem.components.NavItem
 import com.resurgeai.core.designsystem.components.MetricCard
 import com.resurgeai.core.designsystem.components.NumberStepper
@@ -268,7 +269,7 @@ private fun MiscSection() {
         ),
         selected = 0,
         onSelect = {},
-        center = { CoachMascot(commander = false, size = 30.dp) },
+        center = { NavCoach(onClick = {}) },
     )
     Spacer(Modifier.height(12.dp))
     Card {

@@ -261,10 +261,10 @@ private fun RoundButton(icon: Int, label: String, accent: Boolean, onClick: () -
         modifier = Modifier
             .size(40.dp)
             .clip(Resurge.shape.pill)
-            .background(if (accent) Resurge.colors.accent else Resurge.colors.surface)
+            .background(if (accent) Resurge.colors.strong else Resurge.colors.surface)
             .semantics { contentDescription = label },
         indication = LocalIndication.current,
-    ) { Icon(icon, contentDescription = null, tint = if (accent) Resurge.colors.onAccent else Resurge.colors.text, size = 20.dp) }
+    ) { Icon(icon, contentDescription = null, tint = if (accent) Resurge.colors.onStrong else Resurge.colors.text, size = 20.dp) }
 }
 
 @Composable
@@ -279,8 +279,8 @@ private fun EmptyWeight(onLog: () -> Unit, onSmartScale: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(Modifier.size(56.dp).clip(Resurge.shape.pill).background(Resurge.colors.accentMuted), contentAlignment = Alignment.Center) {
-            Icon(ResurgeIcons.Scale, contentDescription = null, tint = Resurge.colors.brandInk, size = 26.dp)
+        Box(Modifier.size(56.dp).clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted), contentAlignment = Alignment.Center) {
+            Icon(ResurgeIcons.Scale, contentDescription = null, tint = Resurge.colors.text, size = 26.dp)
         }
         Spacer(Modifier.height(16.dp))
         Text("Log your first weigh-in", style = Resurge.type.title)
@@ -315,7 +315,7 @@ private fun Hero(state: WeightUiState, units: WeightUnits, onEditGoal: () -> Uni
                 Spacer(Modifier.width(4.dp))
                 Text(units.label, style = Resurge.type.headline, color = Resurge.colors.textMuted, modifier = Modifier.padding(bottom = 8.dp))
                 Spacer(Modifier.weight(1f))
-                if (change != null && state.range != WeightRange.CUSTOM) ChangeChip(change, units, Modifier.padding(bottom = 10.dp))
+                if (change != null && state.range != WeightRange.CUSTOM) ChangeChip(change, units, goal, Modifier.padding(bottom = 10.dp))
             }
             Text(
                 state.period?.first?.takeIf { state.range != WeightRange.CUSTOM }?.let { "Trend weight since ${shortDate(it, state.today)}" } ?: "Trend weight",
@@ -350,9 +350,9 @@ private fun InProgress(state: WeightUiState, goal: WeightGoal, now: Double, unit
             )
             // Milestones earned so far, as awards.
             if (goal.milestonesCelebrated > 0) {
-                Icon(ResurgeIcons.Medal, contentDescription = null, tint = Resurge.colors.glow, size = 16.dp)
+                Icon(ResurgeIcons.Medal, contentDescription = null, tint = Resurge.colors.up, size = 16.dp)
                 Spacer(Modifier.width(3.dp))
-                Text("${goal.milestonesCelebrated}", style = Resurge.type.caption.copy(fontWeight = Resurge.type.headline.fontWeight), color = Resurge.colors.glowInk,
+                Text("${goal.milestonesCelebrated}", style = Resurge.type.caption.copy(fontWeight = Resurge.type.headline.fontWeight), color = Resurge.colors.up,
                     modifier = Modifier.semantics { contentDescription = "${goal.milestonesCelebrated} milestones reached" })
             }
         }
@@ -366,7 +366,7 @@ private fun InProgress(state: WeightUiState, goal: WeightGoal, now: Double, unit
 private fun Reached(state: WeightUiState, goal: WeightGoal, units: WeightUnits, onNewGoal: () -> Unit, onMaintain: () -> Unit) {
     Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(ResurgeIcons.Trophy, contentDescription = null, tint = Resurge.colors.glow, size = 18.dp)
+            Icon(ResurgeIcons.Trophy, contentDescription = null, tint = Resurge.colors.up, size = 18.dp)
             Spacer(Modifier.width(6.dp))
             Text(
                 "Reached ${units.format(goal.goalKg)}" + (goal.reachedOn?.let { " on ${shortDate(it, state.today)}" } ?: ""),
@@ -396,7 +396,7 @@ private fun Maintaining(goal: WeightGoal, now: Double, units: WeightUnits, onEdi
                     else -> "${units.format(-off - band)} below"
                 },
                 style = Resurge.type.caption.copy(fontFeatureSettings = "tnum"),
-                color = if (abs(off) <= band) Resurge.colors.brandInk else Resurge.colors.textMuted,
+                color = if (abs(off) <= band) Resurge.colors.up else Resurge.colors.mid,
             )
         }
         // The track spans twice the range either side; the range is the tinted middle half.
@@ -404,7 +404,7 @@ private fun Maintaining(goal: WeightGoal, now: Double, units: WeightUnits, onEdi
             val w = maxWidth
             val pos = ((off / (band * 2) + 1) / 2).coerceIn(0.0, 1.0).toFloat()
             Box(Modifier.fillMaxWidth().height(10.dp).clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted))
-            Box(Modifier.offset(x = w * 0.25f).width(w * 0.5f).height(10.dp).clip(Resurge.shape.pill).background(Resurge.colors.accentMuted))
+            Box(Modifier.offset(x = w * 0.25f).width(w * 0.5f).height(10.dp).clip(Resurge.shape.pill).background(Resurge.colors.borderStrong))
             Box(
                 Modifier.offset(x = (w - 14.dp) * pos).size(14.dp).clip(Resurge.shape.pill).background(Resurge.colors.surface)
                     .padding(2.dp).clip(Resurge.shape.pill).background(Resurge.colors.accent),
@@ -443,8 +443,9 @@ private fun Ends(start: String, end: String) {
 
 /**
  * The whole goal as one bar cut into milestone steps ([WeightMath.milestoneSteps]), each as wide
- * as its share. Finished steps are solid, the current one fills as the trend moves,
- * the rest wait. [glowLast] lights the latest finished step for a week after crossing it.
+ * as its share. Finished steps are the "up" signal, the current one fills in the accent as the
+ * trend moves, the rest wait in grey. [glowLast] marks the latest finished step for a week after
+ * crossing it.
  */
 @Composable
 private fun GoalSteps(goal: WeightGoal, now: Double, glowLast: Boolean) {
@@ -454,8 +455,13 @@ private fun GoalSteps(goal: WeightGoal, now: Double, glowLast: Boolean) {
     Row(Modifier.fillMaxWidth().height(10.dp), horizontalArrangement = Arrangement.spacedBy(if (steps.size > 10) 2.dp else 3.dp)) {
         steps.forEachIndexed { i, (from, to) ->
             val fill = ((done - from) / (to - from)).coerceIn(0.0, 1.0).toFloat()
-            val color = if (glowLast && i == lastDone) Resurge.colors.glow else Resurge.colors.accent
-            Box(Modifier.weight((to - from).toFloat()).fillMaxHeight().clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted)) {
+            val finished = fill >= 1f
+            val color = when {
+                finished && glowLast && i == lastDone -> Resurge.colors.up
+                finished -> Resurge.colors.up.copy(alpha = 0.7f)
+                else -> Resurge.colors.accent
+            }
+            Box(Modifier.weight((to - from).toFloat()).fillMaxHeight().clip(Resurge.shape.pill).background(Resurge.colors.borderStrong)) {
                 if (fill > 0f) Box(Modifier.fillMaxWidth(fill).fillMaxHeight().clip(Resurge.shape.pill).background(color))
             }
         }
@@ -472,7 +478,7 @@ private fun SetGoalRow(onClick: () -> Unit) {
         contentAlignment = Alignment.CenterStart,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(ResurgeIcons.Target, contentDescription = null, tint = Resurge.colors.brandInk, size = 18.dp)
+            Icon(ResurgeIcons.Target, contentDescription = null, tint = Resurge.colors.text, size = 18.dp)
             Spacer(Modifier.width(10.dp))
             Text("Set a goal", style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight), modifier = Modifier.weight(1f))
             Icon(ResurgeIcons.ChevronRight, contentDescription = null, tint = Resurge.colors.textSubtle, size = 18.dp)
@@ -480,21 +486,30 @@ private fun SetGoalRow(onClick: () -> Unit) {
     }
 }
 
-/** "↓ 1.0 kg": the change as a brand-tint chip; up or down, never red. */
+/**
+ * "↓ 1.0 kg": the change over the period. With a goal it takes the signal colour, up when it moved
+ * the goal's way and down when it didn't; without one (or when maintaining) it stays neutral.
+ */
 @Composable
-private fun ChangeChip(change: Double, units: WeightUnits, modifier: Modifier = Modifier) {
+private fun ChangeChip(change: Double, units: WeightUnits, goal: WeightGoal?, modifier: Modifier = Modifier) {
+    val steady = abs(change) < 0.05
+    val color = when {
+        steady || goal == null || goal.maintaining -> Resurge.colors.textMuted
+        (change < 0) == goal.losing -> Resurge.colors.up
+        else -> Resurge.colors.down
+    }
     Row(
-        modifier.clip(Resurge.shape.pill).background(Resurge.colors.accentMuted).padding(horizontal = 10.dp, vertical = 5.dp),
+        modifier.clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted).padding(horizontal = 10.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (abs(change) >= 0.05) {
-            Icon(ResurgeIcons.ArrowUp, contentDescription = if (change < 0) "Down" else "Up", tint = Resurge.colors.brandInk, size = 13.dp, modifier = if (change < 0) Modifier.rotate(180f) else Modifier)
+        if (!steady) {
+            Icon(ResurgeIcons.ArrowUp, contentDescription = if (change < 0) "Down" else "Up", tint = color, size = 13.dp, modifier = if (change < 0) Modifier.rotate(180f) else Modifier)
             Spacer(Modifier.width(3.dp))
         }
         Text(
             units.signed(change).removePrefix("−").removePrefix("+"),
             style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight, fontFeatureSettings = "tnum"),
-            color = Resurge.colors.brandInk,
+            color = color,
         )
     }
 }
@@ -510,7 +525,7 @@ private fun RangeChips(selected: WeightRange, onSelect: (WeightRange) -> Unit) {
                 modifier = Modifier
                     .weight(if (r == WeightRange.CUSTOM) 1.7f else 1f)
                     .clip(Resurge.shape.pill)
-                    .background(if (on) Resurge.colors.brandInk else Resurge.colors.surface)
+                    .background(if (on) Resurge.colors.strong else Resurge.colors.surface)
                     .semantics { this.selected = on },
                 contentPadding = PaddingValues(vertical = 8.dp),
                 indication = LocalIndication.current,
@@ -518,7 +533,7 @@ private fun RangeChips(selected: WeightRange, onSelect: (WeightRange) -> Unit) {
                 Text(
                     r.label,
                     style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight),
-                    color = if (on) Resurge.colors.onAccent else Resurge.colors.textMuted,
+                    color = if (on) Resurge.colors.onStrong else Resurge.colors.textMuted,
                     maxLines = 1,
                 )
             }
@@ -571,14 +586,14 @@ private fun DatePill(text: String) {
 @Composable
 private fun Legend(state: WeightUiState, units: WeightUnits) {
     Row(Modifier.padding(start = 8.dp, top = 6.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-        LegendItem(Resurge.colors.accent, "Trend", wide = true)
+        LegendItem(Resurge.colors.text, "Trend", wide = true)
         LegendItem(Resurge.colors.textSubtle, "Weigh-ins", wide = false)
         val span = state.chartSpan
         val plan = state.plan
         if (plan != null && span != null && planShows(plan, state.trend, state.weighIns, span, units, plan.goalKg.takeIf { state.showsGoalLine })) {
-            LegendItem(Resurge.colors.brandInk.copy(alpha = 0.5f), "Plan", wide = true)
+            LegendItem(Resurge.colors.textSubtle, "Plan", wide = true)
         }
-        state.goal?.takeIf { state.showsGoalLine }?.let { LegendItem(Resurge.colors.glow, "Goal ${units.format(it.goalKg)}", wide = true) }
+        state.goal?.takeIf { state.showsGoalLine }?.let { LegendItem(Resurge.colors.up, "Goal ${units.format(it.goalKg)}", wide = true) }
     }
     if (state.range == WeightRange.CUSTOM) {
         Text("Drag a handle, or tap the chart, to change the period", style = Resurge.type.caption, color = Resurge.colors.textSubtle, modifier = Modifier.padding(start = 8.dp, top = 4.dp))

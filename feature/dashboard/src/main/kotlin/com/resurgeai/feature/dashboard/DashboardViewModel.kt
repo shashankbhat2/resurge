@@ -25,6 +25,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import com.resurgeai.core.model.WeightMath
 import com.resurgeai.core.data.weight.WeightRepository
+import com.resurgeai.core.data.plan.PlanRepository
+import com.resurgeai.core.model.WorkoutPlan
 import com.resurgeai.core.data.fitness.WorkoutsRepository
 import com.resurgeai.core.data.food.MealsRepository
 import com.resurgeai.core.model.Meal
@@ -97,6 +99,10 @@ data class DashboardUiState(
     /** Health Connect weigh-ins that could be imported; null when there's nothing to offer. */
     val weightImport: Int? = null,
     val importingWeight: Boolean = false,
+    /** The plan the person is following, for today's session; null when there's none. */
+    val plan: WorkoutPlan? = null,
+    /** Today's list collapsed to a row of boxes (remembered on this device). */
+    val compactList: Boolean = false,
 ) {
     /** The latest insight, pinned above the tide until it's seen. */
     val pinnedInsight: CoachInsight? get() = latestInsight?.takeIf { !it.seen && it.id !in dismissedInsights }
@@ -131,6 +137,7 @@ class DashboardViewModel @Inject constructor(
     private val weights: WeightRepository,
     private val streakEngine: DayStreakEngine,
     private val users: UserRepository,
+    private val plans: PlanRepository,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
     private val _state = MutableStateFlow(DashboardUiState())
@@ -156,6 +163,11 @@ class DashboardViewModel @Inject constructor(
     }
 
     /** Marks the pinned insight seen: it leaves the top of Today and joins the feed. */
+    fun setCompactList(on: Boolean) {
+        _state.update { it.copy(compactList = on) }
+        viewModelScope.launch { preferences.setTodayListCompact(on) }
+    }
+
     fun dismissInsight(id: String) {
         _state.update { it.copy(dismissedInsights = it.dismissedInsights + id) }
         coachRepository.markSeen(id)
@@ -203,6 +215,18 @@ class DashboardViewModel @Inject constructor(
             sessionRepository.session.collect { session ->
                 _state.update { it.copy(profile = (session as? SessionState.Ready)?.profile) }
             }
+        }
+        viewModelScope.launch {
+            sessionRepository.session
+                .map { (it as? SessionState.Ready)?.profile?.activePlanId }
+                .distinctUntilChanged()
+                .collect { id ->
+                    val plan = id?.let { runCatching { plans.plan(it) }.onFailure { e -> Log.w(TAG, "Plan read failed", e) }.getOrNull() }
+                    _state.update { it.copy(plan = plan) }
+                }
+        }
+        viewModelScope.launch {
+            preferences.todayListCompact.collect { on -> _state.update { it.copy(compactList = on) } }
         }
         viewModelScope.launch {
             preferences.dismissedInsights.collect { ids -> _state.update { it.copy(dismissedInsights = it.dismissedInsights + ids) } }
@@ -342,8 +366,8 @@ class DashboardViewModel @Inject constructor(
         const val TAG = "Dashboard"
         const val MIN_REFRESH_INTERVAL_MS = 30_000L
         val SPARKLINE_METRICS = listOf(
-            HealthMetric.STEPS, HealthMetric.DISTANCE, HealthMetric.CALORIES_BURNED,
-            HealthMetric.SLEEP, HealthMetric.WEIGHT,
+            HealthMetric.STEPS, HealthMetric.CALORIES_BURNED,
+            HealthMetric.SLEEP, HealthMetric.HEART_RATE,
         )
     }
 }

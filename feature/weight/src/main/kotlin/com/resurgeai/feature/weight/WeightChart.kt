@@ -109,13 +109,16 @@ internal fun WeightChart(
     val step = listOf(0.5, 1.0, 2.0, 5.0, 10.0, 20.0).first { (hi - lo) / it <= 5 }
 
     val cBorder = Resurge.colors.border
-    val cBand = Resurge.colors.accentMuted
-    val cGoal = Resurge.colors.glow
-    val cPlan = Resurge.colors.brandInk.copy(alpha = 0.5f)
+    // Mono: the trend is white, the goal line the "up" signal, the plan a grey dash; only the
+    // latest point and the selection handle carry the accent.
+    val cBand = Resurge.colors.text.copy(alpha = 0.06f)
+    val cGoal = Resurge.colors.up
+    val cPlan = Resurge.colors.textSubtle
     val cDot = Resurge.colors.textSubtle
-    val cLine = Resurge.colors.accent
+    val cLine = Resurge.colors.text
+    val cNow = Resurge.colors.accent
     val cSurface = Resurge.colors.surface
-    val cHandle = Resurge.colors.brandInk
+    val cHandle = Resurge.colors.accent
     val label = Resurge.type.caption.copy(color = cDot, fontFeatureSettings = "tnum")
     val measurer = rememberTextMeasurer()
     val haptics = LocalHapticFeedback.current
@@ -218,12 +221,12 @@ internal fun WeightChart(
                 lineTo(x(points.first().date), b)
                 close()
             }
-            drawPath(fill, Brush.verticalGradient(listOf(cLine.copy(alpha = 0.16f), cLine.copy(alpha = 0f)), startY = t, endY = b))
+            drawPath(fill, Brush.verticalGradient(listOf(cLine.copy(alpha = 0.08f), cLine.copy(alpha = 0f)), startY = t, endY = b))
             drawPath(line, cLine, style = Stroke(2.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
             if (selection == null) {
                 val last = points.last()
                 drawCircle(cSurface, 6.dp.toPx(), Offset(x(last.date), y(units.toUnit(last.kg))))
-                drawCircle(cLine, 4.dp.toPx(), Offset(x(last.date), y(units.toUnit(last.kg))))
+                drawCircle(cNow, 5.dp.toPx(), Offset(x(last.date), y(units.toUnit(last.kg))))
             }
         }
 

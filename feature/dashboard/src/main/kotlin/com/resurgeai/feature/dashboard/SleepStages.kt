@@ -24,11 +24,11 @@ internal val SleepStage.label: String
         SleepStage.SLEEPING, SleepStage.UNKNOWN -> "Asleep"
     }
 
-/** One colour per stage, used by the Today ring, the list rows and the hypnogram. */
+/** Stages on the grey ramp, brighter is deeper (Mono has no category colours). Awake is the faintest. */
 @Composable
 internal fun sleepStageColor(stage: SleepStage): Color = when (stage) {
-    SleepStage.AWAKE -> Resurge.colors.energy
-    SleepStage.REM -> Resurge.colors.sleep
-    SleepStage.LIGHT, SleepStage.SLEEPING, SleepStage.UNKNOWN -> Resurge.colors.water
-    SleepStage.DEEP -> Resurge.colors.activity
+    SleepStage.AWAKE -> Resurge.colors.borderStrong
+    SleepStage.REM -> Resurge.colors.textMuted
+    SleepStage.LIGHT, SleepStage.SLEEPING, SleepStage.UNKNOWN -> Resurge.colors.textSubtle
+    SleepStage.DEEP -> Resurge.colors.text
 }

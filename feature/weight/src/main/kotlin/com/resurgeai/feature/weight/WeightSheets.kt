@@ -250,19 +250,19 @@ internal fun Chip(label: String, selected: Boolean, icon: Int? = null, onClick: 
     UnstyledButton(
         onClick = onClick,
         role = Role.Button,
-        modifier = Modifier.clip(Resurge.shape.pill).background(if (selected) Resurge.colors.accentMuted else Resurge.colors.surfaceMuted).semantics { this.selected = selected },
+        modifier = Modifier.clip(Resurge.shape.pill).background(if (selected) Resurge.colors.accentTint else Resurge.colors.surfaceMuted).semantics { this.selected = selected },
         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp),
         indication = LocalIndication.current,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             icon?.let {
-                Icon(it, contentDescription = null, tint = if (selected) Resurge.colors.brandInk else Resurge.colors.text, size = 15.dp)
+                Icon(it, contentDescription = null, tint = Resurge.colors.text, size = 15.dp)
                 Spacer(Modifier.width(6.dp))
             }
             Text(
                 label,
                 style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight),
-                color = if (selected) Resurge.colors.brandInk else Resurge.colors.text,
+                color = Resurge.colors.text,
             )
         }
     }
@@ -325,17 +325,17 @@ internal fun GoalSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(Resurge.shape.md)
-                        .background(if (on) Resurge.colors.accentMuted else Resurge.colors.surfaceMuted)
+                        .background(if (on) Resurge.colors.accentTint else Resurge.colors.surfaceMuted)
                         .semantics { selected = on },
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
                     indication = LocalIndication.current,
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text(name, style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight), color = if (on) Resurge.colors.brandInk else Resurge.colors.text)
+                            Text(name, style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight), color = Resurge.colors.text)
                             Text("${units.pace(kgPerWeek)} a week", style = Resurge.type.caption, color = Resurge.colors.textMuted)
                         }
-                        by?.let { Text("by ${shortDate(it, today)}", style = Resurge.type.label.copy(fontFeatureSettings = "tnum"), color = if (on) Resurge.colors.brandInk else Resurge.colors.text) }
+                        by?.let { Text("by ${shortDate(it, today)}", style = Resurge.type.label.copy(fontFeatureSettings = "tnum"), color = Resurge.colors.text) }
                     }
                 }
             }

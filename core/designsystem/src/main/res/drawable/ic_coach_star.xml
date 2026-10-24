@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The coach's mark: a four-point star with curved, pinched sides and rounded tips (outline). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#000000"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M12,2.8 C13.1,8.2 15.8,10.9 21.2,12 C15.8,13.1 13.1,15.8 12,21.2 C10.9,15.8 8.2,13.1 2.8,12 C8.2,10.9 10.9,8.2 12,2.8 Z" />
+</vector>

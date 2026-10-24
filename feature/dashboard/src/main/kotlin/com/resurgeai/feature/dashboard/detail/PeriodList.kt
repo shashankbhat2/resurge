@@ -154,7 +154,8 @@ private fun DayRowItem(
                 )
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                if (metric != HealthMetric.HEART_RATE) Viz(row.viz, metric, color, gridLines)
+                // Mono: rows draw in grey; the selected period and the current one are lifted to white.
+                if (metric != HealthMetric.HEART_RATE) Viz(row.viz, metric, if (selected || isCurrent) Resurge.colors.text else color, gridLines)
                 row.detail?.let {
                     Spacer(Modifier.height(4.dp))
                     Text(it, style = Resurge.type.caption, color = Resurge.colors.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)

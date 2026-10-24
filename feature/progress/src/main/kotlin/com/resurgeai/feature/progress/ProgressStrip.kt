@@ -99,8 +99,8 @@ fun ProgressStrip(onOpen: () -> Unit, onCapture: () -> Unit, modifier: Modifier 
         ) {
             UnstyledButton(onClick = onOpen, modifier = Modifier.weight(1f), contentPadding = PaddingValues(16.dp), indication = LocalIndication.current, contentAlignment = Alignment.CenterStart) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(36.dp).clip(Resurge.shape.pill).background(Resurge.colors.accentMuted), contentAlignment = Alignment.Center) {
-                        Icon(ResurgeIcons.Camera, contentDescription = null, tint = Resurge.colors.brandInk, size = 18.dp)
+                    Box(Modifier.size(36.dp).clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted), contentAlignment = Alignment.Center) {
+                        Icon(ResurgeIcons.Camera, contentDescription = null, tint = Resurge.colors.text, size = 18.dp)
                     }
                     Spacer(Modifier.width(12.dp))
                     Column {

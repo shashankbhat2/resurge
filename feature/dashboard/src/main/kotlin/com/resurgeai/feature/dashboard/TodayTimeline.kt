@@ -140,7 +140,7 @@ private fun MealRow(meal: Meal, onClick: () -> Unit) {
             if (bitmap != null) {
                 Image(bitmap, null, Modifier.size(40.dp).clip(Resurge.shape.sm), contentScale = ContentScale.Crop)
             } else {
-                IconTile(ResurgeIcons.Bowl, Resurge.colors.energy)
+                IconTile(ResurgeIcons.Bowl, Resurge.colors.textMuted)
             }
         },
         title = meal.title,
@@ -160,7 +160,7 @@ private fun WorkoutRow(w: Workout, units: UnitSystem, onClick: () -> Unit) {
         else "${Formatters.kilometres(m)} km"
     }
     FeedRow(
-        icon = { IconTile(ActivityVisuals.icon(activity.icon), ActivityVisuals.color(activity.category)) },
+        icon = { IconTile(ActivityVisuals.icon(activity.icon), Resurge.colors.textMuted) },
         title = w.displayName,
         caption = "$origin · ${clock(w.start)}" + if (w.duplicates.isNotEmpty()) " · ${w.duplicates.size + 1} devices" else "",
         value = Formatters.duration(w.duration),
@@ -174,7 +174,7 @@ private fun WorkoutRow(w: Workout, units: UnitSystem, onClick: () -> Unit) {
 @Composable
 private fun SleepRow(session: SleepSession, onClick: () -> Unit) {
     FeedRow(
-        icon = { IconTile(ResurgeIcons.Bed, Resurge.colors.sleep) },
+        icon = { IconTile(ResurgeIcons.Bed, Resurge.colors.textMuted) },
         title = "Sleep",
         caption = "${clock(session.start)} – ${clock(session.end)}",
         value = Formatters.duration(session.asleep),

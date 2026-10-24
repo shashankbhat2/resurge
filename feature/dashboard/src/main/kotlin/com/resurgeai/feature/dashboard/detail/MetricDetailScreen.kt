@@ -1,5 +1,11 @@
 package com.resurgeai.feature.dashboard.detail
 
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
+import com.resurgeai.core.designsystem.components.signalColor
+import com.resurgeai.core.model.PaceSignal
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -202,6 +208,26 @@ private fun SummaryCard(state: MetricDetailUiState) {
         Text("Daily average", style = Resurge.type.caption, color = Resurge.colors.textMuted)
         Spacer(Modifier.height(4.dp))
         Text(series.average?.let { Formatters.seriesValue(metric, it) } ?: "—", style = Resurge.type.display)
+        // How often the goal was met: up for most days, mid for some, down for few.
+        state.goal?.takeIf { values.isNotEmpty() }?.let { goal ->
+            val met = values.count { it >= goal }
+            val rate = met.toDouble() / values.size
+            val signal = when {
+                rate >= 0.7 -> PaceSignal.UP
+                rate >= 0.4 -> PaceSignal.MID
+                else -> PaceSignal.DOWN
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(8.dp).clip(Resurge.shape.pill).background(signalColor(signal)))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Goal ${Formatters.seriesValue(metric, goal)} · met on $met of ${values.size} days",
+                    style = Resurge.type.label,
+                    color = Resurge.colors.textMuted,
+                )
+            }
+        }
         if (values.isNotEmpty()) {
             Spacer(Modifier.height(20.dp))
             Row {
@@ -259,15 +285,10 @@ private fun SessionRow(title: String, subtitle: String, value: String, source: D
     }
 }
 
+/** Mono: every metric draws in grey; the selected or current period is lifted to the text colour by its row. */
+@Suppress("UNUSED_PARAMETER")
 @Composable
-internal fun metricColor(metric: HealthMetric): Color = when (metric) {
-    HealthMetric.STEPS, HealthMetric.EXERCISE -> Resurge.colors.activity
-    HealthMetric.DISTANCE -> Resurge.colors.water
-    HealthMetric.CALORIES_BURNED -> Resurge.colors.energy
-    HealthMetric.SLEEP -> Resurge.colors.sleep
-    HealthMetric.HEART_RATE -> Resurge.colors.heart
-    HealthMetric.WEIGHT -> Resurge.colors.textMuted
-}
+internal fun metricColor(metric: HealthMetric): Color = Resurge.colors.textMuted
 
 private val DAY = DateTimeFormatter.ofPattern("EEE d MMM")
 private val DAY_SHORT = DateTimeFormatter.ofPattern("EEE d")

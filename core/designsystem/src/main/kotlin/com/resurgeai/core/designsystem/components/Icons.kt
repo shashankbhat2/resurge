@@ -24,8 +24,11 @@ object ResurgeIcons {
     @DrawableRes val TodayFilled = TablerFilled.drawable.tabler_ic_sunrise_filled
     @DrawableRes val Food = Tabler.drawable.tabler_ic_salad_outline
     @DrawableRes val FoodFilled = TablerFilled.drawable.tabler_ic_salad_filled
-    @DrawableRes val Coach = Tabler.drawable.tabler_ic_sparkles_outline
-    @DrawableRes val CoachFilled = R.drawable.ic_sparkles_filled
+    @DrawableRes val Coach = R.drawable.ic_coach_star
+    @DrawableRes val CoachFilled = R.drawable.ic_coach_star_filled
+    /** Toggle a list between rows ([ViewList]) and a row of boxes ([ViewBoxes]). */
+    @DrawableRes val ViewBoxes = Tabler.drawable.tabler_ic_layout_columns_outline
+    @DrawableRes val ViewList = Tabler.drawable.tabler_ic_list_check_outline
     @DrawableRes val Profile = Tabler.drawable.tabler_ic_user_circle_outline
     @DrawableRes val ProfileFilled = R.drawable.ic_user_circle_filled
     @DrawableRes val Fitness = Tabler.drawable.tabler_ic_barbell_outline

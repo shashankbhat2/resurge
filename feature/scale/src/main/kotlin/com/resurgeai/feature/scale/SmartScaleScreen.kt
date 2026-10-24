@@ -203,7 +203,7 @@ private fun WorksWith(families: List<String>) {
         families.forEachIndexed { i, family ->
             if (i > 0) Divider(Modifier.padding(start = 16.dp))
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(ResurgeIcons.Check, contentDescription = null, tint = Resurge.colors.brandInk, size = 16.dp)
+                Icon(ResurgeIcons.Check, contentDescription = null, tint = Resurge.colors.text, size = 16.dp)
                 Spacer(Modifier.width(12.dp))
                 Text(family, style = Resurge.type.body)
             }
@@ -456,8 +456,8 @@ private fun AutoLogCard(state: SmartScaleUiState, actions: SmartScaleActions, sc
 @Composable
 private fun StatusPill(state: AutoLogState) {
     val (label, dot) = when (state) {
-        AutoLogState.LISTENING -> "Listening" to Resurge.colors.success
-        AutoLogState.PAUSED -> "Paused" to Resurge.colors.glowInk
+        AutoLogState.LISTENING -> "Listening" to Resurge.colors.up
+        AutoLogState.PAUSED -> "Paused" to Resurge.colors.mid
         AutoLogState.OFF -> "Off" to Resurge.colors.textSubtle
     }
     Row(
@@ -483,10 +483,10 @@ private fun MetaRow(icon: Int, text: String, action: Pair<String, () -> Unit>? =
                 onClick = onClick,
                 role = Role.Button,
                 indication = LocalIndication.current,
-                modifier = Modifier.clip(Resurge.shape.pill).background(Resurge.colors.accentMuted),
+                modifier = Modifier.clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted),
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 7.dp),
             ) {
-                Text(label, style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight), color = Resurge.colors.brandInk)
+                Text(label, style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight), color = Resurge.colors.text)
             }
         }
     }
@@ -504,10 +504,10 @@ private fun AddRow(label: String, onClick: () -> Unit) {
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
-                Icon(ResurgeIcons.Plus, contentDescription = null, tint = Resurge.colors.brandInk, size = 18.dp)
+                Icon(ResurgeIcons.Plus, contentDescription = null, tint = Resurge.colors.text, size = 18.dp)
             }
             Spacer(Modifier.width(12.dp))
-            Text(label, style = Resurge.type.body, color = Resurge.colors.brandInk)
+            Text(label, style = Resurge.type.body, color = Resurge.colors.text)
         }
     }
 }
@@ -518,8 +518,8 @@ private fun WidgetCard(onAdd: () -> Unit) {
         Modifier.fillMaxWidth().clip(Resurge.shape.md).background(Resurge.colors.surface).padding(start = 16.dp, end = 12.dp, top = 14.dp, bottom = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(36.dp).clip(Resurge.shape.pill).background(Resurge.colors.accentMuted), contentAlignment = Alignment.Center) {
-            Icon(ResurgeIcons.Widget, contentDescription = null, tint = Resurge.colors.brandInk, size = 18.dp)
+        Box(Modifier.size(36.dp).clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted), contentAlignment = Alignment.Center) {
+            Icon(ResurgeIcons.Widget, contentDescription = null, tint = Resurge.colors.text, size = 18.dp)
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -568,8 +568,8 @@ private fun ToggleRow(label: String, footnote: String, checked: Boolean, onChang
 
 @Composable
 private fun ScaleBadge(size: Int) {
-    Box(Modifier.size(size.dp).clip(Resurge.shape.pill).background(Resurge.colors.accentMuted), contentAlignment = Alignment.Center) {
-        Icon(ResurgeIcons.Scale, contentDescription = null, tint = Resurge.colors.brandInk, size = (size / 2).dp)
+    Box(Modifier.size(size.dp).clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted), contentAlignment = Alignment.Center) {
+        Icon(ResurgeIcons.Scale, contentDescription = null, tint = Resurge.colors.text, size = (size / 2).dp)
     }
 }
 

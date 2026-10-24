@@ -86,8 +86,8 @@ internal fun RoundButton(icon: Int, label: String, accent: Boolean, onClick: () 
 @Composable
 internal fun Explainer(icon: Int, title: String, body: String, modifier: Modifier = Modifier) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Box(Modifier.size(56.dp).clip(Resurge.shape.pill).background(Resurge.colors.accentMuted), contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = Resurge.colors.brandInk, size = 26.dp)
+        Box(Modifier.size(56.dp).clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = Resurge.colors.text, size = 26.dp)
         }
         Spacer(Modifier.size(10.dp))
         Text(title, style = Resurge.type.title, textAlign = TextAlign.Center)

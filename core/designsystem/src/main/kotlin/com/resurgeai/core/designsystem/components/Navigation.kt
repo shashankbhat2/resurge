@@ -1,5 +1,7 @@
 package com.resurgeai.core.designsystem.components
 
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.layout.Column
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.animateColorAsState
@@ -9,6 +11,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,14 +23,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
@@ -35,6 +37,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.composeunstyled.Text
 import com.composeunstyled.UnstyledButton
 import com.resurgeai.core.designsystem.theme.Resurge
@@ -49,20 +52,18 @@ data class NavItem<T>(
 /** Space the navbar takes at the bottom (bar plus system navigation inset); scrolling tab content should end with at least this much space. */
 val LocalFloatingBarInset = compositionLocalOf { 0.dp }
 
-private val BarHeight = 64.dp
-private val BarRadius = 28.dp
-private val ItemSize = 48.dp
+private val BarHeight = 72.dp
+private val BarMarginX = 16.dp
+private val BarMarginBottom = 12.dp
+private val TabHeight = 56.dp
 
-private val BarPaddingY = 8.dp
-
-/** Height of the navbar above the system navigation-bar inset. */
-val FloatingNavBarHeight: Dp = BarHeight + BarPaddingY * 2
+/** Space the floating navbar takes above the system navigation-bar inset (bar plus its margin). */
+val FloatingNavBarHeight: Dp = BarHeight + BarMarginBottom
 
 /**
- * Navigation bar (Resurge Tide), docked to the bottom edge: `navBar` with `radius-lg` top corners
- * and a soft shadow, running behind the system navigation bar. Icon-only tabs are spread evenly,
- * and the selected tab is a 48dp `navActive` circle holding its filled icon. An optional [center]
- * item (e.g. the Coach) sits between the two halves of [items].
+ * Navigation bar (Resurge Mono): a floating pill inset from the screen edges, icons only. The
+ * selected tab sits on a lighter pill; tabs are a full 56dp tall so they're easy to hit, and each
+ * is announced by its label. An optional [center] item (the Coach) sits between the two halves.
  */
 @Composable
 fun <T> FloatingNavBar(
@@ -70,80 +71,100 @@ fun <T> FloatingNavBar(
     selected: T,
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
-    center: (@Composable () -> Unit)? = null,
+    center: (@Composable RowScope.() -> Unit)? = null,
 ) {
-    val shape = RoundedCornerShape(topStart = BarRadius, topEnd = BarRadius)
-    Row(
-        modifier = modifier
+    val shape = Resurge.shape.pill
+    Box(
+        modifier
             .fillMaxWidth()
-            .shadow(16.dp, shape, ambientColor = Color.Black.copy(alpha = 0.10f), spotColor = Color.Black.copy(alpha = 0.10f))
-            .clip(shape)
-            .background(Resurge.colors.navBar)
             .windowInsetsPadding(WindowInsets.navigationBars)
-            .padding(vertical = BarPaddingY)
-            .height(BarHeight)
-            .padding(horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceEvenly,
+            .padding(start = BarMarginX, end = BarMarginX, bottom = BarMarginBottom),
     ) {
-        val half = (items.size + 1) / 2
-        items.forEachIndexed { index, item ->
-            if (index == half) center?.invoke()
-            val isSelected = item.key == selected
-            NavTab(
-                icon = if (isSelected) item.selectedIcon else item.icon,
-                label = item.label,
-                selected = isSelected,
-                onClick = { onSelect(item.key) },
-            )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(BarHeight)
+                .shadow(20.dp, shape, ambientColor = Color.Black.copy(alpha = 0.4f), spotColor = Color.Black.copy(alpha = 0.4f))
+                .clip(shape)
+                .background(Resurge.colors.navBar)
+                .border(1.dp, Resurge.colors.border, shape)
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val half = (items.size + 1) / 2
+            items.forEachIndexed { index, item ->
+                if (index == half) center?.invoke(this)
+                val isSelected = item.key == selected
+                NavTab(
+                    icon = if (isSelected) item.selectedIcon else item.icon,
+                    label = item.label,
+                    selected = isSelected,
+                    onClick = { onSelect(item.key) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            if (half >= items.size) center?.invoke(this)
         }
-        if (half >= items.size) center?.invoke()
     }
 }
 
-/** One tab: an outline icon, or when [selected] a filled icon in a `navActive` circle. */
+/** One tab: its icon, on a lighter pill when [selected]. */
 @Composable
 private fun NavTab(
     @DrawableRes icon: Int,
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val bg by animateColorAsState(if (selected) Resurge.colors.navActive else Color.Transparent, tween(180), label = "tab")
-    val fg by animateColorAsState(if (selected) Resurge.colors.navOnActive else Resurge.colors.navInactive, tween(180), label = "tabIcon")
-    UnstyledButton(
-        onClick = onClick,
-        role = Role.Tab,
-        modifier = Modifier
-            .size(ItemSize)
-            .clip(Resurge.shape.pill)
-            .background(bg)
-            .semantics {
-                contentDescription = label
-                this.selected = selected
-            },
-        indication = LocalIndication.current,
-    ) {
-        Icon(icon, contentDescription = null, tint = fg, size = 24.dp)
+    val bg by animateColorAsState(if (selected) Resurge.colors.borderStrong else Color.Transparent, tween(180), label = "tab")
+    val fg by animateColorAsState(if (selected) Resurge.colors.text else Resurge.colors.navInactive, tween(180), label = "tabIcon")
+    Box(modifier, contentAlignment = Alignment.Center) {
+        UnstyledButton(
+            onClick = onClick,
+            role = Role.Tab,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(TabHeight)
+                .padding(horizontal = 2.dp)
+                .clip(Resurge.shape.pill)
+                .background(bg)
+                .semantics {
+                    contentDescription = label
+                    this.selected = selected
+                },
+            indication = LocalIndication.current,
+        ) { Icon(icon, contentDescription = null, tint = fg, size = 28.dp) }
     }
 }
 
 /**
- * The coach in the middle of [FloatingNavBar]: the persona's flat blob (Friend or Commander) in a
- * 48dp tap target. It keeps its own colours; tapping starts a new chat with the coach.
+ * The coach's mark: a sparkle in a solid circle (white on black, black on white). Used for the Coach
+ * in the navbar and beside its notes; there's no character, so it reads the same in every persona.
  */
 @Composable
-fun NavCoach(commander: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    UnstyledButton(
-        onClick = onClick,
-        role = Role.Button,
-        modifier = modifier
-            .size(ItemSize)
-            .clip(Resurge.shape.pill)
-            .semantics { contentDescription = "Coach" },
-        indication = LocalIndication.current,
+fun CoachBadge(size: Dp = 32.dp, modifier: Modifier = Modifier) {
+    Box(
+        modifier.size(size).clip(Resurge.shape.pill).background(Resurge.colors.strong),
+        contentAlignment = Alignment.Center,
     ) {
-        CoachMascot(commander = commander, size = 32.dp)
+        Icon(ResurgeIcons.CoachFilled, contentDescription = null, tint = Resurge.colors.onStrong, size = size * 0.55f)
+    }
+}
+
+/** The Coach in the middle of [FloatingNavBar]: a 48dp [CoachBadge]. Tapping starts a new chat. */
+@Composable
+fun RowScope.NavCoach(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(modifier.weight(1f), contentAlignment = Alignment.Center) {
+        UnstyledButton(
+            onClick = onClick,
+            role = Role.Button,
+            modifier = Modifier
+                .size(TabHeight)
+                .clip(Resurge.shape.pill)
+                .semantics { contentDescription = "Coach" },
+            indication = LocalIndication.current,
+        ) { CoachBadge(size = 48.dp) }
     }
 }
 

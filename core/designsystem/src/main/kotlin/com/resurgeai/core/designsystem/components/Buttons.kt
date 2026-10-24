@@ -39,8 +39,8 @@ fun Button(
     val (container, content, border) = when (variant) {
         // Mono: the highest-contrast fill (white on black, black on white). The accent stays for selection.
         ButtonVariant.Primary -> Triple(Resurge.colors.strong, Resurge.colors.onStrong, Color.Transparent)
-        // brandInk rather than the brand fill, so the label passes 4.5:1 in both themes.
-        ButtonVariant.Accent -> Triple(Resurge.colors.brandInk, Resurge.colors.onAccent, Color.Transparent)
+        // Mono keeps the accent for selection and "you are here", so Accent buttons draw as Primary.
+        ButtonVariant.Accent -> Triple(Resurge.colors.strong, Resurge.colors.onStrong, Color.Transparent)
         ButtonVariant.Secondary -> Triple(Resurge.colors.surfaceMuted, Resurge.colors.text, Color.Transparent)
         ButtonVariant.Ghost -> Triple(Color.Transparent, Resurge.colors.text, Color.Transparent)
         ButtonVariant.Danger -> Triple(Resurge.colors.surface, Resurge.colors.danger, Resurge.colors.border)

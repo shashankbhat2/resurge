@@ -220,6 +220,32 @@ class TodayScreenshotTest {
         compose.onRoot().captureRoboImage("src/test/screenshots/today_sheet_$name.png")
     }
 
+    /** A goal and today's planned session, as onboarding leaves them. */
+    private val planned get() = state.copy(
+        streak = streak(false),
+        dismissedInsights = setOfNotNull(state.latestInsight?.id),
+        profile = state.profile!!.copy(
+            majorGoal = com.resurgeai.core.model.MajorGoal(
+                com.resurgeai.core.model.TrainingGoal.LOSE_FAT, weeks = 12, startDate = day.minusDays(18), startKg = 78.0, targetKg = 72.0,
+            ),
+        ),
+        weight = WeightGlance(76.7, -0.4, listOf(77.4, 77.2, 77.1, 77.0, 76.9, 76.8, 76.7)),
+        workouts = emptyList(),
+        plan = com.resurgeai.core.model.WorkoutPlan(
+            id = "p", name = "Lean 12", summary = "", progression = "", notes = "",
+            days = java.time.DayOfWeek.entries.map { d ->
+                if (d == day.dayOfWeek) com.resurgeai.core.model.PlanDay(
+                    d, rest = false, title = "Strength B", kind = com.resurgeai.core.model.SessionKind.STRENGTH, activityId = "weights", durationMin = 45,
+                    exercises = List(5) { com.resurgeai.core.model.PlanExercise("Lift $it", 3, "8", "RPE 7", 90) },
+                ) else com.resurgeai.core.model.PlanDay(d, rest = true, title = "Rest", note = "Walk 8,000 steps")
+            },
+        ),
+    )
+
+    @Test fun plannedDark() = capture("planned_dark", ColorScheme.Dark, planned)
+
+    @Test fun compactDark() = capture("compact_dark", ColorScheme.Dark, planned.copy(compactList = true))
+
     @Test fun loadingLight() = capture("loading_light", ColorScheme.Light, state.copy(today = null))
 
     @Test fun loadingDark() = capture("loading_dark", ColorScheme.Dark, state.copy(today = null))

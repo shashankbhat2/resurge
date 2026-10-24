@@ -77,13 +77,13 @@ internal fun ScaleStripView(strip: ScaleStrip, units: WeightUnits, actions: Scal
                 StripText("${units.format(s.kg)}…", "On ${s.model}")
             }
             is ScaleStrip.Saved -> Strip {
-                Dot(Resurge.colors.accent, ResurgeIcons.Check)
+                Dot(Resurge.colors.up, ResurgeIcons.Check)
                 Spacer(Modifier.width(10.dp))
                 StripText("Logged ${units.format(s.weighIn.kg)}", "From ${s.model}")
                 StripAction("Undo", actions.onUndo)
             }
             is ScaleStrip.Unusual -> Strip {
-                Dot(Resurge.colors.glow, ResurgeIcons.Scale)
+                Dot(Resurge.colors.accent, ResurgeIcons.Scale)
                 Spacer(Modifier.width(10.dp))
                 StripText("${units.format(s.kg)}, was that you?", "From ${s.model}")
                 StripAction("Not me", actions.onDismiss, emphasis = false)
@@ -131,7 +131,7 @@ private fun androidx.compose.foundation.layout.RowScope.StripText(title: String,
 @Composable
 private fun Dot(color: Color, icon: Int) {
     Box(Modifier.size(24.dp).clip(Resurge.shape.pill).background(color.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
-        Icon(icon, contentDescription = null, tint = if (color == Resurge.colors.glow) Resurge.colors.glowInk else Resurge.colors.brandInk, size = 14.dp)
+        Icon(icon, contentDescription = null, tint = Resurge.colors.bg, size = 14.dp)
     }
 }
 
@@ -141,9 +141,9 @@ private fun StripAction(label: String, onClick: () -> Unit, emphasis: Boolean = 
         onClick = onClick,
         role = Role.Button,
         indication = LocalIndication.current,
-        modifier = Modifier.clip(Resurge.shape.pill).then(if (emphasis) Modifier.background(Resurge.colors.accentMuted) else Modifier),
+        modifier = Modifier.clip(Resurge.shape.pill).then(if (emphasis) Modifier.background(Resurge.colors.surfaceMuted) else Modifier),
         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
     ) {
-        Text(label, style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight), color = if (emphasis) Resurge.colors.brandInk else Resurge.colors.textMuted)
+        Text(label, style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight), color = if (emphasis) Resurge.colors.text else Resurge.colors.textMuted)
     }
 }

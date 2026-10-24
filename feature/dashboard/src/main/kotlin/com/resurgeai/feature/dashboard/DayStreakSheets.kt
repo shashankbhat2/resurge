@@ -46,6 +46,7 @@ import com.resurgeai.core.designsystem.components.ButtonVariant
 import com.resurgeai.core.designsystem.components.Divider
 import com.resurgeai.core.designsystem.components.HabitVisuals
 import com.resurgeai.core.designsystem.components.Icon
+import com.resurgeai.core.designsystem.components.dayStatusFill
 import com.resurgeai.core.designsystem.components.NumberStepper
 import com.resurgeai.core.designsystem.components.Overline
 import com.resurgeai.core.designsystem.components.ResurgeIcons
@@ -101,9 +102,9 @@ internal fun StreakSheet(state: DayStreakState, settings: HabitSettings, onDone:
     val streak = state.streak
     SheetColumn {
         SheetHeader(
-            icon = ResurgeIcons.FlameFilled,
-            iconTint = if (streak.current > 0) Resurge.colors.onGlow else Resurge.colors.textMuted,
-            iconBackground = if (streak.current > 0) Resurge.colors.glow else Resurge.colors.surfaceMuted,
+            icon = ResurgeIcons.Check,
+            iconTint = if (streak.current > 0) Resurge.colors.bg else Resurge.colors.textMuted,
+            iconBackground = if (streak.current > 0) Resurge.colors.up else Resurge.colors.surfaceMuted,
             title = "${days(streak.current)} streak",
             subtitle = "Days in a row with everything done",
         )
@@ -152,12 +153,7 @@ private fun Calendar(state: DayStreakState, weeks: Int) {
 @Composable
 private fun CalendarDay(date: LocalDate, status: DayStatus?, isToday: Boolean, modifier: Modifier) {
     val shape = Resurge.shape.sm
-    val fill = when (status) {
-        DayStatus.MET -> Resurge.colors.glow
-        DayStatus.FORGIVEN -> Resurge.colors.frost
-        DayStatus.MISSED -> Resurge.colors.ebb
-        else -> Color.Transparent
-    }
+    val fill = status?.let { dayStatusFill(it) }?.let { if (status == DayStatus.MET) it else it.copy(alpha = 0.28f) } ?: Color.Transparent
     val label = when (status) {
         DayStatus.MET -> "done"
         DayStatus.FORGIVEN -> "covered by the freeze"
@@ -170,13 +166,13 @@ private fun CalendarDay(date: LocalDate, status: DayStatus?, isToday: Boolean, m
             .aspectRatio(1f)
             .clip(shape)
             .background(fill)
-            .then(if (status == DayStatus.OPEN || isToday) Modifier.border(1.5.dp, if (isToday) Resurge.colors.text else Resurge.colors.textSubtle, shape) else Modifier)
+            .then(if (status == DayStatus.OPEN || isToday) Modifier.border(if (isToday) 2.dp else 1.dp, if (isToday) Resurge.colors.accent else Resurge.colors.borderStrong, shape) else Modifier)
             .semantics { contentDescription = "${date.format(DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.getDefault()))}: $label" },
         contentAlignment = Alignment.Center,
     ) {
         when (status) {
-            DayStatus.MET -> Icon(ResurgeIcons.FlameFilled, contentDescription = null, tint = Resurge.colors.onGlow, size = 15.dp)
-            DayStatus.FORGIVEN -> Icon(ResurgeIcons.Snowflake, contentDescription = null, tint = Resurge.colors.frostInk, size = 15.dp)
+            DayStatus.MET -> Icon(ResurgeIcons.Check, contentDescription = null, tint = Resurge.colors.bg, size = 15.dp)
+            DayStatus.FORGIVEN -> Icon(ResurgeIcons.Snowflake, contentDescription = null, tint = Resurge.colors.mid, size = 15.dp)
             else -> Text(
                 date.dayOfMonth.toString(),
                 style = Resurge.type.caption,
@@ -189,9 +185,9 @@ private fun CalendarDay(date: LocalDate, status: DayStatus?, isToday: Boolean, m
 @Composable
 private fun Legend() {
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        LegendItem(Resurge.colors.glow, "Done")
-        LegendItem(Resurge.colors.frost, "Freeze")
-        LegendItem(Resurge.colors.ebb, "Missed")
+        LegendItem(Resurge.colors.up, "Done")
+        LegendItem(Resurge.colors.mid, "Freeze")
+        LegendItem(Resurge.colors.down, "Missed")
     }
 }
 
@@ -217,10 +213,9 @@ internal fun WeekSheet(state: DayStreakState, onDone: () -> Unit) {
     val firstDay = start.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault())
     SheetColumn {
         SheetHeader(
-            icon = null,
-            iconTint = Resurge.colors.onGlow,
-            iconBackground = Resurge.colors.glow,
-            iconContent = { WeeklyFlameIcon(week.metDays.coerceAtMost(week.target) / week.target.toFloat(), size = 28.dp) },
+            icon = ResurgeIcons.Target,
+            iconTint = if (week.reached) Resurge.colors.bg else Resurge.colors.textMuted,
+            iconBackground = if (week.reached) Resurge.colors.up else Resurge.colors.surfaceMuted,
             title = "${week.metDays} of ${week.target} days",
             subtitle = "Weekly goal · $firstDay to $lastDay",
         )
@@ -279,14 +274,14 @@ private fun WeekRow(start: LocalDate, met: Int, target: Int, isCurrent: Boolean)
             repeat(target) { i ->
                 Box(
                     Modifier.weight(1f).fillMaxHeight().clip(Resurge.shape.pill)
-                        .background(if (i < met) (if (reached) Resurge.colors.glow else Resurge.colors.accent) else Resurge.colors.surfaceMuted),
+                        .background(if (i < met) (if (reached) Resurge.colors.up else Resurge.colors.text) else Resurge.colors.surfaceMuted),
                 )
             }
         }
         Spacer(Modifier.width(12.dp))
         Text("${met.coerceAtMost(7)}/$target", style = Resurge.type.caption.copy(fontFeatureSettings = "tnum"), color = Resurge.colors.textMuted, modifier = Modifier.width(28.dp))
         Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
-            if (reached) Icon(ResurgeIcons.FlameFilled, contentDescription = "Reached", tint = Resurge.colors.glow, size = 18.dp)
+            if (reached) Icon(ResurgeIcons.Check, contentDescription = "Reached", tint = Resurge.colors.up, size = 18.dp)
         }
     }
 }
@@ -327,15 +322,15 @@ internal fun GoalsSheet(state: DayStreakState, onSave: (DayGoals) -> Unit) {
         }
         Overline("Daily targets")
         Group {
-            ToggleRow(ResurgeIcons.Bed, Resurge.colors.sleep, "Sleep", if (state.health) "${Targets.formatSleep(t.sleepMinutes)} a night" else "Needs Health Connect", goals.sleep && state.health, enabled = state.health) { goals = goals.copy(sleep = it) }
+            ToggleRow(ResurgeIcons.Bed, Resurge.colors.textMuted, "Sleep", if (state.health) "${Targets.formatSleep(t.sleepMinutes)} a night" else "Needs Health Connect", goals.sleep && state.health, enabled = state.health) { goals = goals.copy(sleep = it) }
             Divider(Modifier.padding(start = 50.dp))
-            ToggleRow(ResurgeIcons.Footprints, Resurge.colors.activity, "Steps", if (state.health) "${"%,d".format(t.steps)} a day" else "Needs Health Connect", goals.steps && state.health, enabled = state.health) { goals = goals.copy(steps = it) }
+            ToggleRow(ResurgeIcons.Footprints, Resurge.colors.textMuted, "Steps", if (state.health) "${"%,d".format(t.steps)} a day" else "Needs Health Connect", goals.steps && state.health, enabled = state.health) { goals = goals.copy(steps = it) }
             Divider(Modifier.padding(start = 50.dp))
-            ToggleRow(ResurgeIcons.Droplet, Resurge.colors.water, "Water", "${"%,d".format(t.waterMl)} ml a day", goals.water) { goals = goals.copy(water = it) }
+            ToggleRow(ResurgeIcons.Droplet, Resurge.colors.textMuted, "Water", "${"%,d".format(t.waterMl)} ml a day", goals.water) { goals = goals.copy(water = it) }
             Divider(Modifier.padding(start = 50.dp))
             Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(ResurgeIcons.Bowl, contentDescription = null, tint = Resurge.colors.energy, size = 22.dp)
+                    Icon(ResurgeIcons.Bowl, contentDescription = null, tint = Resurge.colors.textMuted, size = 22.dp)
                     Spacer(Modifier.width(12.dp))
                     Text("Meals logged", style = Resurge.type.body, modifier = Modifier.weight(1f))
                 }
@@ -432,10 +427,10 @@ private fun Pill(text: String, glow: Boolean = false) {
     Text(
         text,
         style = Resurge.type.label,
-        color = if (glow) Resurge.colors.glowInk else Resurge.colors.textMuted,
+        color = if (glow) Resurge.colors.up else Resurge.colors.textMuted,
         modifier = Modifier
             .clip(Resurge.shape.pill)
-            .background(if (glow) Resurge.colors.glowTint else Resurge.colors.surfaceMuted)
+            .background(Resurge.colors.surfaceMuted)
             .padding(horizontal = 12.dp, vertical = 6.dp),
     )
 }

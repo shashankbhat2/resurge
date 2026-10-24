@@ -1,5 +1,6 @@
 package com.resurgeai.feature.weight
 
+import com.resurgeai.core.designsystem.components.CoachBadge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,7 +33,6 @@ import com.resurgeai.core.data.session.SessionRepository
 import com.resurgeai.core.data.weight.WeightRepository
 import com.resurgeai.core.designsystem.components.Button
 import com.resurgeai.core.designsystem.components.ButtonVariant
-import com.resurgeai.core.designsystem.components.CoachMascot
 import com.resurgeai.core.designsystem.components.Confetti
 import com.resurgeai.core.designsystem.components.Icon
 import com.resurgeai.core.designsystem.components.ResurgeIcons
@@ -151,7 +151,7 @@ internal fun MilestoneAward(c: GoalCelebration.Milestone, s: CelebrationState, o
     Card {
         Badge(ResurgeIcons.Medal, 72.dp)
         Spacer(Modifier.height(14.dp))
-        Text("MILESTONE ${c.number} OF ${c.count}", style = Resurge.type.overline, color = Resurge.colors.glowInk)
+        Text("MILESTONE ${c.number} OF ${c.count}", style = Resurge.type.overline, color = Resurge.colors.up)
         Spacer(Modifier.height(4.dp))
         Text("${trim(s.units.format(c.kgDone))} ${if (s.goal.losing) "down" else "up"}", style = Resurge.type.tide.copy(fontSize = 36.sp, lineHeight = 40.sp))
         Spacer(Modifier.height(18.dp))
@@ -167,7 +167,7 @@ internal fun GoalReward(c: GoalCelebration.Goal, s: CelebrationState, onNewGoal:
     Card {
         Badge(ResurgeIcons.Trophy, 96.dp)
         Spacer(Modifier.height(14.dp))
-        Text("GOAL REACHED", style = Resurge.type.overline, color = Resurge.colors.glowInk)
+        Text("GOAL REACHED", style = Resurge.type.overline, color = Resurge.colors.up)
         Spacer(Modifier.height(4.dp))
         Text(s.units.format(s.goal.goalKg), style = Resurge.type.tide.copy(fontSize = 40.sp, lineHeight = 44.sp))
         Spacer(Modifier.height(16.dp))
@@ -197,9 +197,9 @@ private fun Card(content: @Composable () -> Unit) {
 /** The award: the icon on a glowing disc with a soft halo. */
 @Composable
 private fun Badge(icon: Int, size: Dp) {
-    Box(Modifier.size(size + 24.dp).clip(Resurge.shape.pill).background(Resurge.colors.glowTint), contentAlignment = Alignment.Center) {
-        Box(Modifier.size(size).clip(Resurge.shape.pill).background(Resurge.colors.glow), contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = Resurge.colors.onGlow, size = size * 0.5f)
+    Box(Modifier.size(size + 24.dp).clip(Resurge.shape.pill).background(Resurge.colors.up.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(size).clip(Resurge.shape.pill).background(Resurge.colors.up), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = Resurge.colors.bg, size = size * 0.5f)
         }
     }
 }
@@ -215,7 +215,7 @@ private fun RewardStat(value: String, label: String, modifier: Modifier) {
 @Composable
 private fun CoachSays(text: String, commander: Boolean) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-        CoachMascot(commander = commander, size = 36.dp)
+        CoachBadge(size = 36.dp)
         Spacer(Modifier.width(10.dp))
         Text(
             text,

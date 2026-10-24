@@ -150,6 +150,13 @@ class PreferencesRepository @Inject constructor(
         dataStore.edit { it[PROGRESS_PROMPT_DISMISSED] = true }
     }
 
+    /** Today's list shown as a row of boxes instead of rows. */
+    val todayListCompact: Flow<Boolean> = dataStore.data.map { it[TODAY_COMPACT] == true }
+
+    suspend fun setTodayListCompact(on: Boolean) {
+        dataStore.edit { it[TODAY_COMPACT] = on }
+    }
+
     suspend fun highTideShownOn(): LocalDate? =
         dataStore.data.first()[HIGH_TIDE_SHOWN]?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
 
@@ -159,6 +166,7 @@ class PreferencesRepository @Inject constructor(
 
     private companion object {
         val HIGH_TIDE_SHOWN = stringPreferencesKey("high_tide_shown")
+        val TODAY_COMPACT = booleanPreferencesKey("today_list_compact")
         val PROGRESS_SECURE = booleanPreferencesKey("progress_secure")
         val PROGRESS_PROMPT_DISMISSED = booleanPreferencesKey("progress_prompt_dismissed")
         val WEIGHT_WRITE_HC = booleanPreferencesKey("weight_write_hc")

@@ -17,157 +17,215 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composeunstyled.Text
 import com.composeunstyled.UnstyledButton
 import com.resurgeai.core.designsystem.components.Icon
+import com.resurgeai.core.designsystem.components.MiniBars
+import com.resurgeai.core.designsystem.components.signalColor
 import com.resurgeai.core.designsystem.components.ResurgeIcons
 import com.resurgeai.core.designsystem.components.SkeletonGroup
 import com.resurgeai.core.designsystem.components.SkeletonLine
 import com.resurgeai.core.designsystem.theme.Resurge
-import com.resurgeai.core.designsystem.theme.clockFormatter
 import com.resurgeai.core.model.DailyHealth
 import com.resurgeai.core.model.HealthMetric
+import com.resurgeai.core.model.PaceSignal
 import com.resurgeai.core.model.Targets
 import com.resurgeai.core.model.WeightMath
 import com.resurgeai.core.model.UnitSystem
-import java.time.Duration
-import java.time.ZoneId
 import java.util.Locale
+import kotlin.math.abs
 
 /**
- * Today's health numbers as compact tiles, two per row: the value Health Connect reports for today
- * and a one-line note saying what the number is. Tapping a tile opens its detail.
+ * Today's vitals as tiles, two per row: the value, a week of bars (today in white), and one line on
+ * how it stands, coloured up / mid / down when it bears on a goal. Tapping a tile opens its detail.
  */
 @Composable
-internal fun HealthTiles(day: DailyHealth, targets: Targets, weight: WeightGlance?, units: UnitSystem, onOpen: (HealthMetric) -> Unit) {
-    val zone = ZoneId.systemDefault()
-    val clock = clockFormatter()
-    val night = day.sleep.takeIf { it.isNotEmpty() }
+internal fun VitalTiles(
+    day: DailyHealth,
+    targets: Targets,
+    sparklines: Map<HealthMetric, List<Double?>>,
+    weight: WeightGlance?,
+    eatenKcal: Double,
+    units: UnitSystem,
+    losingWeight: Boolean?,
+    onOpen: (HealthMetric) -> Unit,
+) {
     val hr = day.heartRate
     val stepGoal = targets.steps.toLong()
-    val sleepGoal = Duration.ofMinutes(targets.sleepMinutes.toLong())
-    val rows = buildList {
+    val tiles = buildList {
+        val asleep = day.asleepDuration
         add(
-            HealthRow(
-                HealthMetric.SLEEP, "Sleep", ResurgeIcons.Bed, Resurge.colors.sleep,
-                value = day.asleepDuration?.let(Formatters::duration),
-                note = night?.let {
-                    val asleep = day.asleepDuration
-                    if (asleep != null && asleep >= sleepGoal) return@let "Goal ${Targets.formatSleep(targets.sleepMinutes)} met"
-                    val bed = it.minOf { s -> s.start }.atZone(zone).toLocalTime().format(clock)
-                    val wake = it.maxOf { s -> s.end }.atZone(zone).toLocalTime().format(clock)
-                    "$bed – $wake"
-                } ?: "None recorded last night",
+            Vital(
+                HealthMetric.SLEEP, "Sleep", ResurgeIcons.Bed,
+                value = asleep?.let(Formatters::duration),
+                bars = sparklines[HealthMetric.SLEEP],
+                trend = asleep?.let { a ->
+                    val short = targets.sleepMinutes - a.toMinutes()
+                    when {
+                        short <= 0 -> "Goal ${Targets.formatSleep(targets.sleepMinutes)} met" to PaceSignal.UP
+                        short <= 30 -> "${short} min short" to PaceSignal.MID
+                        else -> "${Targets.formatSleep(short.toInt())} short" to PaceSignal.DOWN
+                    }
+                } ?: ("None recorded last night" to null),
             ),
         )
         add(
-            HealthRow(
-                HealthMetric.STEPS, "Steps", ResurgeIcons.Footprints, Resurge.colors.activity,
+            Vital(
+                HealthMetric.STEPS, "Steps", ResurgeIcons.Footprints,
                 value = day.steps?.let(Formatters::count),
-                note = day.steps?.let { steps ->
-                    if (steps >= stepGoal) "Goal ${Formatters.count(stepGoal)} met"
-                    else "${Formatters.count(stepGoal - steps)} to go"
-                } ?: "None yet today",
+                bars = sparklines[HealthMetric.STEPS],
+                // The day isn't over, so short of the goal is "still to go", not a miss.
+                trend = day.steps?.let { steps ->
+                    if (steps >= stepGoal) "Goal ${Formatters.count(stepGoal)} met" to PaceSignal.UP
+                    else "${Formatters.count(stepGoal - steps)} to go" to PaceSignal.MID
+                } ?: ("None yet today" to null),
             ),
         )
         add(
-            HealthRow(
-                HealthMetric.CALORIES_BURNED, "Burned", ResurgeIcons.Flame, Resurge.colors.heart,
-                value = day.caloriesTotal?.let { "${Formatters.kcal(it)} kcal" },
-                note = day.caloriesActive?.let { "${Formatters.kcal(it)} from activity" } ?: "So far today",
+            Vital(
+                HealthMetric.HEART_RATE, if (hr?.restingBpm != null) "Resting HR" else "Heart rate", ResurgeIcons.Heartbeat,
+                value = (hr?.restingBpm ?: hr?.avgBpm)?.let { "$it" }, unit = " bpm",
+                bars = sparklines[HealthMetric.HEART_RATE],
+                trend = (if (hr?.minBpm != null && hr.maxBpm != null) "Range ${hr.minBpm}–${hr.maxBpm} today" else "No readings yet") to null,
+            ),
+        )
+        add(weightVital(weight, units, losingWeight))
+        add(
+            Vital(
+                HealthMetric.CALORIES_BURNED, "Burned", ResurgeIcons.Flame,
+                value = day.caloriesTotal?.let(Formatters::kcal), unit = " kcal",
+                bars = sparklines[HealthMetric.CALORIES_BURNED],
+                trend = (day.caloriesActive?.let { "${Formatters.kcal(it)} from activity" } ?: "So far today") to null,
             ),
         )
         add(
-            HealthRow(
-                HealthMetric.HEART_RATE, if (hr?.restingBpm != null) "Resting heart rate" else "Avg heart rate", ResurgeIcons.Heartbeat, Resurge.colors.heart,
-                value = (hr?.restingBpm ?: hr?.avgBpm)?.let { "$it bpm" },
-                note = if (hr?.minBpm != null && hr.maxBpm != null) "Range ${hr.minBpm}–${hr.maxBpm} today" else "No readings yet",
+            Vital(
+                null, "Eaten", ResurgeIcons.Bowl,
+                value = eatenKcal.takeIf { it > 0 }?.let(Formatters::kcal), unit = " kcal",
+                bars = null,
+                trend = (targets.calories - eatenKcal).let { left ->
+                    when {
+                        eatenKcal <= 0 -> "Nothing logged yet" to null
+                        left >= 0 -> "${Formatters.kcal(left)} left of ${Formatters.count(targets.calories.toLong())}" to null
+                        -left <= targets.calories * 0.1 -> "${Formatters.kcal(-left)} over" to PaceSignal.MID
+                        else -> "${Formatters.kcal(-left)} over" to PaceSignal.DOWN
+                    }
+                },
             ),
         )
-        day.distanceMeters?.let { m ->
-            add(HealthRow(HealthMetric.DISTANCE, "Distance", ResurgeIcons.Distance, Resurge.colors.water, "${Formatters.kilometres(m)} km", "Walked and run today"))
-        }
-        add(weightRow(weight, units))
     }
+    VitalGrid(tiles, onOpen)
+}
+
+/** Weight is logged in Resurge, so its tile shows without Health Connect too. */
+@Composable
+internal fun WeightVitalRow(weight: WeightGlance?, units: UnitSystem, losingWeight: Boolean?, onOpen: (HealthMetric) -> Unit) {
+    VitalGrid(listOf(weightVital(weight, units, losingWeight)), onOpen)
+}
+
+@Composable
+private fun VitalGrid(tiles: List<Vital>, onOpen: (HealthMetric) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(TILE_GAP)) {
-        rows.chunked(2).forEach { pair ->
+        tiles.chunked(2).forEach { pair ->
             Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(TILE_GAP)) {
-                pair.forEach { row -> HealthTile(row, Modifier.weight(1f).fillMaxHeight()) { onOpen(row.metric) } }
+                pair.forEach { tile ->
+                    VitalTile(tile, Modifier.weight(1f).fillMaxHeight()) { tile.metric?.let(onOpen) }
+                }
                 if (pair.size == 1) Spacer(Modifier.weight(1f))
             }
         }
     }
 }
 
-private val TILE_GAP = 12.dp
+private val TILE_GAP = 10.dp
 
-/** Weight is logged in Resurge, so its tile shows without Health Connect too. */
-@Composable
-internal fun WeightTileRow(weight: WeightGlance?, units: UnitSystem, onOpen: (HealthMetric) -> Unit) {
-    val row = weightRow(weight, units)
-    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(TILE_GAP)) {
-        HealthTile(row, Modifier.weight(1f).fillMaxHeight()) { onOpen(row.metric) }
-        Spacer(Modifier.weight(1f))
-    }
-}
-
-/** The trend and its change this week, or a nudge to log the first weigh-in. */
-@Composable
-private fun weightRow(weight: WeightGlance?, units: UnitSystem): HealthRow {
+/**
+ * The trend weight and its change this week. With a weight goal, moving its way is up and the
+ * other way down ([losingWeight] null: no goal, no colour).
+ */
+private fun weightVital(weight: WeightGlance?, units: UnitSystem, losingWeight: Boolean?): Vital {
     val imperial = units == UnitSystem.IMPERIAL
     fun conv(kg: Double) = if (imperial) kg / WeightMath.KG_PER_LB else kg
     val unit = if (imperial) "lb" else "kg"
-    val note = when {
-        weight == null -> "Tap to log a weigh-in"
-        weight.weekChangeKg == null -> "Trend weight"
-        kotlin.math.abs(conv(weight.weekChangeKg)) < 0.05 -> "Steady this week"
-        else -> String.format(Locale.getDefault(), "%s%.1f %s this week", if (weight.weekChangeKg < 0) "−" else "+", kotlin.math.abs(conv(weight.weekChangeKg)), unit)
+    val change = weight?.weekChangeKg
+    val trend = when {
+        weight == null -> "Tap to log a weigh-in" to null
+        change == null -> "Trend weight" to null
+        abs(conv(change)) < 0.05 -> "Steady this week" to null
+        else -> {
+            val text = String.format(Locale.getDefault(), "%s%.1f %s this week", if (change < 0) "−" else "+", abs(conv(change)), unit)
+            text to losingWeight?.let { losing -> if ((change < 0) == losing) PaceSignal.UP else PaceSignal.DOWN }
+        }
     }
-    return HealthRow(
-        HealthMetric.WEIGHT, "Weight", ResurgeIcons.Scale, Resurge.colors.accent,
-        value = weight?.let { String.format(Locale.getDefault(), "%.1f %s", conv(it.kg), unit) },
-        note = note,
+    return Vital(
+        HealthMetric.WEIGHT, "Weight", ResurgeIcons.Scale,
+        value = weight?.let { String.format(Locale.getDefault(), "%.1f", conv(it.kg)) }, unit = " $unit",
+        bars = weight?.spark?.takeLast(7)?.let { s ->
+            // Weight barely moves day to day: show it relative to the week's low so the shape reads.
+            val low = s.minOrNull() ?: 0.0
+            s.map { v -> (v - low) + (s.maxOrNull()!! - low).coerceAtLeast(0.1) * 0.25 }
+        },
+        trend = trend,
     )
 }
 
-private class HealthRow(
-    val metric: HealthMetric,
+private class Vital(
+    /** Null: no detail screen. */
+    val metric: HealthMetric?,
     val label: String,
     @DrawableRes val icon: Int,
-    val color: Color,
     val value: String?,
-    val note: String,
+    val bars: List<Double?>?,
+    val trend: Pair<String, PaceSignal?>,
+    val unit: String = "",
 )
 
 @Composable
-private fun HealthTile(row: HealthRow, modifier: Modifier, onClick: () -> Unit) {
+private fun VitalTile(tile: Vital, modifier: Modifier, onClick: () -> Unit) {
     UnstyledButton(
         onClick = onClick,
+        enabled = tile.metric != null,
         modifier = modifier
             .clip(Resurge.shape.md)
             .background(Resurge.colors.surface),
         indication = LocalIndication.current,
         contentAlignment = Alignment.TopStart,
     ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
+        Column(Modifier.fillMaxWidth().padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(row.icon, contentDescription = null, tint = row.color, size = 16.dp)
+                Icon(tile.icon, contentDescription = null, tint = Resurge.colors.textMuted, size = 16.dp)
                 Spacer(Modifier.width(6.dp))
-                Text(row.label, style = Resurge.type.caption, color = Resurge.colors.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(tile.label, style = Resurge.type.caption, color = Resurge.colors.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    tile.value ?: "—",
+                    style = Resurge.type.metric.copy(fontSize = 24.sp, lineHeight = 28.sp),
+                    color = if (tile.value != null) Resurge.colors.text else Resurge.colors.textSubtle,
+                    maxLines = 1,
+                )
+                if (tile.value != null && tile.unit.isNotEmpty()) {
+                    Text(tile.unit, style = Resurge.type.caption, color = Resurge.colors.textSubtle, modifier = Modifier.padding(bottom = 4.dp))
+                }
+            }
+            tile.bars?.takeIf { b -> b.any { it != null && it > 0 } }?.let {
+                Spacer(Modifier.height(10.dp))
+                MiniBars(it.takeLast(7))
+            }
+            Spacer(Modifier.height(8.dp))
+            val (text, signal) = tile.trend
             Text(
-                row.value ?: "—",
-                style = Resurge.type.metric.copy(fontSize = 22.sp, lineHeight = 28.sp),
-                color = if (row.value != null) Resurge.colors.text else Resurge.colors.textSubtle,
+                text,
+                style = Resurge.type.caption.copy(fontWeight = if (signal != null) FontWeight.SemiBold else FontWeight.Medium),
+                color = signal?.let { signalColor(it) } ?: Resurge.colors.textSubtle,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.height(6.dp))
-            Text(row.note, style = Resurge.type.caption, color = Resurge.colors.textSubtle, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
