@@ -106,7 +106,7 @@ fun PlanScreen(
                     Button("Build my plan", onClick = { onRebuild(null, state.training) }, enabled = state.goal != null && !state.building, loading = state.building)
                 }
                 else -> {
-                    PlanHeader(shown, state.goal, state.training, isDraft = state.draft != null)
+                    PlanHeader(shown, state.goal, isDraft = state.draft != null)
                     state.error?.let { Text(it, style = Resurge.type.label, color = Resurge.colors.down) }
                     if (state.draft != null) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -137,14 +137,13 @@ fun PlanScreen(
 }
 
 @Composable
-private fun PlanHeader(plan: WorkoutPlan, goal: MajorGoal?, training: TrainingPrefs, isDraft: Boolean) {
+private fun PlanHeader(plan: WorkoutPlan, goal: MajorGoal?, isDraft: Boolean) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // The name says the goal and days; the overline adds how long, and marks a preview.
         Overline(
             listOfNotNull(
                 if (isDraft) "Preview" else null,
-                goal?.type?.label,
-                goal?.weeks?.let(MajorGoal::durationLabel),
-                "${training.days.size} days a week",
+                goal?.weeks?.let { "${MajorGoal.durationLabel(it)} plan" },
             ).joinToString(" · "),
             color = if (isDraft) Resurge.colors.accent else Resurge.colors.textSubtle,
         )

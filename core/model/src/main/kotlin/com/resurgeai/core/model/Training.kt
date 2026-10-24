@@ -275,3 +275,26 @@ object PlanSets {
         return List(exercise.sets.coerceIn(1, 10)) { StrengthSet(reps(exercise.reps), weight) }
     }
 }
+
+/**
+ * The plan's name, in plain words from the goal and schedule ("Build muscle at home · 3 days a
+ * week"), so nobody needs to decode it. The plan service names new plans the same way.
+ */
+object PlanNames {
+    fun of(goal: MajorGoal?, training: TrainingPrefs): String {
+        val what = when (goal?.type) {
+            TrainingGoal.LOSE_FAT -> "Lose fat"
+            TrainingGoal.BUILD_MUSCLE -> "Build muscle"
+            TrainingGoal.RUN_FURTHER -> MajorGoal.RACES.firstOrNull { it.first == goal.raceKm }?.let { "Run a ${it.second}" } ?: "Run further"
+            TrainingGoal.GET_IN_SHAPE -> "Get back in shape"
+            null -> "Your plan"
+        }
+        val where = when (training.location) {
+            TrainingLocation.GYM -> ""
+            TrainingLocation.HOME -> " at home"
+            TrainingLocation.NONE -> " with no equipment"
+        }
+        val days = training.days.size
+        return "$what$where · $days ${if (days == 1) "day" else "days"} a week"
+    }
+}

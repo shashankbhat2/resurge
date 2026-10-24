@@ -492,7 +492,8 @@ private fun PlanStep(state: OnboardingUiState, actions: OnboardingActions) {
         else -> {
             val goal = state.goal
             StepHeader(
-                overline = listOfNotNull(goal?.label, MajorGoal.durationLabel(state.weeks), "${state.training.days.size} days").joinToString(" · "),
+                // The name already says the goal and days; the overline adds how long.
+                overline = "${MajorGoal.durationLabel(state.weeks)} plan",
                 title = plan.name,
                 subtitle = plan.summary,
             )
@@ -740,7 +741,7 @@ private fun ReadyStep(state: OnboardingUiState) {
             style = Resurge.type.headline,
         )
         state.plan?.let {
-            Text("${it.name} · ${it.sessions.size} sessions a week", style = Resurge.type.caption, color = Resurge.colors.textMuted)
+            Text(it.name, style = Resurge.type.caption, color = Resurge.colors.textMuted)
         }
         Spacer(Modifier.height(14.dp))
         GoalTrack(goal)

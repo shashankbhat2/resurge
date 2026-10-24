@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { formatPlanRequest } from "../src/plan/generate";
-import { assembleWeek, clip, GENERATED_PLAN_JSON_SCHEMA, GeneratedPlan, PlanRequest } from "../src/plan/schema";
+import { assembleWeek, clip, GENERATED_PLAN_JSON_SCHEMA, GeneratedPlan, PlanRequest, planName } from "../src/plan/schema";
 
 const session = (day: "mon" | "wed" | "fri" | "sat", title = "Strength A") => ({
   day,
@@ -14,7 +14,6 @@ const session = (day: "mon" | "wed" | "fri" | "sat", title = "Strength A") => ({
 });
 
 const plan = {
-  name: "Lean 12",
   summary: "Two strength days and two easy runs.",
   sessions: [session("mon"), session("wed", "Easy run"), session("fri", "Strength B"), session("sat", "Long run")],
   restDayNote: "Walk 8,000 steps",
@@ -51,6 +50,20 @@ describe("plan request", () => {
     expect(text).toContain("Strength split: your choice");
     expect(text).toContain("Runs: on their own days.");
     expect(formatPlanRequest(r)).not.toContain("Change requested");
+  });
+});
+
+describe("plan names", () => {
+  const base = { goal: "lose_fat", weeks: 12, days: ["mon", "wed", "fri", "sat"], location: "gym", sessionMin: 45, experience: "some" };
+
+  it("are plain words from the goal and schedule", () => {
+    expect(planName(PlanRequest.parse(base))).toBe("Lose fat · 4 days a week");
+    expect(planName(PlanRequest.parse({ ...base, goal: "build_muscle", location: "home", days: ["mon", "wed", "fri"] }))).toBe(
+      "Build muscle at home · 3 days a week",
+    );
+    expect(planName(PlanRequest.parse({ ...base, goal: "run_further", raceKm: 10, location: "none" }))).toBe(
+      "Run a 10K with no equipment · 4 days a week",
+    );
   });
 });
 

@@ -1,5 +1,6 @@
 package com.resurgeai.feature.auth.onboarding
 
+import com.resurgeai.core.model.PlanNames
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.resurgeai.core.data.plan.PlanGenerationException
@@ -225,7 +226,7 @@ class OnboardingViewModel @Inject constructor(
                     change = change,
                     previousPlanId = current.plan?.id.takeIf { change != null },
                 )
-                _state.update { it.copy(plan = plan, planFor = inputs, planLoading = false) }
+                _state.update { it.copy(plan = plan.copy(name = PlanNames.of(goal, inputs.training)), planFor = inputs, planLoading = false) }
             } catch (e: PlanGenerationException) {
                 _state.update { it.copy(planLoading = false, planError = e.message) }
             }

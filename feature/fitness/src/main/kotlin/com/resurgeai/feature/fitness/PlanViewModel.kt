@@ -1,5 +1,6 @@
 package com.resurgeai.feature.fitness
 
+import com.resurgeai.core.model.PlanNames
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.resurgeai.core.data.plan.PlanGenerationException
@@ -55,13 +56,14 @@ class PlanViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             sessionRepository.session.filterIsInstance<SessionState.Ready>().map { it.profile }.distinctUntilChanged().collect { p ->
-                val plan = p.activePlanId?.let { runCatching { plans.plan(it) }.getOrNull() }
+                val training = p.training ?: TrainingPrefs()
+                val plan = p.activePlanId?.let { runCatching { plans.plan(it) }.getOrNull() }?.let { it.copy(name = PlanNames.of(p.majorGoal, training)) }
                 _state.update {
                     it.copy(
                         loaded = true,
                         uid = p.uid,
                         goal = p.majorGoal,
-                        training = p.training ?: TrainingPrefs(),
+                        training = training,
                         units = p.units,
                         plan = plan,
                     )
@@ -86,7 +88,7 @@ class PlanViewModel @Inject constructor(
                     change = change?.takeIf { it.isNotBlank() },
                     previousPlanId = s.plan?.id.takeIf { !change.isNullOrBlank() },
                 )
-                _state.update { it.copy(building = false, draft = plan, draftTraining = training) }
+                _state.update { it.copy(building = false, draft = plan.copy(name = PlanNames.of(goal, training)), draftTraining = training) }
             } catch (e: PlanGenerationException) {
                 _state.update { it.copy(building = false, error = e.message) }
             }

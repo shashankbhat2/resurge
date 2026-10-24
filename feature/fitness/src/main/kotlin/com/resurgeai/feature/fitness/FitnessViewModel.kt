@@ -1,5 +1,7 @@
 package com.resurgeai.feature.fitness
 
+import com.resurgeai.core.model.TrainingPrefs
+import com.resurgeai.core.model.PlanNames
 import com.resurgeai.core.model.Backfill
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -170,10 +172,15 @@ class FitnessViewModel @Inject constructor(
 
     private val records = repository.records(since).catch { emit(emptyList<WorkoutRecord>()) }
 
+    /** The active plan, named in plain words from the goal and schedule (older plans had made-up names). */
     private val plan = sessionRepository.session
-        .map { (it as? SessionState.Ready)?.profile?.activePlanId }
-        .distinctUntilChanged()
-        .map { id -> id?.let { runCatching { plans.plan(it) }.getOrNull() } }
+        .map { (it as? SessionState.Ready)?.profile }
+        .distinctUntilChanged { a, b -> a?.activePlanId == b?.activePlanId && a?.majorGoal == b?.majorGoal && a?.training == b?.training }
+        .map { p ->
+            p?.activePlanId?.let { id ->
+                runCatching { plans.plan(id) }.getOrNull()?.let { it.copy(name = PlanNames.of(p.majorGoal, p.training ?: TrainingPrefs())) }
+            }
+        }
 
     val state: StateFlow<FitnessUiState> = combine(device, records, units, deleted, plan) { dev, recs, u, del, activePlan ->
         val today = LocalDate.now(zone)

@@ -76,7 +76,6 @@ export type PlanSession = z.infer<typeof Session>;
 
 /** The model's reply: one session per training day. Rest days are filled in by [assembleWeek]. */
 export const GeneratedPlan = z.object({
-  name: text(60, 1),
   summary: text(400),
   sessions: z.array(Session).min(1).max(7),
   restDayNote: text(100),
@@ -93,7 +92,7 @@ const exerciseJson = {
     name: { type: "string", description: "Common exercise name, e.g. Goblet squat" },
     sets: { type: "integer" },
     reps: { type: "string", description: "Reps or time per set: \"8\", \"8-10\", \"40 s\", \"40 m\"" },
-    load: { type: "string", description: "How heavy: \"RPE 7\", \"bodyweight\", \"light band\"" },
+    load: { type: "string", description: "How hard, in plain words: \"Moderate: you could do 2-3 more\", \"Bodyweight\"" },
     restSec: { type: "integer", description: "Rest between sets in seconds" },
   },
 } as const;
@@ -101,9 +100,8 @@ const exerciseJson = {
 export const GENERATED_PLAN_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["name", "summary", "sessions", "restDayNote", "progression", "notes"],
+  required: ["summary", "sessions", "restDayNote", "progression", "notes"],
   properties: {
-    name: { type: "string", description: "Short plan name, e.g. \"Lean 12\"" },
     summary: { type: "string", description: "One or two sentences (under 300 characters) on how the week is built and why" },
     sessions: {
       type: "array",
@@ -115,7 +113,7 @@ export const GENERATED_PLAN_JSON_SCHEMA = {
           day: { type: "string", enum: [...WEEKDAYS] },
           kind: { type: "string", enum: [...SESSION_KINDS] },
           activityId: { type: "string", enum: [...PLAN_ACTIVITIES] },
-          title: { type: "string", description: "e.g. \"Strength A\", \"Easy run\", \"Long run\"" },
+          title: { type: "string", description: "What the session works, plain words: \"Full body\", \"Legs and core\", \"Easy run\"" },
           durationMin: { type: "integer" },
           focus: { type: "string", description: "One line: what the session is for" },
           target: { type: "string", description: "Effort guidance for cardio (pace by feel, distance); empty for strength" },
@@ -147,4 +145,23 @@ export function assembleWeek(plan: GeneratedPlan, days: readonly Weekday[]): Pla
     const s = byDay.get(day);
     return s ? { ...s, rest: false as const } : { day, rest: true as const, title: "Rest", note: plan.restDayNote };
   });
+}
+
+const RACE_LABELS: Record<string, string> = { "5": "5K", "10": "10K", "21.1": "Half", "42.2": "Marathon" };
+
+/**
+ * The plan's name in plain words from the goal and schedule ("Build muscle at home · 3 days a
+ * week"). The app names plans the same way (PlanNames), so old and new plans read alike.
+ */
+export function planName(r: PlanRequest): string {
+  const race = r.raceKm != null ? RACE_LABELS[String(r.raceKm)] : undefined;
+  const what = {
+    lose_fat: "Lose fat",
+    build_muscle: "Build muscle",
+    run_further: race ? `Run a ${race}` : "Run further",
+    get_in_shape: "Get back in shape",
+  }[r.goal];
+  const where = { gym: "", home: " at home", none: " with no equipment" }[r.location];
+  const days = r.days.length;
+  return `${what}${where} · ${days} ${days === 1 ? "day" : "days"} a week`;
 }

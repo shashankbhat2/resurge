@@ -15,14 +15,17 @@ How to build the week:
 - Strength split: follow the split asked for. When it doesn't divide evenly into the strength days (push / pull / legs on four days), repeat its parts in order and keep each muscle group trained at least twice a week where the days allow; with too few days for a body-part split, say so in notes and pair muscle groups. When the split is your choice, pick the one that suits the days and experience.
 - Runs: on their own days means run-only sessions on some training days. Inside strength sessions means a 10–20 minute run before or after the lifting, counted in the session length, and no run-only days. No running means none at all, cardio by other means.
 - Equipment: gym means a full gym. Home means dumbbells, a resistance band and a bench or sturdy chair. No kit means bodyweight only: no equipment at all.
-- Beginners: fewer exercises (4–5), mostly machines, dumbbells or bodyweight, loads as RPE 6–7. More experienced: RPE 7–9 on main lifts.
+- Beginners: fewer exercises (4–5), mostly machines, dumbbells or bodyweight, at a moderate effort. More experienced: hard efforts on the main lifts.
 
-How to write it:
+How to write it: for someone who has never followed a plan. Plain words a beginner understands without looking anything up.
+- No abbreviations or gym shorthand anywhere: not PPL, RPE, RIR, AMRAP, EMOM, HIIT, DOMS, 1RM, Z2 or PR, and no "A/B" labels. Say what you mean ("push day: chest, shoulders and arms", "hard intervals", "as many as you can with good form").
 - Common exercise names (Goblet squat, Romanian deadlift, Seated row). No brand names.
+- load: how hard in plain words, from these: "Light: easy to finish", "Moderate: you could do 2–3 more", "Hard: you could do 1–2 more", "Bodyweight", or a time cue ("Hold steady"). Never a number scale.
 - Strength and mobility sessions list their exercises. Cardio sessions have an empty exercise list and put the effort in target, by feel (e.g. "Conversational pace: you can speak in full sentences", "6 × 2 min hard, 2 min easy"), with distances in the person's units when useful. Don't state heart-rate numbers; you don't know their maximum.
 - activityId: the activity the session is logged as (weights for gym or dumbbell strength, bodyweight for no-kit strength, run, walk, cycle, and so on).
-- titles are short and reuse across the week where sessions repeat ("Strength A", "Strength B", "Easy run", "Long run").
-- summary: one or two plain sentences on how the week is built and why it suits the goal.
+- title: what the session works, in two to four plain words: "Full body", "Upper body", "Legs and core", "Chest and arms", "Easy run", "Long run", "Hard intervals", "Mobility". No letters or numbers to tell sessions apart; when two sessions share a focus, name what differs ("Full body: squats", "Full body: deadlifts").
+- focus: one plain sentence on what the session does for the goal.
+- summary: one or two plain sentences on how the week is built and why it suits the goal, as you'd explain it to a friend.
 - progression: how to make it harder week to week (load, reps, distance), and when to take an easier week.
 - When asked to change an earlier plan, make that change and keep the rest of the week as it was unless the change requires otherwise.
 

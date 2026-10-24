@@ -9,7 +9,7 @@ import { LIMITS, PLAN_MODEL } from "../lib/models";
 import { consumeOrThrow, recordUsage } from "../lib/quota";
 import { isValidTimeZone, localParts } from "../lib/time";
 import { PLAN_SYSTEM } from "../prompts/plan";
-import { assembleWeek, GENERATED_PLAN_JSON_SCHEMA, GeneratedPlan, type PlanDay, PlanRequest, WEEKDAYS } from "./schema";
+import { assembleWeek, GENERATED_PLAN_JSON_SCHEMA, GeneratedPlan, type PlanDay, PlanRequest, planName, WEEKDAYS } from "./schema";
 
 const GOAL_LINES: Record<PlanRequest["goal"], (r: PlanRequest) => string> = {
   lose_fat: (r) =>
@@ -110,7 +110,7 @@ export const generatePlan = onCall(
 
       const days = assembleWeek(value, input.days);
       const plan = {
-        name: value.name,
+        name: planName(input),
         summary: value.summary,
         days,
         progression: value.progression,

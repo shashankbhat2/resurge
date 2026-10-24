@@ -125,4 +125,15 @@ class TrainingTest {
         assertEquals(List(3) { StrengthSet(8, 57.5) }, sets)
         assertEquals(StrengthSet(12, null), PlanSets.planned(PlanExercise("Push-up", 2, "12", "bodyweight", 60), null).first())
     }
+
+    @Test
+    fun `plan names are plain words from the goal and schedule`() {
+        val gym = TrainingPrefs()
+        assertEquals("Lose fat · 4 days a week", PlanNames.of(MajorGoal(TrainingGoal.LOSE_FAT, 12, start, 84.0, 78.0), gym))
+        assertEquals(
+            "Build muscle at home · 3 days a week",
+            PlanNames.of(MajorGoal(TrainingGoal.BUILD_MUSCLE, 12, start), gym.copy(location = TrainingLocation.HOME, days = setOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY, DayOfWeek.FRIDAY))),
+        )
+        assertEquals("Run a 10K with no equipment · 4 days a week", PlanNames.of(MajorGoal(TrainingGoal.RUN_FURTHER, 12, start, raceKm = 10.0), gym.copy(location = TrainingLocation.NONE)))
+    }
 }

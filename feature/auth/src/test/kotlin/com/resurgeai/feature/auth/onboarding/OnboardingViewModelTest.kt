@@ -123,7 +123,9 @@ class OnboardingViewModelTest {
         vm.selectGoal(TrainingGoal.LOSE_FAT)
         repeat(3) { vm.next("uid") } // -> Plan
         assertEquals(OnboardingStep.Plan, vm.state.value.step)
-        assertEquals(plan, vm.state.value.plan)
+        assertEquals("p1", vm.state.value.plan?.id)
+        // Named in plain words from the answers, not by the plan service.
+        assertEquals("Lose fat · 4 days a week", vm.state.value.plan?.name)
         coVerify(exactly = 1) { plans.generate(any(), any(), any(), null, null) }
 
         vm.back(); vm.next("uid") // same answers: no rebuild
