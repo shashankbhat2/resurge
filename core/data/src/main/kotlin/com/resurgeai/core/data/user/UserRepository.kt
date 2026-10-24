@@ -5,22 +5,28 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.resurgeai.core.data.auth.AuthUser
-import com.resurgeai.core.data.habits.HabitsRepository
 import com.resurgeai.core.model.CoachStyle
 import com.resurgeai.core.model.DayGoals
+import com.resurgeai.core.model.Experience
 import com.resurgeai.core.model.Goal
-import com.resurgeai.core.model.HabitDraft
 import com.resurgeai.core.model.HabitSettings
-import com.resurgeai.core.model.HabitStreaks
+import com.resurgeai.core.model.MajorGoal
 import com.resurgeai.core.model.MealReminders
+import com.resurgeai.core.model.RunMode
 import com.resurgeai.core.model.Targets
+import com.resurgeai.core.model.TrainingGoal
+import com.resurgeai.core.model.TrainingLocation
+import com.resurgeai.core.model.TrainingPrefs
 import com.resurgeai.core.model.UnitSystem
 import com.resurgeai.core.model.UserProfile
+import com.resurgeai.core.model.WorkoutStyle
+import com.resurgeai.core.model.dayOfWeekFromWire
+import com.resurgeai.core.model.wire
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
-import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -63,31 +69,48 @@ class UserRepository @Inject constructor(
         ).await()
     }
 
-    /** Saves onboarding answers and the starter habits in one atomic batch. */
+    /**
+     * Saves onboarding in one atomic batch: the major goal (and the weight goal it implies), how the
+     * person trains, the accepted plan, and what a day needs for the streak.
+     */
     suspend fun completeOnboarding(
         uid: String,
-        goals: Set<Goal>,
+        goal: MajorGoal,
+        training: TrainingPrefs,
+        planId: String?,
         targets: Targets,
-        habits: List<HabitDraft>,
-        settings: HabitSettings,
+        dayGoals: DayGoals,
     ) {
         val batch = firestore.batch()
         batch.set(
             doc(uid),
-            mapOf(
-                "goals" to goals.map { it.name },
-                "targets" to targets.toMap(),
-                "habitResetTime" to settings.resetTime.format(HHMM),
-                "habitReminder" to settings.reminderMap(),
-                "onboardingComplete" to true,
-                "onboardedAt" to FieldValue.serverTimestamp(),
-                "updatedAt" to FieldValue.serverTimestamp(),
-            ),
+            buildMap {
+                put("goals", listOf(goal.type.legacy.name))
+                put("primaryGoal", goal.type.wire)
+                put("goal", goal.toMap())
+                put("training", training.toMap())
+                planId?.let { put("activePlanId", it) }
+                put("targets", targets.toMap())
+                put("dayGoals", dayGoals.toMap())
+                put("onboardingComplete", true)
+                put("onboardedAt", FieldValue.serverTimestamp())
+                put("updatedAt", FieldValue.serverTimestamp())
+            },
             SetOptions.merge(),
         )
-        val today = HabitStreaks.habitDay(Instant.now(), ZoneId.systemDefault(), settings.resetTime)
-        habits.forEachIndexed { i, h ->
-            batch.set(doc(uid).collection("habits").document(), HabitsRepository.newHabitMap(h, i, today))
+        goal.weightGoal()?.let { w ->
+            batch.set(
+                doc(uid).collection("weightGoal").document("current"),
+                mapOf(
+                    "startKg" to w.startKg,
+                    "startDate" to w.startDate.toString(),
+                    "goalKg" to w.goalKg,
+                    "paceKgPerWeek" to w.paceKgPerWeek,
+                    "mode" to w.mode.wire,
+                    "milestonesCelebrated" to 0,
+                    "updatedAt" to FieldValue.serverTimestamp(),
+                ),
+            )
         }
         batch.commit().await()
     }
@@ -130,18 +153,38 @@ class UserRepository @Inject constructor(
     suspend fun updateDayGoals(uid: String, goals: DayGoals) {
         doc(uid).update(
             mapOf(
-                "dayGoals" to mapOf(
-                    "excludedHabits" to goals.excludedHabits.toList(),
-                    "sleep" to goals.sleep,
-                    "steps" to goals.steps,
-                    "meals" to goals.meals,
-                    "water" to goals.water,
-                    "weeklyDays" to goals.weeklyDays,
-                ),
+                "dayGoals" to goals.toMap(),
                 "updatedAt" to FieldValue.serverTimestamp(),
             ),
         ).await()
     }
+
+    private fun DayGoals.toMap() = mapOf(
+        "excludedHabits" to excludedHabits.toList(),
+        "sleep" to sleep,
+        "steps" to steps,
+        "meals" to meals,
+        "water" to water,
+        "weeklyDays" to weeklyDays,
+    )
+
+    private fun MajorGoal.toMap() = mapOf(
+        "type" to type.wire,
+        "weeks" to weeks,
+        "startDate" to startDate.toString(),
+        "startKg" to startKg,
+        "targetKg" to targetKg,
+        "raceKm" to raceKm,
+    )
+
+    private fun TrainingPrefs.toMap() = mapOf(
+        "days" to days.sorted().map { it.wire },
+        "location" to location.wire,
+        "sessionMin" to sessionMin,
+        "experience" to experience.wire,
+        "style" to style.wire,
+        "runs" to runs.wire,
+    )
 
     private fun Targets.toMap() = mapOf("calories" to calories, "waterMl" to waterMl, "sleepMinutes" to sleepMinutes, "steps" to steps)
 
@@ -171,6 +214,33 @@ class UserRepository @Inject constructor(
             units = UnitSystem.fromWire(getString("units")),
             mealReminders = mealReminders(),
             dayGoals = dayGoals(),
+            majorGoal = majorGoal(),
+            training = training(),
+            activePlanId = getString("activePlanId"),
+        )
+    }
+
+    private fun DocumentSnapshot.majorGoal(): MajorGoal? {
+        val m = get("goal") as? Map<*, *> ?: return null
+        return MajorGoal(
+            type = TrainingGoal.fromWire(m["type"] as? String) ?: return null,
+            weeks = (m["weeks"] as? Number)?.toInt() ?: return null,
+            startDate = (m["startDate"] as? String)?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return null,
+            startKg = (m["startKg"] as? Number)?.toDouble(),
+            targetKg = (m["targetKg"] as? Number)?.toDouble(),
+            raceKm = (m["raceKm"] as? Number)?.toDouble(),
+        )
+    }
+
+    private fun DocumentSnapshot.training(): TrainingPrefs? {
+        val m = get("training") as? Map<*, *> ?: return null
+        return TrainingPrefs(
+            days = (m["days"] as? List<*>).orEmpty().mapNotNull { dayOfWeekFromWire(it as? String) }.toSet(),
+            location = TrainingLocation.fromWire(m["location"] as? String),
+            sessionMin = (m["sessionMin"] as? Number)?.toInt() ?: TrainingPrefs().sessionMin,
+            experience = Experience.fromWire(m["experience"] as? String),
+            style = WorkoutStyle.fromWire(m["style"] as? String),
+            runs = RunMode.fromWire(m["runs"] as? String),
         )
     }
 

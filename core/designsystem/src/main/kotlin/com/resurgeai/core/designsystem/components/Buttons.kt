@@ -37,8 +37,8 @@ fun Button(
 ) {
     val shape = Resurge.shape.pill
     val (container, content, border) = when (variant) {
-        // Raised pill that follows the theme (white in light, charcoal in dark), like the navbar.
-        ButtonVariant.Primary -> Triple(Resurge.colors.inverse, Resurge.colors.onInverse, Resurge.colors.border)
+        // Mono: the highest-contrast fill (white on black, black on white). The accent stays for selection.
+        ButtonVariant.Primary -> Triple(Resurge.colors.strong, Resurge.colors.onStrong, Color.Transparent)
         // brandInk rather than the brand fill, so the label passes 4.5:1 in both themes.
         ButtonVariant.Accent -> Triple(Resurge.colors.brandInk, Resurge.colors.onAccent, Color.Transparent)
         ButtonVariant.Secondary -> Triple(Resurge.colors.surfaceMuted, Resurge.colors.text, Color.Transparent)

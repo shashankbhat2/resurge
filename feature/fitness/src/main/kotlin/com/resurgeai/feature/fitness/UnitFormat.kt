@@ -20,7 +20,8 @@ internal class UnitFormat(val units: UnitSystem) {
 
     fun toWeightUnit(kg: Double): Double = if (imperial) kg / FitnessMath.KG_PER_LB else kg
     fun fromWeightUnit(v: Double): Double = if (imperial) v * FitnessMath.KG_PER_LB else v
-    val weightStep: Double get() = if (imperial) 5.0 else 2.5
+    /** − / + on a set's weight: a tenth of a pound or kilo. Bigger jumps are typed. */
+    val weightStep: Double get() = 0.1
 
     fun toElevationUnit(m: Double): Double = if (imperial) m / FitnessMath.M_PER_FT else m
     fun fromElevationUnit(v: Double): Double = if (imperial) v * FitnessMath.M_PER_FT else v

@@ -1,5 +1,9 @@
 package com.resurgeai.feature.weight
 
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.IntrinsicSize
+import com.resurgeai.core.designsystem.components.TypedNumbers
+import com.resurgeai.core.designsystem.components.EditableValue
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
@@ -129,7 +133,14 @@ internal fun LogWeightSheet(
                 SmallStep("−", "Less") { tenths = (tenths - 1).coerceIn(range) }
                 Spacer(Modifier.width(16.dp))
                 Row(verticalAlignment = Alignment.Bottom) {
-                    Text(WeightUnits.decimal(tenths / 10.0), style = Resurge.type.tide.copy(fontSize = 52.sp, lineHeight = 56.sp, fontFeatureSettings = "tnum"))
+                    EditableValue(
+                        display = WeightUnits.decimal(tenths / 10.0),
+                        editText = { TypedNumbers.tenths(tenths) },
+                        onSubmit = { t -> TypedNumbers.parseTenths(t)?.let { tenths = it.coerceIn(range) } },
+                        label = "Weight in ${units.label}",
+                        style = Resurge.type.tide.copy(fontSize = 52.sp, lineHeight = 56.sp, fontFeatureSettings = "tnum"),
+                        modifier = Modifier.width(IntrinsicSize.Min).widthIn(min = 120.dp),
+                    )
                     Spacer(Modifier.width(4.dp))
                     Text(units.label, style = Resurge.type.headline, color = Resurge.colors.textMuted, modifier = Modifier.padding(bottom = 10.dp))
                 }

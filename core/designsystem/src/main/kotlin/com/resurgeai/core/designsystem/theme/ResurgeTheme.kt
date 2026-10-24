@@ -50,15 +50,19 @@ val Bricolage = FontFamily(
 
 private val Tabular = "tnum"
 
-/** Resurge Tide palette: see the design system's tokens.json for each colour's usage. */
+/**
+ * Resurge Mono: black, white and greys do the work, one accent marks "you are here", and three
+ * signals (up, mid, down) say whether things are moving toward the goal. The older category colours
+ * (sleep, energy, glow, frost…) stay until each screen moves over.
+ */
 private object Light {
-    val brand = Color(0xFF6F66FB)
-    val text = Color(0xFF111127)
+    val brand = Color(0xFF5B4BDB)
+    val text = Color(0xFF000000)
 }
 
 private object Dark {
-    val brand = Color(0xFF8C85FF)
-    val bg = Color(0xFF0C0C11)
+    val brand = Color(0xFF8B7CFF)
+    val bg = Color(0xFF000000)
 }
 
 val ResurgeTheme = buildThemeV2 {
@@ -67,17 +71,17 @@ val ResurgeTheme = buildThemeV2 {
 
     colorScheme(ColorScheme.Light) {
         properties[colors] = mapOf(
-            C.bg to Color(0xFFF6F6F9),
-            C.surface to Color(0xFFFFFFFF),
-            C.surfaceMuted to Color(0xFFEEEEF4),
-            C.border to Color(0xFFE3E3EC),
+            C.bg to Color(0xFFFFFFFF),
+            C.surface to Color(0xFFF5F5F5),
+            C.surfaceMuted to Color(0xFFEDEDED),
+            C.border to Color(0xFFE2E2E2),
             C.text to Light.text,
-            C.textMuted to Color(0xFF55556B),
-            C.textSubtle to Color(0xFF6E6E84),
+            C.textMuted to Color(0xFF404040),
+            C.textSubtle to Color(0xFF6B6B6B),
             C.accent to Light.brand,
-            C.accentMuted to Color(0xFFECEBFF),
+            C.accentMuted to Color(0xFFEEEBFF),
             C.onAccent to Color.White,
-            C.brandInk to Color(0xFF4A41D9),
+            C.brandInk to Light.brand,
             C.foam to Color(0xFFA9A3FF),
             C.glow to Color(0xFFF5B544),
             C.onGlow to Light.text,
@@ -92,14 +96,19 @@ val ResurgeTheme = buildThemeV2 {
             C.energy to Color(0xFFB65015),
             C.water to Color(0xFF0B70A0),
             C.heart to Color(0xFFC92E55),
-            C.danger to Color(0xFFC62828),
-            C.success to Color(0xFF1A7D44),
+            C.danger to Color(0xFFD1105A),
+            C.success to Color(0xFF007A62),
+            C.up to Color(0xFF007A62),
+            C.mid to Color(0xFFA86200),
+            C.down to Color(0xFFD1105A),
+            C.accentTint to Color(0xFFEEEBFF),
+            C.borderStrong to Color(0xFFCFCFCF),
             C.navHighlight to Light.brand,
             C.onNavHighlight to Color.White,
-            C.navBar to Color(0xFFFFFFFF),
+            C.navBar to Color(0xFFF5F5F5),
             C.navActive to Light.text,
             C.navOnActive to Color(0xFFFFFFFF),
-            C.navInactive to Color(0xFF6E6E84),
+            C.navInactive to Color(0xFF6B6B6B),
         )
         defaultContentColor = Light.text
         defaultIndication = rememberColoredIndication(
@@ -112,16 +121,16 @@ val ResurgeTheme = buildThemeV2 {
     colorScheme(ColorScheme.Dark) {
         properties[colors] = mapOf(
             C.bg to Dark.bg,
-            C.surface to Color(0xFF16161D),
-            C.surfaceMuted to Color(0xFF1F1F28),
-            C.border to Color(0xFF2A2A35),
-            C.text to Color(0xFFF3F3F8),
-            C.textMuted to Color(0xFFB3B3C6),
-            C.textSubtle to Color(0xFF8E8EA5),
+            C.surface to Color(0xFF0D0D0D),
+            C.surfaceMuted to Color(0xFF161616),
+            C.border to Color(0xFF222222),
+            C.text to Color(0xFFFFFFFF),
+            C.textMuted to Color(0xFFA3A3A3),
+            C.textSubtle to Color(0xFF7A7A7A),
             C.accent to Dark.brand,
-            C.accentMuted to Color(0xFF25234A),
+            C.accentMuted to Color(0xFF1A1730),
             C.onAccent to Dark.bg,
-            C.brandInk to Color(0xFFB4AFFF),
+            C.brandInk to Dark.brand,
             C.foam to Color(0xFFA9A3FF),
             C.glow to Color(0xFFF7C15F),
             C.onGlow to Dark.bg,
@@ -136,16 +145,21 @@ val ResurgeTheme = buildThemeV2 {
             C.energy to Color(0xFFFF9A57),
             C.water to Color(0xFF5CC8F2),
             C.heart to Color(0xFFFF7A97),
-            C.danger to Color(0xFFFF6B6B),
-            C.success to Color(0xFF5BD394),
+            C.danger to Color(0xFFFF4D8D),
+            C.success to Color(0xFF22F5C3),
+            C.up to Color(0xFF22F5C3),
+            C.mid to Color(0xFFFFC61A),
+            C.down to Color(0xFFFF4D8D),
+            C.accentTint to Color(0xFF1A1730),
+            C.borderStrong to Color(0xFF333333),
             C.navHighlight to Dark.brand,
             C.onNavHighlight to Dark.bg,
-            C.navBar to Color(0xFF1F1F28),
-            C.navActive to Color(0xFFF3F3F8),
+            C.navBar to Color(0xFF161616),
+            C.navActive to Color(0xFFFFFFFF),
             C.navOnActive to Dark.bg,
-            C.navInactive to Color(0xFF8E8EA5),
+            C.navInactive to Color(0xFF7A7A7A),
         )
-        defaultContentColor = Color(0xFFF3F3F8)
+        defaultContentColor = Color(0xFFFFFFFF)
         defaultIndication = rememberColoredIndication(
             hoveredColor = Color.White.copy(alpha = 0.04f),
             pressedColor = Color.White.copy(alpha = 0.08f),
@@ -244,6 +258,11 @@ object ColorAccess {
     val onAccent @Composable get() = Theme[colors][C.onAccent]
     val danger @Composable get() = Theme[colors][C.danger]
     val success @Composable get() = Theme[colors][C.success]
+    val up @Composable get() = Theme[colors][C.up]
+    val mid @Composable get() = Theme[colors][C.mid]
+    val down @Composable get() = Theme[colors][C.down]
+    val accentTint @Composable get() = Theme[colors][C.accentTint]
+    val borderStrong @Composable get() = Theme[colors][C.borderStrong]
     val sleep @Composable get() = Theme[colors][C.sleep]
     val activity @Composable get() = Theme[colors][C.activity]
     val energy @Composable get() = Theme[colors][C.energy]

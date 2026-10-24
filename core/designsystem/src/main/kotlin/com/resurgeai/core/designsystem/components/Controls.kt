@@ -34,7 +34,9 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
 import com.composeunstyled.TextInput
@@ -132,15 +134,18 @@ private fun CheckMark(checked: Boolean) {
         modifier = Modifier
             .size(24.dp)
             .clip(shape)
-            .background(if (checked) Resurge.colors.strong else Color.Transparent)
-            .border(1.5.dp, if (checked) Resurge.colors.strong else Resurge.colors.border, shape),
+            .background(if (checked) Resurge.colors.accent else Color.Transparent)
+            .border(1.5.dp, if (checked) Resurge.colors.accent else Resurge.colors.borderStrong, shape),
         contentAlignment = Alignment.Center,
     ) {
-        if (checked) Icon(ResurgeIcons.Check, contentDescription = null, tint = Resurge.colors.onStrong, size = 14.dp)
+        if (checked) Icon(ResurgeIcons.Check, contentDescription = null, tint = Resurge.colors.onAccent, size = 14.dp)
     }
 }
 
-/** Numeric value with − / + buttons, for targets like calories and water. [format] renders the value. */
+/**
+ * Numeric value with − / + buttons, for targets like calories and water. [format] renders the value;
+ * tapping it types a new one, starting from [toEdit] and read back with [fromEdit] (clamped to [range]).
+ */
 @Composable
 fun NumberStepper(
     value: Int,
@@ -150,6 +155,9 @@ fun NumberStepper(
     unit: String,
     modifier: Modifier = Modifier,
     format: (Int) -> String = { "%,d".format(it) },
+    toEdit: (Int) -> String = { it.toString() },
+    fromEdit: (String) -> Int? = TypedNumbers::parseInt,
+    keyboardType: KeyboardType = KeyboardType.Number,
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -160,7 +168,15 @@ fun NumberStepper(
             modifier = Modifier.weight(1f),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(format(value), style = Resurge.type.display, textAlign = TextAlign.Center)
+            EditableValue(
+                display = format(value),
+                editText = { toEdit(value) },
+                onSubmit = { text -> fromEdit(text)?.let { onValueChange(it.coerceIn(range)) } },
+                label = unit,
+                style = Resurge.type.display,
+                keyboardType = keyboardType,
+                modifier = Modifier.fillMaxWidth(),
+            )
             Text(unit, style = Resurge.type.caption, color = Resurge.colors.textMuted)
         }
         StepButton("+", enabled = value + step <= range.last) { onValueChange((value + step).coerceIn(range)) }
@@ -183,6 +199,9 @@ fun StepperRow(
     range: IntRange,
     format: (Int) -> String,
     modifier: Modifier = Modifier,
+    toEdit: (Int) -> String = { it.toString() },
+    fromEdit: (String) -> Int? = TypedNumbers::parseInt,
+    keyboardType: KeyboardType = KeyboardType.Number,
 ) {
     Row(modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, contentDescription = null, tint = iconTint, size = 22.dp)
@@ -193,11 +212,13 @@ fun StepperRow(
         }
         Spacer(Modifier.width(8.dp))
         SmallStep("−", "Decrease $label", enabled = value - step >= range.first) { onValueChange((value - step).coerceIn(range)) }
-        Text(
-            format(value),
+        EditableValue(
+            display = format(value),
+            editText = { toEdit(value) },
+            onSubmit = { text -> fromEdit(text)?.let { onValueChange(it.coerceIn(range)) } },
+            label = label,
             style = Resurge.type.headline.copy(fontFeatureSettings = "tnum"),
-            textAlign = TextAlign.Center,
-            maxLines = 1,
+            keyboardType = keyboardType,
             modifier = Modifier.width(76.dp),
         )
         SmallStep("+", "Increase $label", enabled = value + step <= range.last) { onValueChange((value + step).coerceIn(range)) }
@@ -221,6 +242,9 @@ fun OptionalStepperRow(
     modifier: Modifier = Modifier,
     @DrawableRes icon: Int? = null,
     iconTint: Color = Resurge.colors.textMuted,
+    toEdit: (Int) -> String = { it.toString() },
+    fromEdit: (String) -> Int? = TypedNumbers::parseInt,
+    keyboardType: KeyboardType = KeyboardType.Number,
 ) {
     Row(modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         if (icon != null) {
@@ -236,12 +260,17 @@ fun OptionalStepperRow(
             val v = value ?: return@SmallStep
             onValueChange(if (v - step < range.first) null else v - step)
         }
-        Text(
-            value?.let(format) ?: "—",
+        // Typing an empty value clears it, like − from the minimum.
+        EditableValue(
+            display = value?.let(format) ?: "—",
+            editText = { value?.let(toEdit) ?: "" },
+            onSubmit = { text ->
+                if (text.isBlank()) onValueChange(null) else fromEdit(text)?.let { onValueChange(it.coerceIn(range)) }
+            },
+            label = label,
             style = Resurge.type.headline.copy(fontFeatureSettings = "tnum"),
             color = if (value != null) Resurge.colors.text else Resurge.colors.textSubtle,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
+            keyboardType = keyboardType,
             modifier = Modifier.width(84.dp),
         )
         SmallStep("+", "Increase $label", enabled = value == null || value + step <= range.last) {
@@ -316,14 +345,22 @@ private fun SmallStep(symbol: String, description: String, enabled: Boolean, onC
     }
 }
 
+/** Round − / + button. [contentDescription] is read instead of the symbol ("Goal weight: less"). */
 @Composable
-private fun StepButton(symbol: String, enabled: Boolean, onClick: () -> Unit) {
+fun StepButton(
+    symbol: String,
+    enabled: Boolean,
+    contentDescription: String? = null,
+    size: Dp = 52.dp,
+    onClick: () -> Unit,
+) {
     val shape = Resurge.shape.pill
     UnstyledButton(
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier
-            .size(52.dp)
+            .size(size)
+            .then(if (contentDescription != null) Modifier.semantics { this.contentDescription = contentDescription } else Modifier)
             .clip(shape)
             .background(Resurge.colors.surfaceMuted)
             .border(1.dp, Resurge.colors.border, shape),
@@ -399,7 +436,15 @@ fun TimeStepper(
     Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         StepButton("−", enabled = true) { onTimeChange(time.minusMinutes(stepMinutes)) }
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(time.format(clockFormatter()), style = Resurge.type.display, textAlign = TextAlign.Center)
+            EditableValue(
+                display = time.format(clockFormatter()),
+                editText = { "%02d:%02d".format(time.hour, time.minute) },
+                onSubmit = { text -> TypedNumbers.parseClock(text)?.let(onTimeChange) },
+                label = caption,
+                style = Resurge.type.display,
+                keyboardType = KeyboardType.Number,
+                modifier = Modifier.fillMaxWidth(),
+            )
             Text(caption, style = Resurge.type.caption, color = Resurge.colors.textMuted)
         }
         StepButton("+", enabled = true) { onTimeChange(time.plusMinutes(stepMinutes)) }

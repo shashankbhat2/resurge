@@ -1,5 +1,8 @@
 package com.resurgeai.feature.profile
 
+import kotlin.math.roundToInt
+import androidx.compose.ui.text.input.KeyboardType
+import com.resurgeai.core.designsystem.components.TypedNumbers
 import com.resurgeai.core.designsystem.components.Avatar
 import androidx.compose.foundation.layout.fillMaxSize
 import com.resurgeai.core.designsystem.components.TopBar
@@ -364,13 +367,17 @@ private fun TargetsPage(targets: Targets, onChange: (Targets) -> Unit) {
             StepperRow(
                 label = "Calories", hint = "Eaten per day", icon = ResurgeIcons.Flame, iconTint = Resurge.colors.energy,
                 value = targets.calories, onValueChange = { onChange(targets.copy(calories = it)) },
-                step = 50, range = 1200..4500, format = { "%,d".format(it) },
+                step = 1, range = 1200..4500, format = { "%,d".format(it) },
             )
             Divider(Modifier.padding(start = 50.dp))
             StepperRow(
-                label = "Water", hint = "ml per day", icon = ResurgeIcons.Droplet, iconTint = Resurge.colors.water,
+                label = "Water", hint = "Litres per day", icon = ResurgeIcons.Droplet, iconTint = Resurge.colors.water,
                 value = targets.waterMl, onValueChange = { onChange(targets.copy(waterMl = it)) },
-                step = 250, range = 1000..5000, format = { "%,d".format(it) },
+                // 0.1 L steps, typed in litres.
+                step = 100, range = 1000..5000, format = { "%.1f L".format(it / 1000.0) },
+                toEdit = { "%.1f".format(it / 1000.0) },
+                fromEdit = { t -> TypedNumbers.parse(t)?.let { (it * 1000).roundToInt() } },
+                keyboardType = KeyboardType.Decimal,
             )
         }
         GroupLabel("Sleep and steps")
@@ -378,7 +385,11 @@ private fun TargetsPage(targets: Targets, onChange: (Targets) -> Unit) {
             StepperRow(
                 label = "Sleep", hint = "Asleep per night", icon = ResurgeIcons.Bed, iconTint = Resurge.colors.sleep,
                 value = targets.sleepMinutes, onValueChange = { onChange(targets.copy(sleepMinutes = it)) },
-                step = Targets.SLEEP_STEP, range = Targets.SLEEP_RANGE, format = Targets::formatSleep,
+                // 0.1 h (6 min) steps, typed in hours ("7.5").
+                step = 6, range = Targets.SLEEP_RANGE, format = Targets::formatSleep,
+                toEdit = { "%.1f".format(it / 60.0) },
+                fromEdit = { t -> TypedNumbers.parse(t)?.let { (it * 60).roundToInt() } },
+                keyboardType = KeyboardType.Decimal,
             )
             Targets.sleepGoalNote(targets.sleepMinutes)?.let {
                 SoftNote(it, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp))
@@ -387,7 +398,7 @@ private fun TargetsPage(targets: Targets, onChange: (Targets) -> Unit) {
             StepperRow(
                 label = "Steps", hint = "Per day", icon = ResurgeIcons.Footprints, iconTint = Resurge.colors.activity,
                 value = targets.steps, onValueChange = { onChange(targets.copy(steps = it)) },
-                step = Targets.STEPS_STEP, range = Targets.STEPS_RANGE, format = { "%,d".format(it) },
+                step = 1, range = Targets.STEPS_RANGE, format = { "%,d".format(it) },
             )
         }
         Text(

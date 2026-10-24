@@ -25,6 +25,18 @@ object ColorTokens {
     val onAccent = ThemeToken<Color>("on_accent")
     val danger = ThemeToken<Color>("danger")
     val success = ThemeToken<Color>("success")
+
+    // Resurge Mono signals: whether something is moving toward the goal, holding, or slipping.
+    /** Toward the goal: a successful day, a won week, a finished set. Electric aqua. */
+    val up = ThemeToken<Color>("up")
+    /** Partly done, at risk, flat. Vivid gold. */
+    val mid = ThemeToken<Color>("mid")
+    /** Missed, lost, moving away from the goal, destructive. Hot pink. */
+    val down = ThemeToken<Color>("down")
+    /** Fill behind a selected option, paired with an accent outline. */
+    val accentTint = ThemeToken<Color>("accent_tint")
+    /** Stronger hairline: unselected outlines, empty days. */
+    val borderStrong = ThemeToken<Color>("border_strong")
     val sleep = ThemeToken<Color>("sleep")
     val activity = ThemeToken<Color>("activity")
     val energy = ThemeToken<Color>("energy")

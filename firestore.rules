@@ -17,7 +17,8 @@ service cloud.firestore {
     function validProfile() {
       let allowed = ['displayName', 'email', 'photoUrl', 'goals', 'targets',
                      'onboardingComplete', 'onboardedAt', 'updatedAt', 'timezone',
-                     'habitResetTime', 'habitReminder', 'coachStyle', 'units', 'mealReminders', 'dayGoals'];
+                     'habitResetTime', 'habitReminder', 'coachStyle', 'units', 'mealReminders', 'dayGoals',
+                     'primaryGoal', 'goal', 'training', 'activePlanId'];
       return request.resource.data.keys().hasOnly(allowed)
         && (!('goals' in request.resource.data) || request.resource.data.goals is list)
         && (!('timezone' in request.resource.data) || (request.resource.data.timezone is string
@@ -41,7 +42,39 @@ service cloud.firestore {
         && (!('mealReminders' in request.resource.data) || (
               request.resource.data.mealReminders.keys().hasOnly(['breakfast', 'lunch', 'dinner'])
               && validReminderTimes(request.resource.data.mealReminders)))
-        && (!('dayGoals' in request.resource.data) || validDayGoals(request.resource.data.dayGoals));
+        && (!('dayGoals' in request.resource.data) || validDayGoals(request.resource.data.dayGoals))
+        && (!('primaryGoal' in request.resource.data) || request.resource.data.primaryGoal in GOALS())
+        && (!('goal' in request.resource.data) || validGoal(request.resource.data.goal))
+        && (!('training' in request.resource.data) || validTraining(request.resource.data.training))
+        && (!('activePlanId' in request.resource.data) || (request.resource.data.activePlanId is string
+              && request.resource.data.activePlanId.size() <= 40));
+    }
+
+    function GOALS() {
+      return ['lose_fat', 'build_muscle', 'run_further', 'get_in_shape'];
+    }
+
+    // The major goal: what, over how many weeks from when, and the target it's measured by.
+    function validGoal(g) {
+      return g.keys().hasOnly(['type', 'weeks', 'startDate', 'startKg', 'targetKg', 'raceKm'])
+        && g.type in GOALS()
+        && g.weeks is int && g.weeks >= 4 && g.weeks <= 52
+        && isDay(g.startDate)
+        && (!('startKg' in g) || g.startKg == null || (g.startKg is number && g.startKg >= 20 && g.startKg <= 400))
+        && (!('targetKg' in g) || g.targetKg == null || (g.targetKg is number && g.targetKg >= 20 && g.targetKg <= 400))
+        && (!('raceKm' in g) || g.raceKm == null || (g.raceKm is number && g.raceKm > 0 && g.raceKm <= 100));
+    }
+
+    // When and how the person trains, used to build the plan.
+    function validTraining(t) {
+      return t.keys().hasOnly(['days', 'location', 'sessionMin', 'experience', 'style', 'runs'])
+        && t.days is list && t.days.size() >= 2 && t.days.size() <= 6
+        && t.days.hasOnly(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'])
+        && t.location in ['gym', 'home', 'none']
+        && t.sessionMin is int && t.sessionMin >= 20 && t.sessionMin <= 90
+        && t.experience in ['new', 'some', 'years']
+        && (!('style' in t) || t.style in ['auto', 'full_body', 'push_pull_legs', 'upper_lower', 'body_part'])
+        && (!('runs' in t) || t.runs in ['separate', 'in_workout', 'none']);
     }
 
     // What a day needs for the day streak.
@@ -245,6 +278,12 @@ service cloud.firestore {
         allow read: if isOwner(uid);
         allow create: if isOwner(uid) && validEvent(eventId);
         allow update, delete: if false;
+      }
+
+      // Training plans, built and saved by the generatePlan function only.
+      match /plans/{planId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
       }
 
       match /habits/{habitId} {

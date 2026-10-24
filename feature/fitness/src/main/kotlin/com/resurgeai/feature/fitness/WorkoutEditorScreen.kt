@@ -1,5 +1,8 @@
 package com.resurgeai.feature.fitness
 
+import androidx.compose.ui.text.input.KeyboardType
+import com.resurgeai.core.designsystem.components.TypedNumbers
+import com.resurgeai.core.designsystem.components.EditableValue
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -139,17 +142,19 @@ internal fun WorkoutEditorScreen(
             val clock = clockFormatter()
             Group {
                 StepperRow(
-                    label = "Start", hint = "15-minute steps", icon = ResurgeIcons.Clock, iconTint = Resurge.colors.textMuted,
+                    label = "Start", hint = "Tap the time to type it", icon = ResurgeIcons.Clock, iconTint = Resurge.colors.textMuted,
                     value = state.time.hour * 60 + state.time.minute,
                     onValueChange = { vm.setTime(LocalTime.of(it / 60, it % 60)) },
-                    step = 15, range = 0..(24 * 60 - 1),
+                    step = 1, range = 0..(24 * 60 - 1),
                     format = { LocalTime.of(it / 60, it % 60).format(clock) },
+                    toEdit = { "%02d:%02d".format(it / 60, it % 60) },
+                    fromEdit = { t -> TypedNumbers.parseClock(t)?.let { it.hour * 60 + it.minute } },
                 )
                 RowDivider()
                 StepperRow(
-                    label = "Duration", hint = "5-minute steps", icon = ResurgeIcons.Stopwatch, iconTint = Resurge.colors.textMuted,
+                    label = "Duration", hint = "Minutes", icon = ResurgeIcons.Stopwatch, iconTint = Resurge.colors.textMuted,
                     value = state.durationMin, onValueChange = vm::setDuration,
-                    step = 5, range = 1..600,
+                    step = 1, range = 1..600,
                     format = { UnitFormat.duration(Duration.ofMinutes(it.toLong())) },
                 )
             }
@@ -161,7 +166,7 @@ internal fun WorkoutEditorScreen(
                     label = "Calories", hint = if (state.kcalAuto) "Estimated from duration" else "Your number",
                     icon = ResurgeIcons.Flame, iconTint = Resurge.colors.energy,
                     value = state.metrics.kcal, onValueChange = vm::setKcal,
-                    step = 10, range = 0..5000, start = 100, format = { "%,d".format(it) },
+                    step = 1, range = 0..5000, start = 100, format = { "%,d".format(it) },
                 )
                 RowDivider()
                 OptionalStepperRow(
@@ -335,13 +340,14 @@ private fun CategoryRows(state: WorkoutEditorState, vm: WorkoutEditorViewModel, 
                 onValueChange = { v -> vm.updateMetrics { it.copy(distanceM = v?.let { t -> f.fromDistanceUnit(t / 10.0) }) } },
                 step = 1, range = 1..5000, start = if (state.activity.showSpeed) 100 else 30,
                 format = { f.distanceValue(it / 10.0) },
+                toEdit = TypedNumbers::tenths, fromEdit = TypedNumbers::parseTenths, keyboardType = KeyboardType.Decimal,
             )
             RowDivider()
             OptionalStepperRow(
                 label = "Elevation gain", hint = f.elevationUnit, icon = ResurgeIcons.Mountain, iconTint = Resurge.colors.textMuted,
                 value = m.elevationM?.let { f.toElevationUnit(it).roundToInt() },
                 onValueChange = { v -> vm.updateMetrics { it.copy(elevationM = v?.let { e -> f.fromElevationUnit(e.toDouble()) }) } },
-                step = 10, range = 10..9000, start = 50, format = { it.toString() },
+                step = 1, range = 10..9000, start = 50, format = { it.toString() },
             )
             RowDivider()
         }
@@ -359,7 +365,7 @@ private fun CategoryRows(state: WorkoutEditorState, vm: WorkoutEditorViewModel, 
                 hint = FitnessMath.swimDistanceM(m.copy(distanceM = null))?.let { "Distance ${f.distance(it)}" } ?: "Lengths of the pool",
                 icon = ResurgeIcons.Repeat, iconTint = Resurge.colors.activity,
                 value = m.laps, onValueChange = { v -> vm.updateMetrics { it.copy(laps = v) } },
-                step = 2, range = 1..400, start = 20, format = { it.toString() },
+                step = 1, range = 1..400, start = 20, format = { it.toString() },
             )
             RowDivider()
         }
@@ -367,7 +373,7 @@ private fun CategoryRows(state: WorkoutEditorState, vm: WorkoutEditorViewModel, 
             OptionalStepperRow(
                 label = "Reps", hint = null, icon = ResurgeIcons.Repeat, iconTint = Resurge.colors.activity,
                 value = m.reps, onValueChange = { v -> vm.updateMetrics { it.copy(reps = v) } },
-                step = 5, range = 1..10000, start = 50, format = { "%,d".format(it) },
+                step = 1, range = 1..10000, start = 50, format = { "%,d".format(it) },
             )
             RowDivider()
         }
@@ -416,6 +422,9 @@ private fun SetLogger(index: Int, exercise: EditableExercise, last: List<Strengt
                 Spacer(Modifier.width(8.dp))
                 MiniStepper(
                     value = set.reps.toString(), label = "Reps, set ${i + 1}",
+                    editText = set.reps.toString(),
+                    onSubmit = { t -> TypedNumbers.parseInt(t)?.let { vm.updateSet(exercise.key, i, set.copy(reps = it.coerceIn(1, 200))) } },
+                    keyboardType = KeyboardType.Number,
                     canDecrease = set.reps > 1,
                     onDecrease = { vm.updateSet(exercise.key, i, set.copy(reps = set.reps - 1)) },
                     onIncrease = { vm.updateSet(exercise.key, i, set.copy(reps = (set.reps + 1).coerceAtMost(200))) },
@@ -425,13 +434,20 @@ private fun SetLogger(index: Int, exercise: EditableExercise, last: List<Strengt
                 val w = set.weightKg?.let(f::toWeightUnit)
                 MiniStepper(
                     value = w?.let { UnitFormat.decimal(it, 1) } ?: "—", label = "Weight, set ${i + 1}",
+                    editText = w?.let { "%.1f".format(it) } ?: "",
+                    // Empty means bodyweight.
+                    onSubmit = { t ->
+                        if (t.isBlank()) vm.updateSet(exercise.key, i, set.copy(weightKg = null))
+                        else TypedNumbers.parse(t)?.let { vm.updateSet(exercise.key, i, set.copy(weightKg = f.fromWeightUnit(it.coerceIn(0.0, 1000.0)).takeIf { kg -> kg > 0 })) }
+                    },
+                    keyboardType = KeyboardType.Decimal,
                     canDecrease = w != null,
                     onDecrease = {
-                        val next = (w ?: 0.0) - f.weightStep
+                        val next = (((w ?: 0.0) - f.weightStep) * 10).roundToInt() / 10.0
                         vm.updateSet(exercise.key, i, set.copy(weightKg = if (next < f.weightStep) null else f.fromWeightUnit(next)))
                     },
                     onIncrease = {
-                        val next = if (w == null) (if (f.weightUnit == "kg") 20.0 else 45.0) else w + f.weightStep
+                        val next = if (w == null) (if (f.weightUnit == "kg") 20.0 else 45.0) else ((w + f.weightStep) * 10).roundToInt() / 10.0
                         vm.updateSet(exercise.key, i, set.copy(weightKg = f.fromWeightUnit(next.coerceAtMost(1000.0))))
                     },
                     modifier = Modifier.weight(1f),
@@ -452,13 +468,31 @@ private fun SetLogger(index: Int, exercise: EditableExercise, last: List<Strengt
 
 /** − value + in one `surface-muted` pill, for the dense set rows. */
 @Composable
-private fun MiniStepper(value: String, label: String, canDecrease: Boolean, onDecrease: () -> Unit, onIncrease: () -> Unit, modifier: Modifier) {
+private fun MiniStepper(
+    value: String,
+    label: String,
+    editText: String,
+    onSubmit: (String) -> Unit,
+    keyboardType: KeyboardType,
+    canDecrease: Boolean,
+    onDecrease: () -> Unit,
+    onIncrease: () -> Unit,
+    modifier: Modifier,
+) {
     Row(
         modifier.height(40.dp).clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         MiniButton("−", "Decrease $label", canDecrease, onDecrease)
-        Text(value, style = Resurge.type.headline.copy(fontFeatureSettings = "tnum"), textAlign = TextAlign.Center, maxLines = 1, modifier = Modifier.weight(1f))
+        EditableValue(
+            display = value,
+            editText = { editText },
+            onSubmit = onSubmit,
+            label = label,
+            style = Resurge.type.headline.copy(fontFeatureSettings = "tnum"),
+            keyboardType = keyboardType,
+            modifier = Modifier.weight(1f),
+        )
         MiniButton("+", "Increase $label", true, onIncrease)
     }
 }

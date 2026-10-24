@@ -1,5 +1,8 @@
 package com.resurgeai.feature.food
 
+import androidx.compose.ui.text.input.KeyboardType
+import com.resurgeai.core.designsystem.components.TypedNumbers
+import com.resurgeai.core.designsystem.components.EditableValue
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -357,7 +360,15 @@ private fun ServingsStepper(servings: Int, onChange: (Int) -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Row(Modifier.height(36.dp).clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted), verticalAlignment = Alignment.CenterVertically) {
             StepButton("−", "Fewer servings", enabled = servings > 1) { onChange(servings - 1) }
-            Text("$servings", style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight, fontFeatureSettings = "tnum"), modifier = Modifier.width(24.dp), textAlign = TextAlign.Center)
+            EditableValue(
+                display = "$servings",
+                editText = { "$servings" },
+                onSubmit = { t -> TypedNumbers.parseInt(t)?.let { onChange(it.coerceIn(1, 9)) } },
+                label = "Servings",
+                style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight, fontFeatureSettings = "tnum"),
+                keyboardType = KeyboardType.Number,
+                modifier = Modifier.width(24.dp),
+            )
             StepButton("+", "More servings", enabled = servings < 9) { onChange(servings + 1) }
         }
         Text(if (servings == 1) "serving" else "servings", style = Resurge.type.caption, color = Resurge.colors.textSubtle, modifier = Modifier.padding(top = 2.dp))
@@ -627,12 +638,13 @@ private fun ItemRow(e: EditableItem, vm: MealReviewViewModel) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 8.dp)) {
             MacroSplit(n, Modifier.weight(1f))
             Spacer(Modifier.width(12.dp))
-            val step = if (item.grams >= 200) 25.0 else 10.0
+            // A gram at a time; bigger changes are typed.
             PortionStepper(
                 grams = item.grams,
                 label = item.name,
-                onDecrease = { vm.setGrams(e.key, (item.grams - step).coerceAtLeast(5.0)) },
-                onIncrease = { vm.setGrams(e.key, item.grams + step) },
+                onDecrease = { vm.setGrams(e.key, (item.grams.roundToInt() - 1.0).coerceAtLeast(1.0)) },
+                onIncrease = { vm.setGrams(e.key, item.grams.roundToInt() + 1.0) },
+                onType = { vm.setGrams(e.key, it.coerceIn(1.0, 3000.0)) },
             )
         }
     }
@@ -640,10 +652,17 @@ private fun ItemRow(e: EditableItem, vm: MealReviewViewModel) {
 
 /** − 150 g + in one `surface-muted` pill. */
 @Composable
-private fun PortionStepper(grams: Double, label: String, onDecrease: () -> Unit, onIncrease: () -> Unit) {
+private fun PortionStepper(grams: Double, label: String, onDecrease: () -> Unit, onIncrease: () -> Unit, onType: (Double) -> Unit) {
     Row(Modifier.height(36.dp).clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted), verticalAlignment = Alignment.CenterVertically) {
-        StepButton("−", "Less $label", enabled = grams > 5.0, onClick = onDecrease)
-        Text("${grams.roundToInt()} g", style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight, fontFeatureSettings = "tnum"), modifier = Modifier.width(56.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        StepButton("−", "Less $label", enabled = grams > 1.0, onClick = onDecrease)
+        EditableValue(
+            display = "${grams.roundToInt()} g",
+            editText = { "${grams.roundToInt()}" },
+            onSubmit = { t -> TypedNumbers.parse(t)?.let(onType) },
+            label = "$label grams",
+            style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight, fontFeatureSettings = "tnum"),
+            modifier = Modifier.width(56.dp),
+        )
         StepButton("+", "More $label", enabled = true, onClick = onIncrease)
     }
 }

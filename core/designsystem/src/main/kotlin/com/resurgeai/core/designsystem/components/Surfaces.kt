@@ -54,7 +54,7 @@ fun Screen(
 
 /**
  * Flat card: surface fill, 28dp corners, no shadow. A hairline border keeps cards separate from the
- * background; selection uses the inverse (navbar) colour. Clickable when [onClick] is set.
+ * background; selection uses an accent outline over the accent tint. Clickable when [onClick] is set.
  */
 @Composable
 fun Card(
@@ -66,11 +66,16 @@ fun Card(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val shape = Resurge.shape.lg
+    // Mono: selection is the one place the accent shows on a card, as an outline over a faint tint.
     val borderColor = when {
-        selected -> Resurge.colors.strong
+        selected -> Resurge.colors.accent
         else -> Resurge.colors.border.copy(alpha = 0.6f)
     }
-    val container = if (inverse) Resurge.colors.inverse else Resurge.colors.surface
+    val container = when {
+        inverse -> Resurge.colors.inverse
+        selected -> Resurge.colors.accentTint
+        else -> Resurge.colors.surface
+    }
     val contentColor = if (inverse) Resurge.colors.onInverse else Resurge.colors.text
     val base = modifier
         .clip(shape)

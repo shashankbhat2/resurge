@@ -20,6 +20,9 @@ export const ACTIVITY_INSIGHT_MODEL: ModelSpec = { ...MODELS.fast, effort: "medi
 /** Meal photo / description analysis: Sonnet with medium thinking for portion estimates. */
 export const MEAL_ANALYSIS_MODEL: ModelSpec = { id: "claude-sonnet-5-5", effort: "medium", label: "Meal" };
 
+/** Weekly training plan from onboarding: Sonnet with medium thinking to balance the week. */
+export const PLAN_MODEL: ModelSpec = { id: "claude-sonnet-5-5", effort: "medium", label: "Plan" };
+
 /** Saturday weekly report: same model as activity insights, with more thought. */
 export const WEEKLY_INSIGHT_MODEL: ModelSpec = { ...MODELS.fast, effort: "high" };
 
@@ -29,4 +32,5 @@ export const LIMITS = {
   smartTurns: 10,
   activityInsights: 4,
   foodScans: 20,
+  plans: 6,
 } as const;

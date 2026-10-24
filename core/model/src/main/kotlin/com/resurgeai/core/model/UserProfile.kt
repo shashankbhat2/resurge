@@ -14,6 +14,10 @@ data class UserProfile(
     val mealReminders: MealReminders = MealReminders(),
     /** What a day needs for the day streak. */
     val dayGoals: DayGoals = DayGoals(),
+    /** The major goal and how the person trains, from onboarding. Null for accounts made before them. */
+    val majorGoal: MajorGoal? = null,
+    val training: TrainingPrefs? = null,
+    val activePlanId: String? = null,
 ) {
     val firstName: String?
         get() = displayName?.substringBefore(' ')?.takeIf { it.isNotBlank() }
@@ -32,11 +36,9 @@ data class Targets(
         const val DEFAULT_SLEEP_MINUTES = 7 * 60
         const val DEFAULT_STEPS = 10_000
 
-        /** Settings ranges; sleep moves in half hours. */
+        /** Settings ranges. */
         val SLEEP_RANGE = 4 * 60..11 * 60
-        const val SLEEP_STEP = 30
         val STEPS_RANGE = 2_000..30_000
-        const val STEPS_STEP = 500
 
         /** Below this, setting a sleep goal shows a gentle note (most adults need 7–9 hours). */
         const val RECOMMENDED_MIN_SLEEP_MINUTES = 7 * 60

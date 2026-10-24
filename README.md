@@ -64,7 +64,7 @@ You need Android Studio with JDK 17+, Node.js 22, the [Firebase CLI](https://fir
    ```sh
    cd functions && npm install
    firebase functions:secrets:set ANTHROPIC_API_KEY
-   cd .. && firebase deploy --only firestore:rules,firestore:indexes,functions
+   cd .. && firebase deploy --only firestore,functions
    ```
 3. **App.** `./gradlew :app:installDebug`, or run `app` from Android Studio.
 
