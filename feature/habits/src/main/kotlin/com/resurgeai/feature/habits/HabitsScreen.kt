@@ -184,7 +184,7 @@ private fun TodayCard(state: HabitsUiState, onCheckIn: () -> Unit) {
 
 /**
  * One habit: icon, name and streak, a check for today, and the last 7 days as streak cells.
- * Today and yesterday (still in its grace period) can be tapped to flip. Tapping the card opens it.
+ * Any of the last 7 days (since the habit began) can be tapped to flip. Tapping the card opens it.
  */
 @Composable
 private fun HabitCard(
@@ -259,7 +259,7 @@ private fun WeekCells(item: HabitItem, today: LocalDate, onToggleDay: (String, L
         (6 downTo 0).forEach { back ->
             val date = today.minusDays(back.toLong())
             val dayState = item.stats.days[date] ?: DayState.NONE
-            val editable = back <= 1
+            val editable = !date.isBefore(item.habit.createdDate)
             val dayName = if (back == 0) "Today" else date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 val described = Modifier.semantics {

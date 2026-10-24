@@ -164,14 +164,14 @@ internal fun WorkoutEditorScreen(
                 CategoryRows(state, vm, f)
                 OptionalStepperRow(
                     label = "Calories", hint = if (state.kcalAuto) "Estimated from duration" else "Your number",
-                    icon = ResurgeIcons.Flame, iconTint = Resurge.colors.energy,
+                    icon = ResurgeIcons.Flame, iconTint = Resurge.colors.textMuted,
                     value = state.metrics.kcal, onValueChange = vm::setKcal,
                     step = 1, range = 0..5000, start = 100, format = { "%,d".format(it) },
                 )
                 RowDivider()
                 OptionalStepperRow(
                     label = "Avg heart rate", hint = "bpm",
-                    icon = ResurgeIcons.Heart, iconTint = Resurge.colors.heart,
+                    icon = ResurgeIcons.Heart, iconTint = Resurge.colors.textMuted,
                     value = state.metrics.avgHr, onValueChange = { v -> vm.updateMetrics { it.copy(avgHr = v) } },
                     step = 1, range = 40..220, start = 120, format = { it.toString() },
                 )
@@ -280,7 +280,7 @@ private fun ActivityCard(state: WorkoutEditorState, onChangeActivity: () -> Unit
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(44.dp).clip(Resurge.shape.sm).background(Resurge.colors.surfaceMuted), contentAlignment = Alignment.Center) {
-            Icon(ActivityVisuals.icon(activity.icon), contentDescription = null, tint = Resurge.colors.activity, size = 24.dp)
+            Icon(ActivityVisuals.icon(activity.icon), contentDescription = null, tint = Resurge.colors.text, size = 24.dp)
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
@@ -309,7 +309,7 @@ private fun DayChips(selected: LocalDate, onSelect: (LocalDate) -> Unit) {
                 role = Role.Tab,
                 modifier = Modifier
                     .clip(Resurge.shape.pill)
-                    .background(if (isSelected) Resurge.colors.accentMuted else Resurge.colors.surface)
+                    .background(if (isSelected) Resurge.colors.accentTint else Resurge.colors.surface)
                     .semantics { this.selected = isSelected },
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 10.dp),
                 indication = LocalIndication.current,
@@ -317,7 +317,7 @@ private fun DayChips(selected: LocalDate, onSelect: (LocalDate) -> Unit) {
                 Text(
                     label,
                     style = Resurge.type.label.copy(fontWeight = if (isSelected) Resurge.type.headline.fontWeight else Resurge.type.label.fontWeight),
-                    color = if (isSelected) Resurge.colors.brandInk else Resurge.colors.text,
+                    color = Resurge.colors.text,
                 )
             }
         }
@@ -335,7 +335,7 @@ private fun CategoryRows(state: WorkoutEditorState, vm: WorkoutEditorViewModel, 
             val derived = if (state.activity.showSpeed) FitnessMath.speedKmh(m.distanceM, duration)?.let { "Avg speed ${f.speed(it)}" }
             else FitnessMath.paceSecPerKm(m.distanceM, duration)?.let { "Avg pace ${f.pace(it)}" }
             OptionalStepperRow(
-                label = "Distance", hint = derived ?: "0.1 ${f.distanceUnit} steps", icon = ResurgeIcons.Distance, iconTint = Resurge.colors.activity,
+                label = "Distance", hint = derived ?: "0.1 ${f.distanceUnit} steps", icon = ResurgeIcons.Distance, iconTint = Resurge.colors.textMuted,
                 value = m.distanceM?.let { (f.toDistanceUnit(it) * 10).roundToInt() },
                 onValueChange = { v -> vm.updateMetrics { it.copy(distanceM = v?.let { t -> f.fromDistanceUnit(t / 10.0) }) } },
                 step = 1, range = 1..5000, start = if (state.activity.showSpeed) 100 else 30,
@@ -363,7 +363,7 @@ private fun CategoryRows(state: WorkoutEditorState, vm: WorkoutEditorViewModel, 
             OptionalStepperRow(
                 label = "Laps",
                 hint = FitnessMath.swimDistanceM(m.copy(distanceM = null))?.let { "Distance ${f.distance(it)}" } ?: "Lengths of the pool",
-                icon = ResurgeIcons.Repeat, iconTint = Resurge.colors.activity,
+                icon = ResurgeIcons.Repeat, iconTint = Resurge.colors.textMuted,
                 value = m.laps, onValueChange = { v -> vm.updateMetrics { it.copy(laps = v) } },
                 step = 1, range = 1..400, start = 20, format = { it.toString() },
             )
@@ -371,7 +371,7 @@ private fun CategoryRows(state: WorkoutEditorState, vm: WorkoutEditorViewModel, 
         }
         ActivityCategory.COUNT -> {
             OptionalStepperRow(
-                label = "Reps", hint = null, icon = ResurgeIcons.Repeat, iconTint = Resurge.colors.activity,
+                label = "Reps", hint = null, icon = ResurgeIcons.Repeat, iconTint = Resurge.colors.textMuted,
                 value = m.reps, onValueChange = { v -> vm.updateMetrics { it.copy(reps = v) } },
                 step = 1, range = 1..10000, start = 50, format = { "%,d".format(it) },
             )

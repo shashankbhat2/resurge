@@ -81,12 +81,14 @@ class HabitsViewModelTest {
     }
 
     @Test
-    fun `only today and yesterday can be flipped`() {
+    fun `days in the last week can be flipped, older ones can't`() {
         val vm = vm()
         vm.toggleDay("a", today.minusDays(1))
         verify { repo.setStatus(today.minusDays(1), "a", HabitStatus.DONE) }
-        vm.toggleDay("a", today.minusDays(2))
-        verify(exactly = 0) { repo.setStatus(today.minusDays(2), any(), any()) }
+        vm.toggleDay("a", today.minusDays(6))
+        verify { repo.setStatus(today.minusDays(6), "a", HabitStatus.DONE) }
+        vm.toggleDay("a", today.minusDays(7))
+        verify(exactly = 0) { repo.setStatus(today.minusDays(7), any(), any()) }
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.resurgeai.feature.weight
 
+import com.resurgeai.core.designsystem.components.BottomSheet
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.IntrinsicSize
 import com.resurgeai.core.designsystem.components.TypedNumbers
@@ -76,29 +77,7 @@ import kotlin.math.roundToInt
 
 /** A bottom sheet over a scrim; tapping outside closes it. */
 @Composable
-internal fun WeightSheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Box(
-            Modifier.fillMaxSize().clickable(interactionSource = null, indication = null, onClick = onDismiss).imePadding(),
-            contentAlignment = Alignment.BottomCenter,
-        ) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                    .background(Resurge.colors.surface)
-                    .clickable(interactionSource = null, indication = null) {}
-                    .windowInsetsPadding(WindowInsets.navigationBars)
-                    .verticalScroll(rememberScrollState())
-                    .padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                Box(Modifier.align(Alignment.CenterHorizontally).size(width = 36.dp, height = 4.dp).clip(Resurge.shape.pill).background(Resurge.colors.border))
-                content()
-            }
-        }
-    }
-}
+internal fun WeightSheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) = BottomSheet(onDismiss, content)
 
 // --- Log weight ---
 

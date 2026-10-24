@@ -241,8 +241,8 @@ service cloud.firestore {
         && (!('bestStreak' in h) || h.bestStreak is int);
     }
 
-    // Check-ins may only be written for habit days close to now (today / yesterday's grace,
-    // with slack for timezones and reset times): from 3 days ago to 2 days ahead.
+    // Check-ins may only be written for habit days in the last week (the app's backfill window,
+    // with slack for timezones and reset times): from 8 days ago to 2 days ahead.
     function validHabitDay(date) {
       let d = request.resource.data;
       let parts = date.split('-');
@@ -252,7 +252,7 @@ service cloud.firestore {
         && d.date == date
         && d.entries is map && d.entries.size() <= 40
         && d.entries.values().hasOnly(['done', 'missed'])
-        && day > request.time - duration.value(3, 'd')
+        && day > request.time - duration.value(8, 'd')
         && day < request.time + duration.value(2, 'd');
     }
 

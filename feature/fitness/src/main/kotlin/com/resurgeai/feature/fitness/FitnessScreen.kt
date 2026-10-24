@@ -1,5 +1,10 @@
 package com.resurgeai.feature.fitness
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.LaunchedEffect
+import com.resurgeai.core.model.PlanDay
 import com.resurgeai.core.designsystem.components.OverviewFooterHeight
 import com.resurgeai.core.designsystem.components.OverviewBodyHeight
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -76,7 +81,15 @@ import java.util.Locale
 @Composable
 fun FitnessRoute(
     onOpenWorkout: (String) -> Unit,
+    /** The full activity picker, then the editor (the detailed way to log). */
     onLogWorkout: () -> Unit,
+    /** The full editor for one activity. */
+    onLogActivity: (String) -> Unit = {},
+    /** Opens the session logger for a planned day (strength), or the editor (cardio). */
+    onStartSession: (PlanDay) -> Unit = {},
+    /** Bumped by the header's "+" to open quick add. */
+    quickAddSignal: Int = 0,
+    onOpenPlan: () -> Unit = {},
     viewModel: FitnessViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -84,19 +97,34 @@ fun FitnessRoute(
         viewModel.refresh()
         onPauseOrDispose {}
     }
+    var quickAdd by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(quickAddSignal) { if (quickAddSignal > 0) quickAdd = true }
     FitnessScreen(
         state = state,
         onOpenWorkout = onOpenWorkout,
-        onLogWorkout = onLogWorkout,
+        onLogWorkout = { quickAdd = true },
         onDelete = viewModel::delete,
         onUndo = viewModel::undoDelete,
         onUndoTimeout = viewModel::clearDeleted,
+        onStartSession = onStartSession,
+        onDoneAsPlanned = viewModel::doneAsPlanned,
+        onOpenPlan = onOpenPlan,
     )
+    if (quickAdd) {
+        QuickLogSheet(
+            recents = state.recents,
+            onSave = { id, minutes, end -> viewModel.quickLog(id, minutes, end); quickAdd = false },
+            onAddDetails = { id -> quickAdd = false; onLogActivity(id) },
+            onAllActivities = { quickAdd = false; onLogWorkout() },
+            onDismiss = { quickAdd = false },
+        )
+    }
 }
 
 /**
- * Fitness tab: the move week (active minutes toward 150) on top, then workouts grouped by day.
- * Cards open the editor; swipe left deletes with undo.
+ * Fitness tab: this week of the plan (Start, or Done as planned), "Log something else" for quick
+ * add, the move week (active minutes toward 150), then workouts grouped by day. Cards open the
+ * full editor; swipe left deletes with undo.
  */
 @Composable
 fun FitnessScreen(
@@ -106,6 +134,9 @@ fun FitnessScreen(
     onDelete: (Workout) -> Unit,
     onUndo: () -> Unit,
     onUndoTimeout: () -> Unit,
+    onStartSession: (PlanDay) -> Unit = {},
+    onDoneAsPlanned: (PlanDay, LocalDate) -> Unit = { _, _ -> },
+    onOpenPlan: () -> Unit = {},
 ) {
     val format = UnitFormat(state.units)
     val top = LocalHeaderInset.current + 12.dp
@@ -123,6 +154,12 @@ fun FitnessScreen(
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = top, bottom = bottom),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                if (state.plan != null) {
+                    item(key = "plan") { PlanWeekSection(state, format, onStartSession, onDoneAsPlanned, onOpenWorkout, onOpenPlan) }
+                } else {
+                    item(key = "plan") { BuildPlanCard(onOpenPlan) }
+                }
+                item(key = "quick") { LogSomethingElse(onLogWorkout) }
                 item(key = "week") { MoveWeek(state.week, state.today) }
                 if (state.days.isEmpty()) {
                     item(key = "empty") { EmptyFeed(onLogWorkout) }
@@ -178,7 +215,7 @@ internal fun MoveWeek(week: WeekSummary, today: LocalDate) {
                 Text(
                     week.activeMinutes.toString(),
                     style = Resurge.type.tide.copy(fontSize = 44.sp, lineHeight = 46.sp),
-                    color = if (week.reached) Resurge.colors.glowInk else Resurge.colors.text,
+                    color = if (week.reached) Resurge.colors.up else Resurge.colors.text,
                 )
                 Spacer(Modifier.width(6.dp))
                 Text("/ $target active min", style = Resurge.type.label, color = Resurge.colors.textMuted, modifier = Modifier.padding(bottom = 6.dp))
@@ -191,7 +228,7 @@ internal fun MoveWeek(week: WeekSummary, today: LocalDate) {
         Row(Modifier.fillMaxWidth().height(OverviewFooterHeight)) {
             StatCell(
                 icon = ResurgeIcons.Dumbbell,
-                iconTint = Resurge.colors.activity,
+                iconTint = Resurge.colors.textMuted,
                 iconBackground = Resurge.colors.surfaceMuted,
                 value = week.workouts.toString(),
                 label = if (week.workouts == 1) "Workout this week" else "Workouts this week",
@@ -200,7 +237,7 @@ internal fun MoveWeek(week: WeekSummary, today: LocalDate) {
             StatDivider()
             StatCell(
                 icon = ResurgeIcons.Flame,
-                iconTint = Resurge.colors.energy,
+                iconTint = Resurge.colors.textMuted,
                 iconBackground = Resurge.colors.surfaceMuted,
                 value = if (week.kcal > 0) "%,d".format(week.kcal) else "—",
                 label = "kcal from workouts",
@@ -214,7 +251,7 @@ internal fun MoveWeek(week: WeekSummary, today: LocalDate) {
 private fun DayColumns(week: WeekSummary, today: LocalDate) {
     val weekStart = today.minusDays(week.todayIndex.toLong())
     val pace = WeekSummary.MOVE_WEEK_TARGET / 7f / COLUMN_MAX_MIN
-    val move = Resurge.colors.activity
+    val move = Resurge.colors.text
     val line = Resurge.colors.textSubtle
     val description = week.dailyMinutes.withIndex().filter { it.index <= week.todayIndex }.joinToString { (i, m) ->
         "${weekStart.plusDays(i.toLong()).dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault())} $m min"
@@ -291,7 +328,7 @@ internal fun WorkoutCard(w: Workout, format: UnitFormat, best: PersonalBest?, on
                 Box(
                     Modifier.size(44.dp).clip(Resurge.shape.sm).background(Resurge.colors.surfaceMuted),
                     contentAlignment = Alignment.Center,
-                ) { Icon(ActivityVisuals.icon(activity.icon), contentDescription = null, tint = Resurge.colors.activity, size = 24.dp) }
+                ) { Icon(ActivityVisuals.icon(activity.icon), contentDescription = null, tint = Resurge.colors.text, size = 24.dp) }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(w.displayName, style = Resurge.type.headline, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -324,7 +361,7 @@ internal fun WorkoutCard(w: Workout, format: UnitFormat, best: PersonalBest?, on
                     best?.let { BestPill(it, format) }
                     // Shown once though two devices logged it; the editor lets you pick the other.
                     alsoFrom?.let { Tag("Also recorded by ${it.joinToString()}", icon = ResurgeIcons.Devices) }
-                    heart?.let { Tag("$it bpm", icon = ResurgeIcons.Heart, tint = Resurge.colors.heart) }
+                    heart?.let { Tag("$it bpm", icon = ResurgeIcons.Heart) }
                     effort?.let { Tag("Effort $it · ${effortLabel(it)}") }
                 }
             }
@@ -363,14 +400,14 @@ private fun BestPill(best: PersonalBest, format: UnitFormat) {
 @Composable
 internal fun EarnedPill(text: String) {
     Row(
-        Modifier.clip(Resurge.shape.pill).background(Resurge.colors.glowTint).padding(start = 4.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
+        Modifier.clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted).padding(start = 4.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(24.dp).clip(Resurge.shape.pill).background(Resurge.colors.glow), contentAlignment = Alignment.Center) {
-            Icon(ResurgeIcons.Medal, contentDescription = null, tint = Resurge.colors.onGlow, size = 14.dp)
+        Box(Modifier.size(24.dp).clip(Resurge.shape.pill).background(Resurge.colors.up), contentAlignment = Alignment.Center) {
+            Icon(ResurgeIcons.Medal, contentDescription = null, tint = Resurge.colors.bg, size = 14.dp)
         }
         Spacer(Modifier.width(6.dp))
-        Text(text, style = Resurge.type.caption.copy(fontSize = 13.sp), color = Resurge.colors.glowInk, maxLines = 1)
+        Text(text, style = Resurge.type.caption.copy(fontSize = 13.sp), color = Resurge.colors.up, maxLines = 1)
     }
 }
 

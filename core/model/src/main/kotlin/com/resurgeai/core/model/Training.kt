@@ -243,3 +243,35 @@ data class WorkoutPlan(
         }
     }
 }
+
+/** Whether a logged or synced workout counts as a planned session done. */
+object PlanMatch {
+    private val RUNS = setOf("run", "treadmill")
+
+    /** Strength and mobility days take strength or timed work; run days a run; cardio days any cardio. */
+    fun matches(day: PlanDay, workout: Workout): Boolean {
+        if (day.rest) return false
+        val category = workout.activity.category
+        return when (day.kind) {
+            SessionKind.STRENGTH, SessionKind.MOBILITY -> category == ActivityCategory.STRENGTH || category == ActivityCategory.TIMED
+            SessionKind.RUN -> workout.activityId in RUNS
+            SessionKind.CARDIO -> category == ActivityCategory.DISTANCE || category == ActivityCategory.SWIM || category == ActivityCategory.TIMED
+            null -> true
+        }
+    }
+}
+
+/** Sets for a planned exercise, filled in so logging is a tap per set. */
+object PlanSets {
+    /** The first number in a plan's reps ("8-10" → 8, "40 s" → 40); 10 when there's none. */
+    fun reps(text: String): Int = Regex("\\d+").find(text)?.value?.toIntOrNull()?.coerceIn(1, 200) ?: 10
+
+    /**
+     * [PlanExercise.sets] sets at the planned reps, each at the heaviest weight from [last] time
+     * (null for bodyweight, or when it's never been logged).
+     */
+    fun planned(exercise: PlanExercise, last: List<StrengthSet>?): List<StrengthSet> {
+        val weight = last?.mapNotNull { it.weightKg }?.maxOrNull()
+        return List(exercise.sets.coerceIn(1, 10)) { StrengthSet(reps(exercise.reps), weight) }
+    }
+}

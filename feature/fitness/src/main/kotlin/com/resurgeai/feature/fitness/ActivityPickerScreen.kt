@@ -138,7 +138,7 @@ private fun ActivityRow(activity: Activity, onPick: (String) -> Unit) {
     ) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(40.dp).clip(Resurge.shape.sm).background(Resurge.colors.surfaceMuted), contentAlignment = Alignment.Center) {
-                Icon(ActivityVisuals.icon(activity.icon), contentDescription = null, tint = Resurge.colors.activity, size = 22.dp)
+                Icon(ActivityVisuals.icon(activity.icon), contentDescription = null, tint = Resurge.colors.text, size = 22.dp)
             }
             Spacer(Modifier.width(12.dp))
             Text(activity.name, style = Resurge.type.body, modifier = Modifier.weight(1f))

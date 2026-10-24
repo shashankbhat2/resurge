@@ -1,6 +1,7 @@
 package com.resurgeai.core.model
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -95,5 +96,33 @@ class TrainingTest {
     @Test
     fun `a plan without days is unusable`() {
         assertNull(WorkoutPlan.fromMap("p", mapOf("name" to "Empty")))
+    }
+
+    private fun workout(activityId: String) = Workout(
+        "w", WorkoutSource.MANUAL, activityId, null,
+        java.time.Instant.parse("2026-10-26T07:00:00Z"), java.time.Instant.parse("2026-10-26T07:45:00Z"), WorkoutMetricsInput(),
+    )
+
+    @Test
+    fun `planned days match the right kind of workout`() {
+        val strength = PlanDay(DayOfWeek.MONDAY, rest = false, title = "Strength A", kind = SessionKind.STRENGTH)
+        val run = PlanDay(DayOfWeek.WEDNESDAY, rest = false, title = "Easy run", kind = SessionKind.RUN)
+        val rest = PlanDay(DayOfWeek.TUESDAY, rest = true, title = "Rest")
+        assertTrue(PlanMatch.matches(strength, workout("weights")))
+        assertTrue(PlanMatch.matches(strength, workout("yoga")))
+        assertFalse(PlanMatch.matches(strength, workout("run")))
+        assertTrue(PlanMatch.matches(run, workout("treadmill")))
+        assertFalse(PlanMatch.matches(run, workout("cycle")))
+        assertFalse(PlanMatch.matches(rest, workout("walk")))
+    }
+
+    @Test
+    fun `planned sets take the plan's reps and last time's top weight`() {
+        assertEquals(8, PlanSets.reps("8-10"))
+        assertEquals(40, PlanSets.reps("40 s"))
+        assertEquals(10, PlanSets.reps("AMRAP"))
+        val sets = PlanSets.planned(PlanExercise("Bench press", 3, "8", "RPE 7", 90), listOf(StrengthSet(8, 55.0), StrengthSet(8, 57.5)))
+        assertEquals(List(3) { StrengthSet(8, 57.5) }, sets)
+        assertEquals(StrengthSet(12, null), PlanSets.planned(PlanExercise("Push-up", 2, "12", "bodyweight", 60), null).first())
     }
 }

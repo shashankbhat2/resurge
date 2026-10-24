@@ -46,6 +46,7 @@ import com.resurgeai.core.model.DayGoals
 import com.resurgeai.core.model.HabitSettings
 import com.resurgeai.core.model.HealthMetric
 import com.resurgeai.core.model.PlanDay
+import com.resurgeai.core.model.PlanMatch
 import com.resurgeai.core.model.SourceKind
 import com.resurgeai.core.model.Targets
 import com.resurgeai.core.model.UnitSystem
@@ -60,8 +61,8 @@ fun TodayRoute(
     onOpenHabit: (String) -> Unit = {},
     onAddHabit: () -> Unit = {},
     onOpenHabits: () -> Unit = {},
-    /** Logs today's planned session as this activity (null: let the person pick). */
-    onStartWorkout: (String?) -> Unit = {},
+    /** Starts today's planned session: the session logger for strength, the editor for cardio. */
+    onStartSession: (PlanDay) -> Unit = {},
     /** A new progress reel, when there is one (supplied by the app). */
     reelCard: (@Composable () -> Unit)? = null,
     viewModel: DashboardViewModel = hiltViewModel(),
@@ -91,7 +92,7 @@ fun TodayRoute(
         onOpenHabit = onOpenHabit,
         onAddHabit = onAddHabit,
         onOpenHabits = onOpenHabits,
-        onStartSession = { onStartWorkout(it.activityId) },
+        onStartSession = onStartSession,
         onCompactListChange = viewModel::setCompactList,
         onDismissDayComplete = viewModel::dismissDayComplete,
         onSaveDayGoals = viewModel::saveDayGoals,
@@ -166,7 +167,7 @@ fun TodayScreen(
         }
 
         val session = state.plan?.days?.firstOrNull { it.day == today.dayOfWeek }
-        val sessionDone = state.workouts.any { it.date() == today }
+        val sessionDone = session != null && state.workouts.any { it.date() == today && PlanMatch.matches(session, it) }
         TodayChecklist(
             state = state.streak,
             session = session,

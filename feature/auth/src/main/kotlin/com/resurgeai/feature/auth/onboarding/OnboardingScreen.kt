@@ -1,5 +1,6 @@
 package com.resurgeai.feature.auth.onboarding
 
+import com.resurgeai.core.designsystem.components.OptionRow
 import androidx.compose.ui.text.input.KeyboardType
 import com.resurgeai.core.designsystem.components.TypedNumbers
 import com.resurgeai.core.designsystem.components.EditableValue
@@ -455,7 +456,7 @@ private fun ScheduleStep(state: OnboardingUiState, actions: OnboardingActions) {
         Spacer(Modifier.height(10.dp))
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             WorkoutStyle.entries.forEach { style ->
-                StyleRow(style, selected = style == state.training.style, onClick = { actions.setStyle(style) })
+                OptionRow(style.label, style.description, selected = style == state.training.style, onClick = { actions.setStyle(style) })
             }
         }
     }
@@ -471,23 +472,6 @@ private fun ScheduleStep(state: OnboardingUiState, actions: OnboardingActions) {
         )
         Spacer(Modifier.height(10.dp))
         OptionChips(RunMode.entries, state.training.runs, actions.setRuns, { it.label })
-    }
-}
-
-@Composable
-private fun StyleRow(style: WorkoutStyle, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(Resurge.shape.sm)
-            .background(if (selected) Resurge.colors.accentTint else Resurge.colors.bg)
-            .border(if (selected) 1.5.dp else 1.dp, if (selected) Resurge.colors.accent else Resurge.colors.borderStrong, Resurge.shape.sm)
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(style.label, style = Resurge.type.label, color = if (selected) Resurge.colors.text else Resurge.colors.textMuted, modifier = Modifier.weight(1f))
-        Text(style.description, style = Resurge.type.caption, color = Resurge.colors.textSubtle)
     }
 }
 

@@ -85,4 +85,15 @@ class HabitStreaksTest {
         val s = stats(12, 12 to DONE, 13 to MISSED, 14 to DONE)
         assertEquals(2f / 3f, s.completion30, 0.001f)
     }
+
+    @Test
+    fun `backfill covers today and the six days before it`() {
+        val today = java.time.LocalDate.of(2026, 10, 24)
+        assertEquals(java.time.LocalDate.of(2026, 10, 18), Backfill.earliest(today))
+        assertEquals(7, Backfill.days(today).size)
+        assertEquals(today, Backfill.days(today).last())
+        org.junit.Assert.assertTrue(Backfill.allows(today.minusDays(6), today))
+        org.junit.Assert.assertFalse(Backfill.allows(today.minusDays(7), today))
+        org.junit.Assert.assertFalse(Backfill.allows(today.plusDays(1), today))
+    }
 }

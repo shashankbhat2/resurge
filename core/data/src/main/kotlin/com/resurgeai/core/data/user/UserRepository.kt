@@ -115,6 +115,17 @@ class UserRepository @Inject constructor(
         batch.commit().await()
     }
 
+    /** Switches to a rebuilt plan, saving the schedule it was built for. */
+    suspend fun setActivePlan(uid: String, planId: String, training: TrainingPrefs) {
+        doc(uid).update(
+            mapOf(
+                "activePlanId" to planId,
+                "training" to training.toMap(),
+                "updatedAt" to FieldValue.serverTimestamp(),
+            ),
+        ).await()
+    }
+
     suspend fun updateCoachStyle(uid: String, style: CoachStyle) {
         doc(uid).update(mapOf("coachStyle" to style.wire, "updatedAt" to FieldValue.serverTimestamp())).await()
     }

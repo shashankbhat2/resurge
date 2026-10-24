@@ -66,5 +66,74 @@ class FitnessScreenshotTest {
 
     @Test fun feed() = capture("feed", state)
     @Test fun feedDark() = capture("feed_dark", state, ColorScheme.Dark)
+    /** Mon/Wed/Fri strength, Sat run; today (Wed 14) still to do, Monday done by the logged lift. */
+    private val plan = com.resurgeai.core.model.WorkoutPlan(
+        id = "p", name = "Lean 12", summary = "", progression = "", notes = "",
+        days = java.time.DayOfWeek.entries.map { d ->
+            val ex = List(5) { com.resurgeai.core.model.PlanExercise(listOf("Goblet squat", "Bench press", "Romanian deadlift", "Seated row", "Plank")[it], 3, if (it == 4) "40 s" else "8", "RPE 7", 90) }
+            when (d) {
+                java.time.DayOfWeek.MONDAY -> com.resurgeai.core.model.PlanDay(d, false, "Strength A", com.resurgeai.core.model.SessionKind.STRENGTH, "weights", 45, exercises = ex)
+                java.time.DayOfWeek.WEDNESDAY -> com.resurgeai.core.model.PlanDay(d, false, "Strength B", com.resurgeai.core.model.SessionKind.STRENGTH, "weights", 45, exercises = ex)
+                java.time.DayOfWeek.FRIDAY -> com.resurgeai.core.model.PlanDay(d, false, "Strength A", com.resurgeai.core.model.SessionKind.STRENGTH, "weights", 45, exercises = ex)
+                java.time.DayOfWeek.SATURDAY -> com.resurgeai.core.model.PlanDay(d, false, "Long easy run", com.resurgeai.core.model.SessionKind.RUN, "run", 45, focus = "Conversational pace")
+                else -> com.resurgeai.core.model.PlanDay(d, true, "Rest", note = "Walk 8,000 steps")
+            }
+        },
+    )
+    private val planned get() = state.copy(
+        plan = plan,
+        planWeek = QuickLog.planWeek(plan, today.with(java.time.DayOfWeek.MONDAY), workouts.filter { it.id != "b" } +
+            at(today.minusDays(2), 18, 42).let { (s, e) -> Workout("m", WorkoutSource.MANUAL, "weights", "Strength A", s, e, WorkoutMetricsInput()) }, zone),
+    )
+
+    @Test fun plannedDark() = capture("planned_dark", planned, ColorScheme.Dark)
+
+    @Test fun quickLogDark() {
+        compose.setContent {
+            ResurgeTheme(colorScheme = ColorScheme.Dark) {
+                Screen { QuickLogSheet(state.recents, onSave = { _, _, _ -> }, onAddDetails = {}, onAllActivities = {}, onDismiss = {}) }
+            }
+        }
+        compose.onRoot().captureRoboImage("src/test/screenshots/fitness_quick_log_dark.png")
+    }
+
+    @Test fun sessionLoggerDark() {
+        val logger = SessionLoggerState(
+            loaded = true,
+            day = plan.days[2],
+            exercises = listOf(
+                LoggedExercise("Front squat", listOf(StrengthSet(8, 57.5), StrengthSet(8, 57.5)), List(3) { LoggedSet(8, 57.5, done = true) }),
+                LoggedExercise("Overhead press", null, listOf(LoggedSet(8, 35.0, done = true), LoggedSet(8, 35.0), LoggedSet(8, 35.0))),
+                LoggedExercise("Push-up", null, List(3) { LoggedSet(12, null) }),
+            ),
+        )
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            ResurgeTheme(colorScheme = ColorScheme.Dark) {
+                SessionLoggerScreen(logger, onClose = {}, onToggle = { _, _ -> }, onReps = { _, _, _ -> }, onWeight = { _, _, _ -> }, onAddSet = {}, onAllDone = {}, onFinish = {})
+            }
+        }
+        compose.mainClock.advanceTimeBy(300)
+        compose.onRoot().captureRoboImage("src/test/screenshots/fitness_session_logger_dark.png")
+    }
+
+    @Test fun planScreenDark() {
+        compose.setContent {
+            ResurgeTheme(colorScheme = ColorScheme.Dark) {
+                Screen {
+                    PlanScreen(
+                        PlanUiState(
+                            loaded = true,
+                            goal = com.resurgeai.core.model.MajorGoal(com.resurgeai.core.model.TrainingGoal.LOSE_FAT, 12, today.minusDays(9), 84.0, 78.0),
+                            plan = plan.copy(summary = "Two strength days keep the muscle; two easy runs burn the fat.", progression = "Add a rep a week, then load when you hit the top of the range."),
+                        ),
+                        onBack = {}, onRebuild = { _, _ -> }, onAccept = {}, onDiscard = {}, today = today,
+                    )
+                }
+            }
+        }
+        compose.onRoot().captureRoboImage("src/test/screenshots/fitness_plan_dark.png")
+    }
+
     @Test fun empty() = capture("empty", state.copy(days = emptyList(), week = WeekSummary(0, 0, 0, todayIndex = 3), bests = emptyMap()))
 }

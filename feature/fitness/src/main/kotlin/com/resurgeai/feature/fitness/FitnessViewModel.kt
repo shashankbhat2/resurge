@@ -1,5 +1,17 @@
 package com.resurgeai.feature.fitness
 
+import com.resurgeai.core.model.Backfill
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.distinctUntilChanged
+import com.resurgeai.core.model.WorkoutSource
+import com.resurgeai.core.model.WorkoutMetricsInput
+import com.resurgeai.core.model.WorkoutDraft
+import com.resurgeai.core.model.WorkoutPlan
+import com.resurgeai.core.model.PlanMatch
+import com.resurgeai.core.model.PlanDay
+import com.resurgeai.core.model.ActivityCatalog
+import com.resurgeai.core.model.Activity
+import com.resurgeai.core.data.plan.PlanRepository
 import com.resurgeai.core.model.ActivityCategory
 import com.resurgeai.core.model.FitnessMath
 import androidx.lifecycle.ViewModel
@@ -89,6 +101,11 @@ object PersonalBests {
     }
 }
 
+/** A day of this week's plan and the workout that did it, if one has. */
+data class PlannedDay(val date: LocalDate, val day: PlanDay, val workout: Workout?) {
+    val done: Boolean get() = workout != null
+}
+
 data class FitnessUiState(
     val loading: Boolean = true,
     val days: List<Pair<LocalDate, List<Workout>>> = emptyList(),
@@ -98,13 +115,49 @@ data class FitnessUiState(
     val today: LocalDate = LocalDate.now(),
     /** Set right after a delete, for the undo bar. */
     val deleted: Workout? = null,
-)
+    /** The plan being followed, and this week of it (Monday first); empty without a plan. */
+    val plan: WorkoutPlan? = null,
+    val planWeek: List<PlannedDay> = emptyList(),
+    /** What quick add offers first: the most logged activities lately, then common ones. */
+    val recents: List<Activity> = QuickLog.DEFAULTS.map(ActivityCatalog::byId),
+) {
+    val todayPlan: PlannedDay? get() = planWeek.firstOrNull { it.date == today }
+    val sessionsPlanned: Int get() = planWeek.count { !it.day.rest }
+    val sessionsDone: Int get() = planWeek.count { !it.day.rest && it.done }
+}
+
+/** Quick add: a few activities and durations, so logging is two taps. */
+object QuickLog {
+    val DEFAULTS = listOf("walk", "run", "cycle", "weights", "yoga", "swim_pool")
+    val MINUTES = listOf(15, 30, 45, 60, 90)
+
+    /** When a workout on an earlier day ended: morning, midday or evening. */
+    val PAST_ENDS = listOf(java.time.LocalTime.of(9, 0) to "Morning", java.time.LocalTime.of(13, 0) to "Midday", java.time.LocalTime.of(19, 0) to "Evening")
+    val EVENING: java.time.LocalTime = PAST_ENDS.last().first
+
+    /** For today: how long ago it ended, in minutes. */
+    val TODAY_ENDS = listOf(0 to "Just now", 60 to "1 h ago", 180 to "3 h ago")
+
+    /** The six most logged activities in [workouts], topped up with [DEFAULTS]. */
+    fun recents(workouts: List<Workout>): List<String> =
+        (workouts.groupingBy { it.activityId }.eachCount().entries.sortedByDescending { it.value }.map { it.key }.filter { it != "other" } + DEFAULTS)
+            .distinct()
+            .take(6)
+
+    /** Matches each planned day of [weekStart]'s week to the first workout that day that fits it. */
+    fun planWeek(plan: WorkoutPlan, weekStart: LocalDate, workouts: List<Workout>, zone: ZoneId): List<PlannedDay> =
+        plan.days.map { d ->
+            val date = weekStart.with(java.time.temporal.TemporalAdjusters.nextOrSame(d.day))
+            PlannedDay(date, d, workouts.firstOrNull { it.date(zone) == date && PlanMatch.matches(d, it) })
+        }.sortedBy { it.date }
+}
 
 /** Fitness feed: the last [DAYS] days of Health Connect sessions and logged workouts, newest first. */
 @HiltViewModel
 class FitnessViewModel @Inject constructor(
     private val repository: WorkoutsRepository,
     sessionRepository: SessionRepository,
+    private val plans: PlanRepository,
 ) : ViewModel() {
     private val zone = ZoneId.systemDefault()
     private val since = LocalDate.now(zone).minusDays(DAYS).atStartOfDay(zone).toInstant()
@@ -117,9 +170,14 @@ class FitnessViewModel @Inject constructor(
 
     private val records = repository.records(since).catch { emit(emptyList<WorkoutRecord>()) }
 
-    val state: StateFlow<FitnessUiState> = combine(device, records, units, deleted) { dev, recs, u, del ->
+    private val plan = sessionRepository.session
+        .map { (it as? SessionState.Ready)?.profile?.activePlanId }
+        .distinctUntilChanged()
+        .map { id -> id?.let { runCatching { plans.plan(it) }.getOrNull() } }
+
+    val state: StateFlow<FitnessUiState> = combine(device, records, units, deleted, plan) { dev, recs, u, del, activePlan ->
         val today = LocalDate.now(zone)
-        if (dev == null) return@combine FitnessUiState(loading = true, units = u, today = today)
+        if (dev == null) return@combine FitnessUiState(loading = true, units = u, today = today, plan = activePlan)
         val all = WorkoutsRepository.merge(dev, recs)
         val weekStart = HabitStreaks.weekStart(today)
         val thisWeek = all.filter { !it.date(zone).isBefore(weekStart) }
@@ -138,6 +196,10 @@ class FitnessViewModel @Inject constructor(
             units = u,
             today = today,
             deleted = del,
+            plan = activePlan,
+            // The plan's week runs Monday to Sunday, whatever the locale's first day.
+            planWeek = activePlan?.let { QuickLog.planWeek(it, today.with(java.time.DayOfWeek.MONDAY), all, zone) }.orEmpty(),
+            recents = QuickLog.recents(all).map(ActivityCatalog::byId),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FitnessUiState())
 
@@ -165,7 +227,38 @@ class FitnessViewModel @Inject constructor(
 
     fun clearDeleted() = deleted.update { null }
 
+    /**
+     * Logs [day] as planned: its exercises at last time's weights, ending now on [date] today, or
+     * in the evening of an earlier day of the backfill week.
+     */
+    fun doneAsPlanned(day: PlanDay, date: LocalDate = LocalDate.now(zone)) {
+        if (!Backfill.allows(date, LocalDate.now(zone))) return
+        viewModelScope.launch {
+            val now = if (date == LocalDate.now(zone)) Instant.now() else date.atTime(QuickLog.EVENING).atZone(zone).toInstant()
+            val history = runCatching { repository.records(now.minus(Duration.ofDays(HISTORY_DAYS))).first() }.getOrDefault(emptyList())
+            val minutes = day.durationMin ?: PlanLogging.DEFAULT_MINUTES
+            val exercises = PlanLogging.plannedExercises(day, history, now)
+            repository.save(PlanLogging.draft(day, now, minutes, exercises, repository.latestWeightKg()), null, WorkoutSource.MANUAL)
+        }
+    }
+
+    /** Quick add: [activityId] for [minutes], ending at [end] (somewhere in the backfill week). */
+    fun quickLog(activityId: String, minutes: Int, end: Instant) {
+        if (!Backfill.allows(end.atZone(zone).toLocalDate(), LocalDate.now(zone))) return
+        viewModelScope.launch {
+            val activity = ActivityCatalog.byId(activityId)
+            val draft = WorkoutDraft(
+                activityId = activity.id,
+                start = end.minus(Duration.ofMinutes(minutes.toLong())),
+                durationMin = minutes,
+                metrics = WorkoutMetricsInput(kcal = FitnessMath.estimateKcal(activity, minutes, repository.latestWeightKg())),
+            )
+            repository.save(draft, null, WorkoutSource.MANUAL)
+        }
+    }
+
     companion object {
         const val DAYS = 30L
+        const val HISTORY_DAYS = 120L
     }
 }

@@ -1,5 +1,6 @@
 package com.resurgeai.feature.habits
 
+import com.resurgeai.core.model.Backfill
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.resurgeai.core.data.habits.HabitsRepository
@@ -135,11 +136,12 @@ class HabitsViewModel @Inject constructor(
         _state.update { it.copy(lastSwiped = null, showStreaksEarly = false) }
     }
 
-    /** Tapping today's or yesterday's flame on the streaks list flips done / not done (grace period). */
+    /** Tapping a day in the last week on the streaks list flips done / not done ([Backfill]). */
     fun toggleDay(habitId: String, date: LocalDate) {
         val s = _state.value
-        if (date != s.today && date != s.yesterday) return
+        if (!Backfill.allows(date, s.today)) return
         val item = s.item(habitId) ?: return
+        if (date.isBefore(item.habit.createdDate)) return
         val done = item.stats.days[date] == DayState.DONE
         repository.setStatus(date, habitId, if (done) HabitStatus.MISSED else HabitStatus.DONE)
     }

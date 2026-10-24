@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
@@ -105,5 +106,28 @@ private fun ChoiceBox(
             style = Resurge.type.label.copy(fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium),
             color = if (selected) Resurge.colors.text else Resurge.colors.textMuted,
         )
+    }
+}
+
+/** A full-width option with its label and a short description; the selected one gets the accent outline. */
+@Composable
+fun OptionRow(label: String, description: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val shape = Resurge.shape.sm
+    UnstyledButton(
+        onClick = onClick,
+        role = Role.RadioButton,
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics { this.selected = selected }
+            .clip(shape)
+            .background(if (selected) Resurge.colors.accentTint else Resurge.colors.bg, shape)
+            .border(if (selected) 1.5.dp else 1.dp, if (selected) Resurge.colors.accent else Resurge.colors.borderStrong, shape),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        indication = LocalIndication.current,
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(label, style = Resurge.type.label, color = if (selected) Resurge.colors.text else Resurge.colors.textMuted, modifier = Modifier.weight(1f))
+            Text(description, style = Resurge.type.caption, color = Resurge.colors.textSubtle)
+        }
     }
 }

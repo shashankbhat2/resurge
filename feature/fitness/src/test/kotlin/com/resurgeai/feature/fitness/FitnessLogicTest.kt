@@ -67,4 +67,38 @@ class FitnessLogicTest {
         assertEquals("3 sets, top 62.5 kg × 7", LastSession.describe(listOf(StrengthSet(8, 60.0), StrengthSet(8, 60.0), StrengthSet(7, 62.5)), kg))
         assertEquals("2 × 10", LastSession.describe(List(2) { StrengthSet(10) }, kg))
     }
+
+    @Test
+    fun `quick add offers the most logged activities first, topped up with common ones`() {
+        val all = listOf(
+            workout("1", "yoga", 0, 30, WorkoutMetricsInput()),
+            workout("2", "yoga", 1, 30, WorkoutMetricsInput()),
+            workout("3", "cycle", 2, 30, WorkoutMetricsInput()),
+            workout("4", "other", 3, 30, WorkoutMetricsInput()),
+        )
+        assertEquals(listOf("yoga", "cycle", "walk", "run", "weights", "swim_pool"), QuickLog.recents(all))
+    }
+
+    @Test
+    fun `the plan's week is matched to fitting workouts on each day`() {
+        val monday = LocalDate.of(2026, 10, 5)
+        val zone = java.time.ZoneOffset.UTC
+        val plan = com.resurgeai.core.model.WorkoutPlan(
+            "p", "Plan", "", java.time.DayOfWeek.entries.map { d ->
+                when (d) {
+                    java.time.DayOfWeek.MONDAY -> com.resurgeai.core.model.PlanDay(d, false, "Strength A", com.resurgeai.core.model.SessionKind.STRENGTH)
+                    java.time.DayOfWeek.WEDNESDAY -> com.resurgeai.core.model.PlanDay(d, false, "Easy run", com.resurgeai.core.model.SessionKind.RUN)
+                    else -> com.resurgeai.core.model.PlanDay(d, true, "Rest")
+                }
+            }, "", "",
+        )
+        val start = monday.atTime(7, 0).toInstant(zone)
+        val lift = Workout("l", WorkoutSource.MANUAL, "weights", null, start, start.plusSeconds(2700), WorkoutMetricsInput())
+        val walkWednesday = start.plusSeconds(2 * 86_400).let { Workout("w", WorkoutSource.MANUAL, "walk", null, it, it.plusSeconds(1800), WorkoutMetricsInput()) }
+        val week = QuickLog.planWeek(plan, monday, listOf(lift, walkWednesday), zone)
+        assertEquals(7, week.size)
+        assertEquals("l", week.first { it.day.title == "Strength A" }.workout?.id)
+        // A walk isn't the planned run.
+        assertEquals(null, week.first { it.day.title == "Easy run" }.workout)
+    }
 }

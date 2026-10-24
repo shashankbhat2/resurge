@@ -1,5 +1,6 @@
 package com.resurgeai.feature.dashboard
 
+import com.resurgeai.core.model.Backfill
 import android.util.Log
 import com.resurgeai.core.data.di.ApplicationScope
 import com.resurgeai.core.data.food.MealsRepository
@@ -52,6 +53,8 @@ data class DayStreakState(
     val habits: List<TodayHabit> = emptyList(),
     /** Health Connect is readable, so sleep and steps can be chosen. */
     val health: Boolean = false,
+    /** Days of the backfill week whose live result differs from what's saved, to save again. */
+    val backfill: List<DayResult> = emptyList(),
 ) {
     val done: Int get() = today.count { it.done == true }
     val total: Int get() = today.size
@@ -74,8 +77,8 @@ class DayStreakEngine @Inject constructor(
 ) {
     private val clock = MutableStateFlow(Instant.now())
     private val health = MutableStateFlow<HealthToday?>(null)
-    /** Yesterday's sleep and steps from its daily summary (today's come live from [health]). */
-    private val yesterdayHealth = MutableStateFlow<Pair<LocalDate, Pair<Int?, Long?>>?>(null)
+    /** Sleep and steps from the daily summaries of the backfill week (today's come live from [health]). */
+    private val recentHealth = MutableStateFlow<Map<LocalDate, Pair<Int?, Long?>>>(emptyMap())
     private val settleLock = Mutex()
     private var settledFor: LocalDate? = null
 
@@ -84,8 +87,8 @@ class DayStreakEngine @Inject constructor(
 
     private val dayData = combine(
         todayHabits(session, habitsRepository, clock),
-        meals.meals(LocalDate.now().minusDays(2)).catch { emit(emptyList()) }.map { list -> list.groupingBy { it.date }.eachCount() },
-        meals.water(LocalDate.now().minusDays(2)).catch { emit(emptyMap()) },
+        meals.meals(Backfill.earliest(LocalDate.now()).minusDays(1)).catch { emit(emptyList()) }.map { list -> list.groupingBy { it.date }.eachCount() },
+        meals.water(Backfill.earliest(LocalDate.now()).minusDays(1)).catch { emit(emptyMap()) },
     ) { (day, habits), mealCounts, water -> DayData(day, habits, mealCounts, water) }
 
     val state: StateFlow<DayStreakState> = combine(
@@ -93,8 +96,8 @@ class DayStreakEngine @Inject constructor(
         profile,
         repository.results(historyStart).catch { emit(emptyList()) },
         health,
-        yesterdayHealth,
-    ) { data, profile, saved, health, yesterday ->
+        recentHealth,
+    ) { data, profile, saved, health, recent ->
         val goals = profile.dayGoals
         val targets = profile.targets
         val ready = health?.ready == true
@@ -106,13 +109,22 @@ class DayStreakEngine @Inject constructor(
             goals, targets, isToday = true,
         )
         val yesterdayItems = DayStreakMath.items(
-            inputs(data, yesterdayDate, yesterday?.takeIf { it.first == yesterdayDate }?.second, ready),
+            inputs(data, yesterdayDate, recent[yesterdayDate], ready),
             goals, targets, isToday = false,
         )
         val yesterdayOpen = DayStreakMath.yesterdayOpen(yesterdayItems)
         val yesterdayResult = if (yesterdayOpen) null else DayStreakMath.settle(yesterdayDate, yesterdayItems)
-        // Saved days stop at the day before yesterday; yesterday is always judged live.
-        val results = saved.filter { it.date.isBefore(yesterdayDate) } + listOfNotNull(yesterdayResult)
+        // The rest of the backfill week is judged live too, so a habit logged late counts; days
+        // before it come from what was saved.
+        val earliest = Backfill.earliest(today)
+        val firstHabit = data.habits.minOfOrNull { it.habit.createdDate }
+        // Until the week's sleep and steps have loaded, the saved results stand (judging without
+        // them would leave those goals out and could turn a missed day into a met one).
+        val window = if (recent.isEmpty()) saved.filter { !it.date.isBefore(earliest) && it.date.isBefore(yesterdayDate) }
+        else Backfill.days(today).filter { it.isBefore(yesterdayDate) && firstHabit != null && !it.isBefore(firstHabit) }.mapNotNull { date ->
+            DayStreakMath.settle(date, DayStreakMath.items(inputs(data, date, recent[date], ready), goals, targets, isToday = false))
+        }
+        val results = saved.filter { it.date.isBefore(earliest) } + window + listOfNotNull(yesterdayResult)
         val todayMet = todayItems.isNotEmpty() && todayItems.all { it.done == true }
         val streak = DayStreakMath.streak(results, today, todayMet, yesterdayDate, yesterdayOpen)
         DayStreakState(
@@ -125,6 +137,7 @@ class DayStreakEngine @Inject constructor(
             week = DayStreakMath.week(streak, today, goals.weeklyDays),
             habits = data.habits,
             health = ready,
+            backfill = window.filterNot { w -> saved.any { it.date == w.date && it.met == w.met && it.done == w.done && it.total == w.total } },
         )
     }.stateIn(scope, SharingStarted.Eagerly, DayStreakState())
 
@@ -133,6 +146,12 @@ class DayStreakEngine @Inject constructor(
         scope.launch {
             state.map { if (it.loaded) it.day else null }.distinctUntilChanged().collect { day ->
                 if (day != null) runCatching { settle(day) }.onFailure { Log.w(TAG, "Settling days failed", it) }
+            }
+        }
+        // A day in the backfill week that changed (a habit logged late) is saved again.
+        scope.launch {
+            state.map { if (it.loaded) it.backfill else emptyList() }.distinctUntilChanged().collect { changed ->
+                if (changed.isNotEmpty()) runCatching { repository.save(changed) }.onFailure { Log.w(TAG, "Saving backfilled days failed", it) }
             }
         }
     }
@@ -171,7 +190,7 @@ class DayStreakEngine @Inject constructor(
         val s = state.value
         val yesterday = today.minusDays(1)
         val summaries = repository.summaries(minOf(yesterday, historyStart))
-        yesterdayHealth.value = yesterday to (summaries[yesterday] ?: (null to null))
+        recentHealth.value = Backfill.days(today).associateWith { summaries[it] ?: (null to null) }
         if (settledFor == today) return@withLock
         val first = s.habits.minOfOrNull { it.habit.createdDate } ?: return@withLock run { settledFor = today }
         val from = maxOf(first, historyStart)

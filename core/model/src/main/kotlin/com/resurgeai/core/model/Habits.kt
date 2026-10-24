@@ -83,7 +83,8 @@ data class HabitStats(
 /**
  * Streak rules (pure, unit-tested):
  * - A habit day runs from the reset time to the next reset; [habitDay] maps an instant to it.
- * - Today never breaks a streak. Yesterday is in its grace period: unlogged = pending, still editable.
+ * - Today never breaks a streak. Yesterday is in its grace period: unlogged = pending. Any day in
+ *   the [Backfill] week can still be logged, which settles it again.
  * - Older unlogged days, and any day explicitly logged as missed, count as missed.
  * - Each habit has one freeze per Sunday–Saturday week. A missed day that would break a running
  *   streak uses that week's freeze instead: the day shows as FROZEN and the streak carries on
@@ -196,4 +197,19 @@ object HabitSuggestions {
 
     fun forGoals(goals: Set<Goal>): List<HabitDraft> =
         (Goal.entries.filter { it in goals }.flatMap { byGoal[it].orEmpty() } + general).distinctBy { it.name }
+}
+
+/**
+ * How far back things can be logged or changed: today and the six days before it. Habits, workouts
+ * and the day streak all use the same week.
+ */
+object Backfill {
+    const val DAYS = 7
+
+    fun earliest(today: LocalDate): LocalDate = today.minusDays(DAYS - 1L)
+
+    fun allows(date: LocalDate, today: LocalDate): Boolean = !date.isAfter(today) && !date.isBefore(earliest(today))
+
+    /** The window, oldest first. */
+    fun days(today: LocalDate): List<LocalDate> = (DAYS - 1 downTo 0).map { today.minusDays(it.toLong()) }
 }

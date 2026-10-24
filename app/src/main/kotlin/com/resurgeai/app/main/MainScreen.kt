@@ -1,5 +1,10 @@
 package com.resurgeai.app.main
 
+import com.resurgeai.feature.fitness.PlanRoute
+import androidx.compose.runtime.mutableIntStateOf
+import com.resurgeai.feature.fitness.SessionLoggerRoute
+import com.resurgeai.core.model.wire
+import com.resurgeai.core.model.PlanDay
 import androidx.compose.animation.core.LinearEasing
 import dev.chrisbanes.haze.HazeProgressive
 import androidx.compose.ui.graphics.Color
@@ -129,6 +134,12 @@ import com.resurgeai.feature.scale.SmartScaleRoute as SmartScaleScreen
 /** Log a workout ([activityId]) or edit one ([workoutId]). */
 @Serializable data class WorkoutEditorRoute(val workoutId: String? = null, val activityId: String? = null)
 
+/** The training plan in full, with rebuilding. */
+@Serializable data object PlanScreenRoute
+
+/** The tap-through logger for the plan's session on [day] ("mon" … "sun"). */
+@Serializable data class SessionLogRoute(val day: String)
+
 /** Scan / photo / type / log again. [mode] "scan" opens the camera, "type" focuses the text field. */
 @Serializable data class FoodLogRoute(val mode: String? = null)
 
@@ -256,9 +267,13 @@ fun MainScreen(
                 onOpenHabit = { id -> rootNav.navigate(HabitDetailRoute(id)) },
                 onAddHabit = { rootNav.navigate(HabitEditorRoute()) },
                 onLogWorkout = { rootNav.navigate(ActivityPickerRoute()) },
-                onStartWorkout = { activityId ->
-                    if (activityId != null) rootNav.navigate(WorkoutEditorRoute(activityId = activityId)) else rootNav.navigate(ActivityPickerRoute())
+                // A planned strength session opens the tap-through logger; cardio opens the editor for its activity.
+                onStartSession = { day ->
+                    if (day.exercises.isNotEmpty()) rootNav.navigate(SessionLogRoute(day.day.wire))
+                    else rootNav.navigate(WorkoutEditorRoute(activityId = day.activityId))
                 },
+                onLogActivity = { id -> rootNav.navigate(WorkoutEditorRoute(activityId = id)) },
+                onOpenPlan = { rootNav.navigate(PlanScreenRoute) },
                 onOpenWorkout = { id -> rootNav.navigate(WorkoutEditorRoute(workoutId = id)) },
                 onLogMeal = { rootNav.navigate(FoodLogRoute()) },
                 onScanMeal = { rootNav.navigate(FoodLogRoute(mode = "scan")) },
@@ -302,6 +317,12 @@ fun MainScreen(
                     onBack = { rootNav.popBackStack() },
                 )
             }
+        }
+        composable<PlanScreenRoute> {
+            FullScreen { PlanRoute(onBack = { rootNav.popBackStack() }) }
+        }
+        composable<SessionLogRoute> {
+            FullScreen { SessionLoggerRoute(onClose = { rootNav.popBackStack() }) }
         }
         composable<WorkoutEditorRoute> { entry ->
             val picked by entry.savedStateHandle.getStateFlow<String?>(PICKED_ACTIVITY, null).collectAsStateWithLifecycle()
@@ -445,7 +466,9 @@ private fun TabsShell(
     onOpenHabit: (String) -> Unit,
     onAddHabit: () -> Unit,
     onLogWorkout: () -> Unit,
-    onStartWorkout: (String?) -> Unit,
+    onStartSession: (PlanDay) -> Unit,
+    onLogActivity: (String) -> Unit,
+    onOpenPlan: () -> Unit,
     onOpenWorkout: (String) -> Unit,
     onLogMeal: () -> Unit,
     onScanMeal: () -> Unit,
@@ -457,6 +480,8 @@ private fun TabsShell(
 ) {
     val tabsNav = rememberNavController()
     val headerHaze = remember { HazeState() }
+    // The Fitness header's "+" opens quick add on the tab.
+    var fitnessQuickAdd by remember { mutableIntStateOf(0) }
     // The habit reminder notification opens the Habits tab.
     LaunchedEffect(openHabitsSignal) {
         if (openHabitsSignal > 0) {
@@ -499,11 +524,20 @@ private fun TabsShell(
                         onOpenHabit = onOpenHabit,
                         onAddHabit = onAddHabit,
                         onOpenHabits = { tabsNav.switchTab(HabitsRoute) },
-                        onStartWorkout = onStartWorkout,
+                        onStartSession = onStartSession,
                         reelCard = { ReelReadyCard(onPlay = onOpenReel, modifier = Modifier.padding(bottom = 12.dp)) },
                     )
                 }
-                composable<FitnessRoute> { FitnessScreenRoute(onOpenWorkout = onOpenWorkout, onLogWorkout = onLogWorkout) }
+                composable<FitnessRoute> {
+                    FitnessScreenRoute(
+                        onOpenWorkout = onOpenWorkout,
+                        onLogWorkout = onLogWorkout,
+                        onLogActivity = onLogActivity,
+                        onStartSession = onStartSession,
+                        quickAddSignal = fitnessQuickAdd,
+                        onOpenPlan = onOpenPlan,
+                    )
+                }
                 composable<FoodRoute> { FoodScreenRoute(onOpenMeal = onOpenMeal, onLogMeal = onLogMeal) }
                 composable<HabitsRoute> { HabitsScreenRoute(onOpenHabit = onOpenHabit, onAddHabit = onAddHabit) }
             }
@@ -525,7 +559,7 @@ private fun TabsShell(
             trailing = {
                 // Fitness and Food get a "+" to log, left of the profile photo.
                 val onAdd = when (currentTab) {
-                    Tab.Fitness -> onLogWorkout
+                    Tab.Fitness -> { { fitnessQuickAdd += 1 } }
                     Tab.Food -> onLogMeal
                     else -> null
                 }
