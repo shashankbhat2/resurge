@@ -103,6 +103,8 @@ data class DashboardUiState(
     val plan: WorkoutPlan? = null,
     /** Today's list collapsed to a row of boxes (remembered on this device). */
     val compactList: Boolean = false,
+    /** Recovery, Effort and Fuel by day. */
+    val scores: ScoreHistory = ScoreHistory(),
 ) {
     /** The latest insight, pinned above the tide until it's seen. */
     val pinnedInsight: CoachInsight? get() = latestInsight?.takeIf { !it.seen && it.id !in dismissedInsights }
@@ -138,6 +140,7 @@ class DashboardViewModel @Inject constructor(
     private val streakEngine: DayStreakEngine,
     private val users: UserRepository,
     private val plans: PlanRepository,
+    private val scoresEngine: ScoresEngine,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
     private val _state = MutableStateFlow(DashboardUiState())
@@ -226,6 +229,9 @@ class DashboardViewModel @Inject constructor(
                 }
         }
         viewModelScope.launch {
+            scoresEngine.state.collect { s -> _state.update { it.copy(scores = s) } }
+        }
+        viewModelScope.launch {
             preferences.todayListCompact.collect { on -> _state.update { it.copy(compactList = on) } }
         }
         viewModelScope.launch {
@@ -290,6 +296,7 @@ class DashboardViewModel @Inject constructor(
         val now = SystemClock.elapsedRealtime()
         clock.value = Instant.now()
         streakEngine.tick()
+        scoresEngine.refresh(force)
         if (!force && loadJob?.isActive == true) return
         if (!force && now - lastLoadedAt < MIN_REFRESH_INTERVAL_MS && _state.value.today != null) return
         loadJob = viewModelScope.launch { load() }

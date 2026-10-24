@@ -47,6 +47,7 @@ import com.resurgeai.core.model.HabitSettings
 import com.resurgeai.core.model.HealthMetric
 import com.resurgeai.core.model.PlanDay
 import com.resurgeai.core.model.PlanMatch
+import com.resurgeai.core.model.ScoreKind
 import com.resurgeai.core.model.SourceKind
 import com.resurgeai.core.model.Targets
 import com.resurgeai.core.model.UnitSystem
@@ -63,6 +64,8 @@ fun TodayRoute(
     onOpenHabits: () -> Unit = {},
     /** Starts today's planned session: the session logger for strength, the editor for cardio. */
     onStartSession: (PlanDay) -> Unit = {},
+    /** Opens a score's detail at the period shown on Today. */
+    onOpenScore: (ScoreKind, ScorePeriod) -> Unit = { _, _ -> },
     /** A new progress reel, when there is one (supplied by the app). */
     reelCard: (@Composable () -> Unit)? = null,
     viewModel: DashboardViewModel = hiltViewModel(),
@@ -93,6 +96,7 @@ fun TodayRoute(
         onAddHabit = onAddHabit,
         onOpenHabits = onOpenHabits,
         onStartSession = onStartSession,
+        onOpenScore = onOpenScore,
         onCompactListChange = viewModel::setCompactList,
         onDismissDayComplete = viewModel::dismissDayComplete,
         onSaveDayGoals = viewModel::saveDayGoals,
@@ -125,6 +129,7 @@ fun TodayScreen(
     onAddHabit: () -> Unit = {},
     onOpenHabits: () -> Unit = {},
     onStartSession: (PlanDay) -> Unit = {},
+    onOpenScore: (ScoreKind, ScorePeriod) -> Unit = { _, _ -> },
     onCompactListChange: (Boolean) -> Unit = {},
     onDismissDayComplete: () -> Unit = {},
     onSaveDayGoals: (DayGoals) -> Unit = {},
@@ -149,6 +154,7 @@ fun TodayScreen(
     val units = state.profile?.units ?: UnitSystem.METRIC
     val losingWeight = goal?.takeIf { it.type.byWeight }?.let { g -> (g.targetKg ?: 0.0) < (g.startKg ?: 0.0) }
     var detail by rememberSaveable { mutableStateOf<StreakDetail?>(null) }
+    var scorePeriod by rememberSaveable { mutableStateOf(ScorePeriod.TODAY) }
     Column(
         Modifier
             .fillMaxSize()
@@ -157,7 +163,9 @@ fun TodayScreen(
     ) {
         Spacer(Modifier.height(LocalHeaderInset.current + 4.dp))
         StreakHero(state.streak) { detail = StreakDetail.STREAK }
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(14.dp))
+        ScoreRings(state.scores, scorePeriod, onPeriodChange = { scorePeriod = it }, onOpen = { onOpenScore(it, scorePeriod) })
+        Spacer(Modifier.height(10.dp))
         WeekCard(state.streak, goal, today) { detail = StreakDetail.WEEK }
         goal?.let { g ->
             Spacer(Modifier.height(10.dp))

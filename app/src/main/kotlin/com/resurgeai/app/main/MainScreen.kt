@@ -83,6 +83,9 @@ import com.resurgeai.core.model.HealthMetric
 import com.resurgeai.core.model.UserProfile
 import com.resurgeai.feature.dashboard.TodayRoute as TodayScreenRoute
 import com.resurgeai.feature.dashboard.detail.MetricDetailRoute as MetricDetailScreenRoute
+import com.resurgeai.feature.dashboard.detail.ScoreDetailRoute as ScoreDetailScreenRoute
+import com.resurgeai.feature.dashboard.ScorePeriod
+import com.resurgeai.core.model.ScoreKind
 import com.resurgeai.feature.dashboard.sources.MetricSourcesRoute as MetricSourcesScreenRoute
 import com.resurgeai.feature.coach.CoachRoute as CoachScreen
 import com.resurgeai.feature.coach.InsightsRoute as InsightsScreen
@@ -136,6 +139,7 @@ import com.resurgeai.feature.scale.SmartScaleRoute as SmartScaleScreen
 
 /** The training plan in full, with rebuilding. */
 @Serializable data object PlanScreenRoute
+@Serializable data class ScoreDetailRoute(val kind: String, val period: String)
 
 /** The tap-through logger for the plan's session on [day] ("mon" … "sun"). */
 @Serializable data class SessionLogRoute(val day: String)
@@ -261,6 +265,7 @@ fun MainScreen(
                     // Weight is logged in Resurge now, with its own screen.
                     if (metric == HealthMetric.WEIGHT) rootNav.navigate(WeightScreenRoute()) else rootNav.navigate(MetricDetailRoute(metric.name))
                 },
+                onOpenScore = { kind, period -> rootNav.navigate(ScoreDetailRoute(kind.name, period.name)) },
                 onOpenSettings = { rootNav.navigate(SettingsRoute) },
                 onOpenCoach = { rootNav.navigate(CoachScreenRoute(newChat = true)) },
                 onOpenInsights = { rootNav.navigate(InsightsScreenRoute) },
@@ -425,6 +430,15 @@ fun MainScreen(
                 )
             }
         }
+        composable<ScoreDetailRoute> {
+            FullScreen {
+                ScoreDetailScreenRoute(
+                    onBack = { rootNav.popBackStack() },
+                    onOpenMetric = { metric -> rootNav.navigate(MetricDetailRoute(metric.name)) },
+                    onOpenScore = { kind -> rootNav.navigate(ScoreDetailRoute(kind.name, ScorePeriod.WEEK.name)) },
+                )
+            }
+        }
         composable<MetricSourcesRoute> {
             FullScreen { MetricSourcesScreenRoute(onBack = { rootNav.popBackStack() }) }
         }
@@ -460,6 +474,7 @@ private fun FullScreen(content: @Composable () -> Unit) {
 private fun TabsShell(
     profile: UserProfile,
     onOpenMetric: (HealthMetric) -> Unit,
+    onOpenScore: (ScoreKind, ScorePeriod) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenCoach: () -> Unit,
     onOpenInsights: () -> Unit,
@@ -525,6 +540,7 @@ private fun TabsShell(
                         onAddHabit = onAddHabit,
                         onOpenHabits = { tabsNav.switchTab(HabitsRoute) },
                         onStartSession = onStartSession,
+                        onOpenScore = onOpenScore,
                         reelCard = { ReelReadyCard(onPlay = onOpenReel, modifier = Modifier.padding(bottom = 12.dp)) },
                     )
                 }

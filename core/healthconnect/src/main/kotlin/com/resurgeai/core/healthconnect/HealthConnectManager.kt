@@ -12,6 +12,7 @@ import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.DistanceRecord
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.HeartRateVariabilityRmssdRecord
 import androidx.health.connect.client.records.RestingHeartRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
@@ -36,6 +37,13 @@ object HealthPermissions {
         HealthPermission.getReadPermission(RestingHeartRateRecord::class),
         HealthPermission.getReadPermission(WeightRecord::class),
     )
+
+    /** Asked for alongside [READ] but not needed for the dashboard to count as fully connected. */
+    val OPTIONAL: Set<String> = setOf(
+        HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class),
+    )
+
+    val HRV: String = HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class)
 
     const val BACKGROUND = HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND
 
@@ -74,8 +82,8 @@ class HealthConnectManager @Inject constructor(
 
     /** Permissions to request: all dashboard reads, plus background read where supported. */
     fun permissionsToRequest(): Set<String> =
-        if (isBackgroundReadSupported()) HealthPermissions.READ + HealthPermissions.BACKGROUND
-        else HealthPermissions.READ
+        if (isBackgroundReadSupported()) HealthPermissions.READ + HealthPermissions.OPTIONAL + HealthPermissions.BACKGROUND
+        else HealthPermissions.READ + HealthPermissions.OPTIONAL
 
     fun permissionContract(): ActivityResultContract<Set<String>, Set<String>> =
         PermissionController.createRequestPermissionResultContract()

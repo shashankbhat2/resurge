@@ -7,6 +7,7 @@ import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.DistanceRecord
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.HeartRateVariabilityRmssdRecord
 import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.records.RestingHeartRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
@@ -165,6 +166,22 @@ class HealthDataSource @Inject constructor(
     suspend fun exerciseSessionsBetween(from: Instant, to: Instant): List<ExerciseSession> =
         if (HealthPermission.getReadPermission(ExerciseSessionRecord::class) in manager.grantedPermissions()) exerciseSessions(from, to)
         else emptyList()
+
+    /** Resting heart rate per day (the day's average reading) over [from, to). */
+    suspend fun restingHeartRateByDay(from: Instant, to: Instant, zone: ZoneId = ZoneId.systemDefault()): Map<LocalDate, Double> {
+        if (HealthPermission.getReadPermission(RestingHeartRateRecord::class) !in manager.grantedPermissions()) return emptyMap()
+        return readAll(RestingHeartRateRecord::class, TimeRangeFilter.between(from, to), maxPages = 10)
+            .groupBy { it.time.atZone(zone).toLocalDate() }
+            .mapValues { (_, r) -> r.map { it.beatsPerMinute.toDouble() }.average() }
+    }
+
+    /** Heart rate variability (RMSSD, ms) per day over [from, to); empty without the optional permission. */
+    suspend fun hrvByDay(from: Instant, to: Instant, zone: ZoneId = ZoneId.systemDefault()): Map<LocalDate, Double> {
+        if (HealthPermissions.HRV !in manager.grantedPermissions()) return emptyMap()
+        return readAll(HeartRateVariabilityRmssdRecord::class, TimeRangeFilter.between(from, to), maxPages = 20)
+            .groupBy { it.time.atZone(zone).toLocalDate() }
+            .mapValues { (_, r) -> r.map { it.heartRateVariabilityMillis }.average() }
+    }
 
     /** Most recent weight in the last 30 days, for calorie estimates. */
     suspend fun latestWeight(): Double? =
