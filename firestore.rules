@@ -96,6 +96,26 @@ service cloud.firestore {
         && r.done is int && r.total is int && r.done >= 0 && r.done <= r.total && r.total <= 60;
     }
 
+    function isScore(v) {
+      return v == null || (v is int && v >= 0 && v <= 100);
+    }
+
+    function isWhy(v) {
+      return v == null || (v is string && v.size() <= 300);
+    }
+
+    function validDayScore(date) {
+      let s = request.resource.data;
+      return isDay(date)
+        && s.keys().hasOnly(['date', 'recovery', 'effort', 'fuel', 'recoveryWhy', 'effortWhy', 'fuelWhy',
+                             'effortLow', 'effortHigh', 'soFar', 'updatedAt'])
+        && s.date == date
+        && isScore(s.get('recovery', null)) && isScore(s.get('effort', null)) && isScore(s.get('fuel', null))
+        && isScore(s.get('effortLow', null)) && isScore(s.get('effortHigh', null))
+        && isWhy(s.get('recoveryWhy', null)) && isWhy(s.get('effortWhy', null)) && isWhy(s.get('fuelWhy', null))
+        && (!('soFar' in s) || s.soFar is bool);
+    }
+
     function validReminderTimes(m) {
       return (!('breakfast' in m) || m.breakfast == 'off' || isClock(m.breakfast))
         && (!('lunch' in m) || m.lunch == 'off' || isClock(m.lunch))
@@ -330,6 +350,12 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      match /dayScores/{date} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validDayScore(date);
+        allow delete: if false;
+      }
+
       match /progressPhotos/{photoId} {
         allow read, delete: if isOwner(uid);
         allow create, update: if isOwner(uid) && validProgressPhoto();
@@ -379,7 +405,7 @@ service cloud.firestore {
         allow read, write: if isOwner(uid)
           && !(collection in ['events', 'devices', 'insights', 'usage', 'coachThreads', 'habits', 'habitDays',
                               'workouts', 'meals', 'waterDays', 'weights', 'weightGoal',
-                              'progressPhotos', 'progressKey', 'progressReels', 'progressSettings', 'dayResults']);
+                              'progressPhotos', 'progressKey', 'progressReels', 'progressSettings', 'dayResults', 'dayScores']);
       }
     }
 

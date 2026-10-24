@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import androidx.lifecycle.SavedStateHandle
 import javax.inject.Inject
 
 data class PlanUiState(
@@ -37,6 +38,8 @@ data class PlanUiState(
     val building: Boolean = false,
     val error: String? = null,
     val saving: Boolean = false,
+    /** A change the coach offered, being built (or built) into the draft. */
+    val coachChange: String? = null,
 )
 
 /**
@@ -45,6 +48,7 @@ data class PlanUiState(
  */
 @HiltViewModel
 class PlanViewModel @Inject constructor(
+    private val savedState: SavedStateHandle,
     sessionRepository: SessionRepository,
     private val plans: PlanRepository,
     private val users: UserRepository,
@@ -67,6 +71,13 @@ class PlanViewModel @Inject constructor(
                         units = p.units,
                         plan = plan,
                     )
+                }
+                // Opened from the coach's button: build its change once, as a draft to review.
+                val change = savedState.get<String>(ARG_CHANGE)?.takeIf { it.isNotBlank() }
+                if (change != null && plan != null) {
+                    savedState[ARG_CHANGE] = null
+                    _state.update { it.copy(coachChange = change) }
+                    rebuild(change)
                 }
             }
         }
@@ -102,10 +113,15 @@ class PlanViewModel @Inject constructor(
         _state.update { it.copy(saving = true, error = null) }
         viewModelScope.launch {
             runCatching { users.setActivePlan(uid, draft.id, s.draftTraining ?: s.training) }
-                .onSuccess { _state.update { it.copy(saving = false, plan = draft, training = s.draftTraining ?: s.training, draft = null, draftTraining = null) } }
+                .onSuccess { _state.update { it.copy(saving = false, plan = draft, training = s.draftTraining ?: s.training, draft = null, draftTraining = null, coachChange = null) } }
                 .onFailure { _state.update { it.copy(saving = false, error = "Couldn't switch plans. Try again.") } }
         }
     }
 
-    fun discard() = _state.update { it.copy(draft = null, draftTraining = null, error = null) }
+    fun discard() = _state.update { it.copy(draft = null, draftTraining = null, error = null, coachChange = null) }
+
+    companion object {
+        /** Must match the property name in the navigation route. */
+        const val ARG_CHANGE = "change"
+    }
 }

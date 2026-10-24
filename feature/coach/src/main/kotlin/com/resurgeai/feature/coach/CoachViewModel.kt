@@ -9,6 +9,7 @@ import com.resurgeai.core.model.CoachStyle
 import com.resurgeai.core.model.SessionState
 import kotlinx.coroutines.flow.filterIsInstance
 import com.resurgeai.core.model.ChatEvent
+import com.resurgeai.core.model.CoachInsight
 import com.resurgeai.core.model.CoachModel
 import com.resurgeai.core.model.CoachThread
 import com.resurgeai.core.model.CoachTurn
@@ -42,11 +43,34 @@ data class CoachUiState(
     val turns: List<CoachTurn> = emptyList(),
     val pending: PendingReply? = null,
     val model: CoachModel = CoachModel.FAST,
-    val showHistory: Boolean = false,
     /** Selected persona; picks the coach mascot. */
     val coachStyle: CoachStyle = CoachStyle.FRIEND,
     val error: String? = null,
+    /** The insight a new chat is about (opened with "Ask about this"). */
+    val insight: CoachInsight? = null,
+    /** They follow a plan, so plan changes can be offered and asked about. */
+    val hasPlan: Boolean = false,
+    /** Plan changes waved off with "Not now", by turn id. */
+    val dismissedOffers: Set<String> = emptySet(),
 ) {
+    /** What the conversation is about, for the card at the top: the insight, or the one the thread came from. */
+    val aboutTitle: String? get() = insight?.title ?: threads.firstOrNull { it.id == threadId }?.insightTitle
+
+    /** Quick questions above the composer, fitted to what's open. */
+    val suggestions: List<String> get() = buildList {
+        if (aboutTitle != null) {
+            add("What should I do differently?")
+            add("Explain the numbers")
+        }
+        if (hasPlan) {
+            add("What's today's session?")
+            add("Change this week's plan")
+        } else add("Help me build a plan")
+        add("How's my week going?")
+        add("Why is my Recovery where it is?")
+        add("Ideas to hit my protein")
+    }.distinct().take(4)
+
     val sending: Boolean get() = pending != null && !pending.done
 
     /**
@@ -64,6 +88,12 @@ class CoachViewModel @Inject constructor(
     sessionRepository: SessionRepository,
     private val savedState: SavedStateHandle,
 ) : ViewModel() {
+    /** Opened on an existing conversation (from the chats list). */
+    private val openThreadId: String? = savedState.get<String>(THREAD_KEY)
+
+    /** Opened from an insight: a new chat about it until the first message makes a thread. */
+    private val insightId: String? = savedState.get<String>(INSIGHT_KEY)
+
     private val _state = MutableStateFlow(CoachUiState())
     val state: StateFlow<CoachUiState> = _state.asStateFlow()
 
@@ -71,12 +101,18 @@ class CoachViewModel @Inject constructor(
     private var sendJob: Job? = null
 
     /** Opened from the navbar: start on an empty conversation instead of the latest one. */
-    private var startNew: Boolean = savedState.get<Boolean>(NEW_CHAT_KEY) == true
+    private var startNew: Boolean = savedState.get<Boolean>(NEW_CHAT_KEY) == true || insightId != null
 
     init {
+        openThreadId?.let { threadId.value = it }
         viewModelScope.launch {
             sessionRepository.session.filterIsInstance<SessionState.Ready>().collect { s ->
-                _state.update { it.copy(coachStyle = s.profile.coachStyle) }
+                _state.update { it.copy(coachStyle = s.profile.coachStyle, hasPlan = s.profile.activePlanId != null) }
+            }
+        }
+        if (insightId != null && openThreadId == null) {
+            viewModelScope.launch {
+                repository.insight(insightId).catch { emit(null) }.collect { i -> _state.update { it.copy(insight = i) } }
             }
         }
         viewModelScope.launch {
@@ -112,19 +148,14 @@ class CoachViewModel @Inject constructor(
 
     fun selectModel(model: CoachModel) = _state.update { it.copy(model = model) }
 
-    fun toggleHistory() = _state.update { it.copy(showHistory = !it.showHistory) }
-
-    fun openThread(id: String) {
-        if (_state.value.sending) return
-        threadId.value = id
-        _state.update { it.copy(showHistory = false, pending = null, error = null) }
-    }
-
     fun newChat() {
         if (_state.value.sending) return
         threadId.value = null
-        _state.update { it.copy(showHistory = false, pending = null, error = null, turns = emptyList()) }
+        _state.update { it.copy(pending = null, error = null, turns = emptyList(), insight = null) }
     }
+
+    /** "Not now" on a plan change: hides its buttons in this conversation. */
+    fun dismissOffer(turnId: String) = _state.update { it.copy(dismissedOffers = it.dismissedOffers + turnId) }
 
     fun dismissError() = _state.update { it.copy(error = null) }
 
@@ -135,13 +166,14 @@ class CoachViewModel @Inject constructor(
         val current = _state.value
         _state.update {
             it.copy(
-                showHistory = false,
                 error = null,
                 pending = PendingReply(userText = trimmed, baseline = current.turns.size),
             )
         }
         sendJob = viewModelScope.launch {
-            repository.send(threadId.value, trimmed, current.model).collect { event ->
+            // Only a new thread carries the insight; once the thread exists it's part of it.
+            val about = current.insight?.id?.takeIf { threadId.value == null }
+            repository.send(threadId.value, trimmed, current.model, about).collect { event ->
                 when (event) {
                     is ChatEvent.Thread -> if (threadId.value != event.threadId) threadId.value = event.threadId
                     is ChatEvent.Delta -> _state.update { s ->
@@ -164,7 +196,9 @@ class CoachViewModel @Inject constructor(
     }
 
     companion object {
-        /** Name of the optional `newChat` argument on the coach route. */
+        /** Names of the optional arguments on the coach route. */
         const val NEW_CHAT_KEY = "newChat"
+        const val THREAD_KEY = "threadId"
+        const val INSIGHT_KEY = "insightId"
     }
 }

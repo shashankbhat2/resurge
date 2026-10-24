@@ -16,6 +16,7 @@ import com.resurgeai.core.model.CoachThread
 import com.resurgeai.core.model.CoachTurn
 import com.resurgeai.core.model.InsightHighlight
 import com.resurgeai.core.model.InsightKind
+import com.resurgeai.core.model.PlanChangeOffer
 import com.resurgeai.core.model.TurnRole
 import com.resurgeai.core.model.WeeklyArea
 import com.resurgeai.core.model.WeeklyDetails
@@ -52,6 +53,18 @@ class CoachRepository @Inject constructor(
     }
 
     /** Marks an insight seen (dismissed from Today). The rules let the client change only `seen` and `seenAt`. */
+    /** One insight, live (for its own page). */
+    fun insight(id: String): Flow<CoachInsight?> {
+        val ref = user() ?: return flowOf(null)
+        return callbackFlow {
+            val reg = ref.collection("insights").document(id).addSnapshotListener { snap, err ->
+                if (err != null) { close(err); return@addSnapshotListener }
+                trySend(snap?.takeIf { it.exists() }?.let(::toInsight))
+            }
+            awaitClose { reg.remove() }
+        }
+    }
+
     fun markSeen(insightId: String) {
         user()?.collection("insights")?.document(insightId)?.update(mapOf("seen" to true, "seenAt" to FieldValue.serverTimestamp()))
     }
@@ -65,6 +78,8 @@ class CoachRepository @Inject constructor(
                     title = it.getString("title") ?: "Conversation",
                     updatedAt = it.getTimestamp("updatedAt")?.toInstant(),
                     preview = it.getString("lastPreview"),
+                    insightId = it.getString("insightId"),
+                    insightTitle = it.getString("insightTitle"),
                 )
             }
         }
@@ -82,17 +97,21 @@ class CoachRepository @Inject constructor(
                     text = text,
                     model = CoachModel.fromWire(d.getString("model")),
                     notice = d.getString("kind") == "notice",
+                    offer = (d.get("action") as? Map<*, *>)?.takeIf { it["type"] == "plan_change" }?.let { a ->
+                        val change = a["change"] as? String ?: return@let null
+                        PlanChangeOffer(change, a["label"] as? String ?: "Update my plan")
+                    },
                 )
             }
         }
     }
 
     /** Sends a message; emits the thread id, streamed text, tool use, then Done (or Failed). */
-    fun send(threadId: String?, text: String, model: CoachModel): Flow<ChatEvent> {
+    fun send(threadId: String?, text: String, model: CoachModel, insightId: String? = null): Flow<ChatEvent> {
         val data = buildMap {
             put("text", text)
             put("model", model.wire)
-            if (threadId != null) put("threadId", threadId)
+            if (threadId != null) put("threadId", threadId) else if (insightId != null) put("insightId", insightId)
         }
         return functions.getHttpsCallable("coachChat")
             .withTimeout(5, TimeUnit.MINUTES)
@@ -164,12 +183,15 @@ class CoachRepository @Inject constructor(
                 summary = d.getString("summary").orEmpty(),
                 wins = (d.get("wins") as? List<String>).orEmpty(),
                 areas = (d.get("areas") as? List<Map<String, Any?>>).orEmpty().map {
-                    WeeklyArea(it["area"] as? String ?: "", it["trend"] as? String ?: "steady", it["note"] as? String ?: "")
+                    WeeklyArea(it["area"] as? String ?: "", it["trend"] as? String ?: "steady", it["note"] as? String ?: "", it["value"] as? String ?: "")
                 },
                 focus = (d.get("focus") as? List<String>).orEmpty(),
                 weekStart = d.getString("weekStart"),
                 weekEnd = d.getString("weekEnd"),
                 habits = d.getString("habits").orEmpty(),
+                days = (d.get("days") as? List<Map<String, Any?>>).orEmpty().map { it["met"] as? Boolean },
+                goodDays = d.getLong("goodDays")?.toInt(),
+                target = d.getLong("target")?.toInt(),
             )
         } else null
         return CoachInsight(

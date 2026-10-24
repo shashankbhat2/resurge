@@ -1,5 +1,5 @@
 import { db, userDoc } from "./firebase";
-import type { ActivityEvent, DailySummary, UserProfile } from "./types";
+import type { ActivityEvent, DailySummary, DayResult, DayScore, StoredPlan, UserProfile } from "./types";
 
 /** Firestore reads used to build prompts and serve tools. All scoped to one user. */
 
@@ -17,6 +17,25 @@ export async function loadSummaries(uid: string, from: string, to: string): Prom
   return snap.docs.map((d) => d.data() as DailySummary);
 }
 
+/** The plan the person follows, or null without one. */
+export async function loadPlan(uid: string, planId: string | null | undefined): Promise<StoredPlan | null> {
+  if (!planId) return null;
+  const snap = await userDoc(uid).collection("plans").doc(planId).get();
+  return snap.exists ? (snap.data() as StoredPlan) : null;
+}
+
+/** Streak results with from <= date <= to. */
+export async function loadDayResults(uid: string, from: string, to: string): Promise<DayResult[]> {
+  const snap = await userDoc(uid).collection("dayResults").where("date", ">=", from).where("date", "<=", to).get();
+  return snap.docs.map((d) => d.data() as DayResult);
+}
+
+/** Daily scores with from <= date <= to. */
+export async function loadDayScores(uid: string, from: string, to: string): Promise<DayScore[]> {
+  const snap = await userDoc(uid).collection("dayScores").where("date", ">=", from).where("date", "<=", to).get();
+  return snap.docs.map((d) => d.data() as DayScore);
+}
+
 export async function loadEvents(
   uid: string,
   sinceMs: number,
@@ -31,6 +50,9 @@ export async function loadEvents(
 
 export interface StoredInsight {
   kind: "activity" | "sleep" | "weekly";
+  category?: string;
+  suggestion?: string;
+  highlights?: { label: string; value: string }[];
   title?: string;
   headline?: string;
   body?: string;
@@ -46,6 +68,21 @@ export async function loadRecentInsights(uid: string, sinceMs: number, limit = 2
     .limit(limit)
     .get();
   return snap.docs.map((d) => d.data() as StoredInsight);
+}
+
+export async function loadInsight(uid: string, id: string): Promise<StoredInsight | null> {
+  const snap = await userDoc(uid).collection("insights").doc(id).get();
+  return snap.exists ? (snap.data() as StoredInsight) : null;
+}
+
+/** One insight in full, for a chat about it. */
+export function formatInsight(i: StoredInsight): string {
+  const lines = [`Title: ${i.title ?? i.headline ?? ""}`, `Written: ${i.createdAt.toDate().toISOString().slice(0, 10)} (${i.kind})`];
+  const body = i.body ?? i.summary;
+  if (body) lines.push(body);
+  if (i.highlights?.length) lines.push(`Numbers: ${i.highlights.map((h) => `${h.label} ${h.value}`).join("; ")}`);
+  if (i.suggestion) lines.push(`Suggested: ${i.suggestion}`);
+  return lines.join("\n");
 }
 
 export function formatInsightList(items: StoredInsight[]): string {

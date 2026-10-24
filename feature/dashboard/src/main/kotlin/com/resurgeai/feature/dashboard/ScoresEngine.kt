@@ -6,6 +6,8 @@ import com.resurgeai.core.data.di.ApplicationScope
 import com.resurgeai.core.data.fitness.WorkoutsRepository
 import com.resurgeai.core.data.food.MealsRepository
 import com.resurgeai.core.data.plan.PlanRepository
+import com.resurgeai.core.data.scores.DayScoreRecord
+import com.resurgeai.core.data.scores.DayScoresRepository
 import com.resurgeai.core.data.session.SessionRepository
 import com.resurgeai.core.data.weight.WeightRepository
 import com.resurgeai.core.healthconnect.HealthConnectAvailability
@@ -100,6 +102,7 @@ class ScoresEngine @javax.inject.Inject constructor(
     meals: MealsRepository,
     weights: WeightRepository,
     private val plans: PlanRepository,
+    private val saved: DayScoresRepository,
     @param:ApplicationScope private val scope: CoroutineScope,
 ) {
     private val zone: ZoneId get() = ZoneId.systemDefault()
@@ -128,6 +131,25 @@ class ScoresEngine @javax.inject.Inject constructor(
     }
         .catch { Log.w(TAG, "Scores failed", it); emit(ScoreHistory(loaded = true)) }
         .stateIn(scope, SharingStarted.Eagerly, ScoreHistory())
+
+    /** What was last saved per day, so only changed days are written. */
+    private val written = mutableMapOf<LocalDate, Map<String, Any?>>()
+
+    init {
+        // The coach and weekly review read the last two weeks; save days whose scores changed.
+        scope.launch {
+            state.collect { h ->
+                if (!h.loaded || h.days.isEmpty()) return@collect
+                val changed = h.days.takeLast(SAVED_DAYS)
+                    .map { DayScoreRecord(it.recovery.date, it.recovery, it.effort, it.fuel) }
+                    .filter { written[it.date] != it.toMap() }
+                if (changed.isEmpty()) return@collect
+                runCatching { saved.save(changed) }
+                    .onSuccess { changed.forEach { written[it.date] = it.toMap() } }
+                    .onFailure { Log.w(TAG, "Saving scores failed", it) }
+            }
+        }
+    }
 
     /** Reads Health Connect again unless it was read in the last few minutes; always re-checks the clock. */
     fun refresh(force: Boolean = false) {
@@ -288,6 +310,8 @@ class ScoresEngine @javax.inject.Inject constructor(
         /** Days of history behind each day's normals. */
         const val HISTORY = 28L
         const val MIN_READ_INTERVAL_MS = 5 * 60_000L
+        /** Days of scores kept in Firestore for the coach. */
+        const val SAVED_DAYS = 14
         /** Effort counts as "so far" until 21:00. */
         const val EFFORT_DAY_END = 21 * 60
 

@@ -50,6 +50,8 @@ class FeedActions(
     val onOpenWorkout: (String) -> Unit = {},
     val onOpenSleep: () -> Unit = {},
     val onOpenInsights: () -> Unit = {},
+    /** Opens one insight's page. */
+    val onOpenInsight: (String) -> Unit = {},
 )
 
 // --- Feed ---
@@ -75,7 +77,7 @@ internal fun Feed(days: List<FeedDay>, today: LocalDate, units: UnitSystem, comm
                     is FeedItem.MealEntry -> MealRow(item.meal) { actions.onOpenMeal(item.meal.id) }
                     is FeedItem.WorkoutEntry -> WorkoutRow(item.workout, units) { actions.onOpenWorkout(item.workout.id) }
                     is FeedItem.SleepEntry -> SleepRow(item.session, actions.onOpenSleep)
-                    is FeedItem.InsightEntry -> CoachNote(item.insight, commander, actions.onOpenInsights)
+                    is FeedItem.InsightEntry -> CoachNote(item.insight, commander, onClick = { actions.onOpenInsight(item.insight.id) })
                 }
             }
         }

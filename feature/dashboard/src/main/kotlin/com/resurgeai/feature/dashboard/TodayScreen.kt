@@ -57,6 +57,7 @@ import java.time.LocalDate
 fun TodayRoute(
     onOpenMetric: (HealthMetric) -> Unit,
     onOpenInsights: () -> Unit,
+    onOpenInsight: (String) -> Unit = {},
     onOpenMeal: (String) -> Unit = {},
     onOpenWorkout: (String) -> Unit = {},
     onOpenHabit: (String) -> Unit = {},
@@ -89,6 +90,7 @@ fun TodayRoute(
         onRetry = { viewModel.refresh(force = true) },
         onOpenMetric = onOpenMetric,
         onOpenInsights = onOpenInsights,
+        onOpenInsight = onOpenInsight,
         onOpenMeal = onOpenMeal,
         onOpenWorkout = onOpenWorkout,
         onToggleHabit = viewModel::toggleHabit,
@@ -122,6 +124,7 @@ fun TodayScreen(
     onRetry: () -> Unit,
     onOpenMetric: (HealthMetric) -> Unit,
     onOpenInsights: () -> Unit = {},
+    onOpenInsight: (String) -> Unit = {},
     onOpenMeal: (String) -> Unit = {},
     onOpenWorkout: (String) -> Unit = {},
     onToggleHabit: (String) -> Unit = {},
@@ -258,7 +261,7 @@ fun TodayScreen(
             key(insight.id) {
                 CoachCard(
                     insight,
-                    onOpen = { onDismissInsight(insight.id); onOpenInsights() },
+                    onOpen = { onDismissInsight(insight.id); onOpenInsight(insight.id) },
                     onDismiss = { onDismissInsight(insight.id) },
                 )
             }
@@ -274,6 +277,7 @@ fun TodayScreen(
                 onOpenWorkout = onOpenWorkout,
                 onOpenSleep = { onOpenMetric(HealthMetric.SLEEP) },
                 onOpenInsights = onOpenInsights,
+                onOpenInsight = onOpenInsight,
             ),
         )
         Spacer(Modifier.height(32.dp + LocalFloatingBarInset.current))

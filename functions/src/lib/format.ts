@@ -1,4 +1,4 @@
-import type { ActivityEvent, DailySummary, UserProfile } from "./types";
+import type { ActivityEvent, DailySummary, DayResult, DayScore, StoredPlan, UserProfile } from "./types";
 
 /*
  * Compact, deterministic text renderings of user data for prompts. Deterministic output keeps
@@ -136,4 +136,63 @@ export function formatWorkoutLogs(logs: { date: string; activity: string; title:
       return `${l.date} ${l.title ?? l.activity} (${origin}): ${parts.join(", ")}${exercises ? ` — ${exercises}` : ""}${l.notes ? ` — note: ${l.notes}` : ""}`;
     })
     .join("\n");
+}
+
+const GOAL_LABELS: Record<string, string> = {
+  lose_fat: "Lose fat",
+  build_muscle: "Build muscle",
+  run_further: "Run further",
+  get_in_shape: "Get back in shape",
+};
+
+/** The major goal, where they are in it, and the training schedule. */
+export function formatGoal(p: UserProfile, today: string): string {
+  const g = p.goal;
+  if (!g?.type || !g.startDate || !g.weeks) return "No goal set yet.";
+  const days = Math.floor((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${g.startDate}T00:00:00Z`)) / 86_400_000);
+  const week = Math.min(Math.max(Math.floor(days / 7) + 1, 1), g.weeks);
+  const parts = [`${GOAL_LABELS[g.type] ?? g.type} over ${g.weeks} weeks, started ${g.startDate} (now week ${week} of ${g.weeks})`];
+  if (g.startKg != null && g.targetKg != null) parts.push(`weight ${g.startKg} kg to ${g.targetKg} kg`);
+  if (g.raceKm != null) parts.push(`race ${g.raceKm} km`);
+  const t = p.training;
+  const schedule = t?.days?.length
+    ? `Trains ${t.days.join(", ")} for about ${t.sessionMin ?? "-"} min (${t.location ?? "-"}, experience ${t.experience ?? "-"}, style ${t.style ?? "-"}, runs ${t.runs ?? "-"}).`
+    : "";
+  const dg = p.dayGoals;
+  const day = dg
+    ? `A good day needs: ${[dg.sleep !== false ? "sleep goal" : null, dg.steps !== false ? "step goal" : null, dg.meals ? `${dg.meals} meals logged` : null, dg.water ? "water goal" : null, "every habit"].filter(Boolean).join(", ")}. The week is won at ${dg.weeklyDays ?? 5} good days.`
+    : "";
+  return [parts.join("; ") + ".", schedule, day].filter(Boolean).join("\n");
+}
+
+/** The weekly plan, one line per day, Monday first. */
+export function formatPlan(plan: StoredPlan | null): string {
+  if (!plan?.days?.length) return "No plan yet.";
+  const lines = plan.days.map((d) => {
+    if (d.rest) return `${d.day}: rest${d.note ? ` (${d.note})` : ""}`;
+    const ex = d.exercises?.length ? ` | ${d.exercises.map((e) => `${e.name} ${e.sets}x${e.reps}`).join(", ")}` : "";
+    return `${d.day}: ${d.title} (${d.kind ?? "-"}, ${d.durationMin ?? "-"} min)${d.target ? ` target: ${d.target}` : ""}${ex}`;
+  });
+  return [`${plan.name ?? "Plan"}: ${plan.summary ?? ""}`.trim(), ...lines].join("\n");
+}
+
+/**
+ * One line per day: whether it was a good (streak) day and its scores. Dates without either are
+ * left out. Scores are 0-100; Effort comes with the range that day asked for.
+ */
+export function formatDays(dates: string[], results: DayResult[], scores: DayScore[]): string {
+  const met = new Map(results.map((r) => [r.date, r]));
+  const sc = new Map(scores.map((s) => [s.date, s]));
+  const lines = dates.flatMap((date) => {
+    const r = met.get(date);
+    const s = sc.get(date);
+    if (!r && !s) return [];
+    const day = r ? (r.met ? "good day" : `missed (${r.done ?? "-"}/${r.total ?? "-"} goals)`) : "open";
+    if (!s) return [`${date} | ${day}`];
+    const band = s.effortLow != null && s.effortHigh != null ? ` (target ${s.effortLow}-${s.effortHigh})` : "";
+    const why = [s.recoveryWhy, s.effortWhy, s.fuelWhy].map((w) => w ?? "-").join(" / ");
+    return [`${date} | ${day} | recovery ${n(s.recovery)} | effort ${n(s.effort)}${band} | fuel ${n(s.fuel)}${s.soFar ? " (so far)" : ""} | ${why}`];
+  });
+  if (lines.length === 0) return "No streak days or scores yet.";
+  return ["date | streak | recovery | effort | fuel | why (recovery / effort / fuel)", ...lines].join("\n");
 }

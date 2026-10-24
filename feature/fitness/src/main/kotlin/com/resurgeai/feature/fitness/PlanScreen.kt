@@ -18,6 +18,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.border
+import com.resurgeai.core.designsystem.components.CoachBadge
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -106,6 +108,7 @@ fun PlanScreen(
                     Button("Build my plan", onClick = { onRebuild(null, state.training) }, enabled = state.goal != null && !state.building, loading = state.building)
                 }
                 else -> {
+                    state.coachChange?.let { CoachChangeNote(it, building = state.building) }
                     PlanHeader(shown, state.goal, isDraft = state.draft != null)
                     state.error?.let { Text(it, style = Resurge.type.label, color = Resurge.colors.down) }
                     if (state.draft != null) {
@@ -324,5 +327,22 @@ private fun ScheduleSheet(initial: TrainingPrefs, showStyle: Boolean, onSave: (T
             OptionChips(RunMode.entries, prefs.runs, { prefs = prefs.copy(runs = it) }, { it.label })
         }
         Button("Rebuild my plan", onClick = { onSave(prefs) }, enabled = prefs.validDays && prefs != initial, modifier = Modifier.fillMaxWidth())
+    }
+}
+
+/** The coach's change at the top: being built, then shown above the draft it produced. */
+@Composable
+private fun CoachChangeNote(change: String, building: Boolean) {
+    Row(
+        Modifier.fillMaxWidth().clip(Resurge.shape.md).border(1.dp, Resurge.colors.border, Resurge.shape.md).padding(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        CoachBadge(size = 28.dp)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(if (building) "Rebuilding with your coach’s change" else "Your coach’s change", style = Resurge.type.label, color = Resurge.colors.text)
+            Text(change, style = Resurge.type.label, color = Resurge.colors.textMuted)
+        }
+        if (building) Spinner(Modifier.size(18.dp), color = Resurge.colors.text)
     }
 }

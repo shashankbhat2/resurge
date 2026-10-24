@@ -39,11 +39,16 @@ export const ACTIVITY_INSIGHT_JSON_SCHEMA = {
 
 const Trend = z.enum(["up", "down", "steady"]);
 
+/** Areas a weekly review can cover. Older reviews used only sleep, activity and heart. */
+export const AREAS = ["training", "weight", "food", "sleep", "activity", "heart"] as const;
+
 export const WeeklyInsight = z.object({
   headline: z.string().min(1).max(160),
   summary: z.string().min(1).max(1200),
   wins: z.array(z.string().max(240)).max(3),
-  areas: z.array(z.object({ area: z.enum(["sleep", "activity", "heart"]), trend: Trend, note: z.string().max(240) })).max(3),
+  areas: z
+    .array(z.object({ area: z.enum(AREAS), trend: Trend, value: z.string().max(24), note: z.string().max(240) }))
+    .max(4),
   focus: z.array(z.string().max(240)).max(2),
   habits: z.string().max(400),
 });
@@ -62,10 +67,11 @@ export const WEEKLY_INSIGHT_JSON_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["area", "trend", "note"],
+        required: ["area", "trend", "value", "note"],
         properties: {
-          area: { type: "string", enum: ["sleep", "activity", "heart"] },
+          area: { type: "string", enum: [...AREAS] },
           trend: { type: "string", enum: ["up", "down", "steady"] },
+          value: { type: "string", description: "The week's figure in a few characters, e.g. \"4 of 4\", \"-0.6 kg\", \"79%\", \"6h 38m\"" },
           note: { type: "string" },
         },
       },

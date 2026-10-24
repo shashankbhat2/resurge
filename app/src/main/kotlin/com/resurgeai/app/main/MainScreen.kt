@@ -89,6 +89,7 @@ import com.resurgeai.core.model.ScoreKind
 import com.resurgeai.feature.dashboard.sources.MetricSourcesRoute as MetricSourcesScreenRoute
 import com.resurgeai.feature.coach.CoachRoute as CoachScreen
 import com.resurgeai.feature.coach.InsightsRoute as InsightsScreen
+import com.resurgeai.feature.coach.InsightDetailRoute as InsightDetailScreen
 import com.resurgeai.feature.habits.HabitDetailRoute as HabitDetailScreen
 import com.resurgeai.feature.habits.HabitEditorRoute as HabitEditorScreen
 import com.resurgeai.feature.habits.HabitsRoute as HabitsScreenRoute
@@ -129,7 +130,7 @@ import com.resurgeai.feature.scale.SmartScaleRoute as SmartScaleScreen
 @Serializable data class HabitEditorRoute(val id: String? = null)
 
 /** Full-screen coach chat; [newChat] opens on an empty conversation instead of the latest one. */
-@Serializable data class CoachScreenRoute(val newChat: Boolean = false)
+@Serializable data class CoachScreenRoute(val newChat: Boolean = false, val threadId: String? = null, val insightId: String? = null)
 
 /** Activity catalog search; [forResult] returns the pick to the workout editor instead of opening it. */
 @Serializable data class ActivityPickerRoute(val forResult: Boolean = false)
@@ -138,7 +139,7 @@ import com.resurgeai.feature.scale.SmartScaleRoute as SmartScaleScreen
 @Serializable data class WorkoutEditorRoute(val workoutId: String? = null, val activityId: String? = null)
 
 /** The training plan in full, with rebuilding. */
-@Serializable data object PlanScreenRoute
+@Serializable data class PlanScreenRoute(val change: String? = null)
 @Serializable data class ScoreDetailRoute(val kind: String, val period: String)
 
 /** The tap-through logger for the plan's session on [day] ("mon" … "sun"). */
@@ -172,7 +173,8 @@ import com.resurgeai.feature.scale.SmartScaleRoute as SmartScaleScreen
 @Serializable data object SettingsRoute
 
 /** Standalone list of past insights. */
-@Serializable data object InsightsScreenRoute
+@Serializable data class InsightsScreenRoute(val filter: String? = null)
+@Serializable data class InsightDetailRoute(val id: String)
 
 // Tab graph, nested inside the shell.
 @Serializable data object TodayRoute
@@ -223,7 +225,7 @@ fun MainScreen(
     val rootNav = rememberNavController()
     // A tapped insight notification opens Coach on the Insights tab.
     LaunchedEffect(openInsightsSignal) {
-        if (openInsightsSignal > 0) rootNav.navigate(InsightsScreenRoute) { launchSingleTop = true }
+        if (openInsightsSignal > 0) rootNav.navigate(InsightsScreenRoute()) { launchSingleTop = true }
     }
     // Meal reminder actions: Scan / Type open the log screen in that mode.
     LaunchedEffect(openFoodSignal.count) {
@@ -268,7 +270,8 @@ fun MainScreen(
                 onOpenScore = { kind, period -> rootNav.navigate(ScoreDetailRoute(kind.name, period.name)) },
                 onOpenSettings = { rootNav.navigate(SettingsRoute) },
                 onOpenCoach = { rootNav.navigate(CoachScreenRoute(newChat = true)) },
-                onOpenInsights = { rootNav.navigate(InsightsScreenRoute) },
+                onOpenInsights = { rootNav.navigate(InsightsScreenRoute()) },
+                onOpenInsight = { id -> rootNav.navigate(InsightDetailRoute(id)) },
                 onOpenHabit = { id -> rootNav.navigate(HabitDetailRoute(id)) },
                 onAddHabit = { rootNav.navigate(HabitEditorRoute()) },
                 onLogWorkout = { rootNav.navigate(ActivityPickerRoute()) },
@@ -278,7 +281,7 @@ fun MainScreen(
                     else rootNav.navigate(WorkoutEditorRoute(activityId = day.activityId))
                 },
                 onLogActivity = { id -> rootNav.navigate(WorkoutEditorRoute(activityId = id)) },
-                onOpenPlan = { rootNav.navigate(PlanScreenRoute) },
+                onOpenPlan = { rootNav.navigate(PlanScreenRoute()) },
                 onOpenWorkout = { id -> rootNav.navigate(WorkoutEditorRoute(workoutId = id)) },
                 onLogMeal = { rootNav.navigate(FoodLogRoute()) },
                 onScanMeal = { rootNav.navigate(FoodLogRoute(mode = "scan")) },
@@ -303,7 +306,13 @@ fun MainScreen(
             FullScreen { HabitEditorScreen(habitId = entry.toRoute<HabitEditorRoute>().id, onDone = { rootNav.popBackStack() }) }
         }
         composable<CoachScreenRoute> {
-            FullScreen { CoachScreen(onBack = { rootNav.popBackStack() }) }
+            FullScreen {
+                CoachScreen(
+                    onBack = { rootNav.popBackStack() },
+                    onOpenChats = { rootNav.navigate(InsightsScreenRoute(filter = "CHATS")) },
+                    onOpenPlanChange = { change -> rootNav.navigate(PlanScreenRoute(change)) },
+                )
+            }
         }
         composable<ActivityPickerRoute> { entry ->
             val forResult = entry.toRoute<ActivityPickerRoute>().forResult
@@ -420,7 +429,22 @@ fun MainScreen(
             }
         }
         composable<InsightsScreenRoute> {
-            FullScreen { InsightsScreen(onBack = { rootNav.popBackStack() }) }
+            FullScreen {
+                InsightsScreen(
+                    onBack = { rootNav.popBackStack() },
+                    onOpenInsight = { id -> rootNav.navigate(InsightDetailRoute(id)) },
+                    onOpenChat = { id -> rootNav.navigate(CoachScreenRoute(threadId = id)) },
+                    onNewChat = { rootNav.navigate(CoachScreenRoute(newChat = true)) },
+                )
+            }
+        }
+        composable<InsightDetailRoute> {
+            FullScreen {
+                InsightDetailScreen(
+                    onBack = { rootNav.popBackStack() },
+                    onAsk = { id -> rootNav.navigate(CoachScreenRoute(insightId = id)) },
+                )
+            }
         }
         composable<MetricDetailRoute> {
             FullScreen {
@@ -478,6 +502,7 @@ private fun TabsShell(
     onOpenSettings: () -> Unit,
     onOpenCoach: () -> Unit,
     onOpenInsights: () -> Unit,
+    onOpenInsight: (String) -> Unit,
     onOpenHabit: (String) -> Unit,
     onAddHabit: () -> Unit,
     onLogWorkout: () -> Unit,
@@ -534,6 +559,7 @@ private fun TabsShell(
                     TodayScreenRoute(
                         onOpenMetric = onOpenMetric,
                         onOpenInsights = onOpenInsights,
+                        onOpenInsight = onOpenInsight,
                         onOpenMeal = onOpenMeal,
                         onOpenWorkout = onOpenWorkout,
                         onOpenHabit = onOpenHabit,

@@ -99,6 +99,8 @@ object ResurgeIcons {
     @DrawableRes val Keyboard = Tabler.drawable.tabler_ic_keyboard_outline
     @DrawableRes val Search = Tabler.drawable.tabler_ic_search_outline
     @DrawableRes val Clock = Tabler.drawable.tabler_ic_clock_outline
+    /** A clock with a counter-clockwise arrow: recent things, past chats. */
+    @DrawableRes val History = Tabler.drawable.tabler_ic_history_outline
     @DrawableRes val Stopwatch = Tabler.drawable.tabler_ic_stopwatch_outline
     @DrawableRes val Repeat = Tabler.drawable.tabler_ic_repeat_outline
     @DrawableRes val Mountain = Tabler.drawable.tabler_ic_mountain_outline

@@ -2,9 +2,21 @@ import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { ANTHROPIC_API_KEY } from "../lib/anthropic";
-import { formatInsightList, loadEvents, loadHabits, loadProfile, loadRecentInsights, loadSummaries } from "../lib/data";
+import {
+  formatInsightList,
+  loadDayResults,
+  loadDayScores,
+  loadEvents,
+  loadHabits,
+  loadMeals,
+  loadPlan,
+  loadProfile,
+  loadRecentInsights,
+  loadSummaries,
+  loadWorkoutLogs,
+} from "../lib/data";
 import { db, userDoc } from "../lib/firebase";
-import { formatEvents, formatHabits, formatProfile, formatSummaries } from "../lib/format";
+import { formatDays, formatEvents, formatGoal, formatHabits, formatMeals, formatPlan, formatProfile, formatSummaries, formatWorkoutLogs } from "../lib/format";
 import { WEEKLY_INSIGHT_MODEL } from "../lib/models";
 import { notifyInsight } from "../lib/push";
 import { recordUsage } from "../lib/quota";
@@ -57,13 +69,18 @@ export async function writeWeekly(uid: string, saturday: string): Promise<void> 
   const { start, end } = weekWindow(saturday);
   const prevStart = addDays(start, -7);
   const startMs = Date.parse(`${start}T00:00:00Z`) - 14 * 3600_000; // generous: covers all timezones
-  const [profile, thisWeek, lastWeek, events, insights, habits] = await Promise.all([
-    loadProfile(uid),
+  const profile = await loadProfile(uid);
+  const [thisWeek, lastWeek, events, insights, habits, plan, results, scores, meals, logs] = await Promise.all([
     loadSummaries(uid, start, end),
     loadSummaries(uid, prevStart, addDays(start, -1)),
     loadEvents(uid, startMs, undefined, 60),
     loadRecentInsights(uid, startMs, 30),
     loadHabits(uid, start),
+    loadPlan(uid, profile.activePlanId),
+    loadDayResults(uid, start, end),
+    loadDayScores(uid, start, end),
+    loadMeals(uid, start),
+    loadWorkoutLogs(uid, startMs),
   ]);
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   if (thisWeek.length === 0) {
@@ -72,8 +89,15 @@ export async function writeWeekly(uid: string, saturday: string): Promise<void> 
   }
   const weekEvents = events.filter((e) => e.localDate >= start && e.localDate <= end);
 
+  const target = profile.dayGoals?.weeklyDays ?? 5;
+  const goodDays = results.filter((r) => r.met).length;
   const context = [
     `<profile>\n${formatProfile(profile)}\n</profile>`,
+    `<goal>\n${formatGoal(profile, end)}\n</goal>`,
+    `<plan>\n${formatPlan(plan)}\n</plan>`,
+    `<streak_and_scores good_days="${goodDays}" target="${target}" won="${goodDays >= target}">\n${formatDays(weekDates, results, scores)}\n</streak_and_scores>`,
+    `<logged_workouts>\n${formatWorkoutLogs(logs.filter((l) => l.date >= start && l.date <= end))}\n</logged_workouts>`,
+    `<meals>\n${formatMeals(meals.filter((m) => m.date <= end))}\n</meals>`,
     `<this_week start="${start}" end="${end}">\n${formatSummaries(thisWeek)}\n</this_week>`,
     `<workouts_and_sleep>\n${formatEvents(weekEvents)}\n</workouts_and_sleep>`,
     `<previous_week>\n${formatSummaries(lastWeek)}\n</previous_week>`,
@@ -97,6 +121,10 @@ export async function writeWeekly(uid: string, saturday: string): Promise<void> 
     title: value.headline,
     weekStart: start,
     weekEnd: end,
+    // The streak days as they stood when the review was written, for the review's day squares.
+    days: weekDates.map((date) => ({ date, met: results.find((r) => r.date === date)?.met ?? null })),
+    goodDays,
+    target,
     model: usage.model,
     createdAt: FieldValue.serverTimestamp(),
   });

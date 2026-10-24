@@ -10,8 +10,9 @@ import { consumeOrThrow, recordUsage } from "../lib/quota";
 import { isValidTimeZone, localParts } from "../lib/time";
 import { COACH_SYSTEM } from "../prompts/coach";
 import { parseStyle, withPersona } from "../prompts/shared";
+import { formatInsight, loadInsight } from "../lib/data";
 import { buildSnapshot } from "./snapshot";
-import { COACH_TOOLS, runTool } from "./tools";
+import { COACH_TOOLS, type PlanChangeAction, runTool } from "./tools";
 
 /** Flip to true once App Check (Play Integrity + debug tokens) is registered in the Firebase console. */
 export const ENFORCE_APP_CHECK = false;
@@ -22,6 +23,8 @@ const Input = z.object({
   threadId: z.string().min(1).max(64).optional(),
   text: z.string().trim().min(1).max(4000),
   model: z.enum(["fast", "smart"]),
+  /** Starts a new conversation about this insight. Ignored for an existing thread. */
+  insightId: z.string().min(1).max(128).optional(),
 });
 
 /** Chunks streamed to the app while a reply is generated. */
@@ -43,6 +46,8 @@ interface Turn {
   display: string | null;
   model?: ModelChoice;
   excluded?: boolean;
+  /** Something the person can tap under this reply. */
+  action?: PlanChangeAction;
 }
 
 /**
@@ -91,6 +96,7 @@ export const coachChat = onCall(
       return full;
     };
 
+    const insight = !thread.exists && parsed.data.insightId ? await loadInsight(uid, parsed.data.insightId) : null;
     if (!thread.exists) {
       await threadRef.set({
         title: text.length > 60 ? `${text.slice(0, 57)}…` : text,
@@ -98,15 +104,16 @@ export const coachChat = onCall(
         updatedAt: FieldValue.serverTimestamp(),
         contextDate: today,
         lastPreview: text,
+        ...(insight ? { insightId: parsed.data.insightId, insightTitle: insight.title ?? insight.headline ?? "" } : {}),
       });
     }
 
     // New thread: the health snapshot rides along with the first user message. Later days on an
     // existing thread: append a mid-conversation system message with the new snapshot instead of
     // editing anything earlier (keeps the cached prefix and history intact).
-    const userContent: Anthropic.Beta.BetaContentBlockParam[] = thread.exists
-      ? [{ type: "text", text }]
-      : [{ type: "text", text: await buildSnapshot(uid, today) }, { type: "text", text }];
+    const opening: Anthropic.Beta.BetaContentBlockParam[] = thread.exists ? [] : [{ type: "text", text: await buildSnapshot(uid, today) }];
+    if (insight) opening.push({ type: "text", text: `<about_insight>\nThe person opened this chat from an insight the app showed them:\n${formatInsight(insight)}\n</about_insight>` });
+    const userContent: Anthropic.Beta.BetaContentBlockParam[] = [...opening, { type: "text", text }];
     const userTurn = await append({ role: "user", kind: "message", raw: JSON.stringify(userContent), display: text });
     let contextTurn: Turn | null = null;
     if (thread.exists && thread.get("contextDate") !== today) {
@@ -121,6 +128,8 @@ export const coachChat = onCall(
 
     // --- Generate (with tool loop) ---
     let finalText = "";
+    let action: PlanChangeAction | undefined;
+    const toolContext = { hasPlan: typeof user.activePlanId === "string" && user.activePlanId.length > 0 };
     try {
       for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
         const stream = anthropic().beta.messages.stream({
@@ -144,17 +153,22 @@ export const coachChat = onCall(
         }
 
         const replyText = textOf(message.content);
-        await append({ role: "assistant", kind: "message", raw: JSON.stringify(message.content), display: replyText || null, model: choice });
+        const toolUses = message.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use");
+        const last = message.stop_reason !== "tool_use" || toolUses.length === 0;
+        // The offer rides on the final reply, so its button sits under the text that explains it.
+        await append({
+          role: "assistant", kind: "message", raw: JSON.stringify(message.content), display: replyText || null, model: choice,
+          ...(last && action ? { action } : {}),
+        });
         messages.push({ role: "assistant", content: message.content });
         if (replyText) finalText = replyText;
-
-        const toolUses = message.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use");
-        if (message.stop_reason !== "tool_use" || toolUses.length === 0) break;
+        if (last) break;
 
         const results: Anthropic.Beta.BetaToolResultBlockParam[] = [];
         for (const use of toolUses) {
           send({ type: "status", status: "tool", name: use.name });
-          const r = await runTool(uid, use.name, use.input);
+          const r = await runTool(uid, use.name, use.input, toolContext);
+          if (r.action) action = r.action;
           results.push({ type: "tool_result", tool_use_id: use.id, content: r.content, is_error: r.isError });
         }
         await append({ role: "user", kind: "tool_result", raw: JSON.stringify(results), display: null });
@@ -168,7 +182,7 @@ export const coachChat = onCall(
     }
 
     await threadRef.update({ updatedAt: FieldValue.serverTimestamp(), lastPreview: finalText.slice(0, 140), lastModel: choice });
-    return { threadId: threadRef.id, text: finalText };
+    return { threadId: threadRef.id, text: finalText, ...(action ? { action } : {}) };
   },
 );
 
