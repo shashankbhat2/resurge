@@ -56,29 +56,28 @@ class FeedActions(
 
 // --- Feed ---
 
-/** Day groups of flat rows, newest first: meals, workouts, sleep and coach notes. */
+/** One day's flat rows, newest first: meals, workouts, sleep and coach notes. */
 @Composable
-internal fun Feed(days: List<FeedDay>, today: LocalDate, units: UnitSystem, commander: Boolean, actions: FeedActions) {
-    if (days.isEmpty()) {
-        SectionLabel("Today")
+internal fun Feed(day: FeedDay, today: LocalDate, units: UnitSystem, commander: Boolean, actions: FeedActions) {
+    val count = day.items.size
+    SectionLabel(dayLabel(day.date, today), trailing = if (count > 0) "$count ${if (count == 1) "entry" else "entries"}" else null)
+    if (day.items.isEmpty()) {
         Text(
-            "Meals, workouts and sleep show up here as you log them or your devices sync.",
+            if (day.date == today) "Meals, workouts and sleep show up here as you log them or your devices sync."
+            else "Nothing was logged this day.",
             style = Resurge.type.body,
             color = Resurge.colors.textMuted,
             modifier = Modifier.padding(horizontal = 4.dp),
         )
         return
     }
-    days.forEach { day ->
-        SectionLabel(dayLabel(day.date, today), trailing = "${day.items.size} ${if (day.items.size == 1) "entry" else "entries"}")
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            day.items.forEach { item ->
-                when (item) {
-                    is FeedItem.MealEntry -> MealRow(item.meal) { actions.onOpenMeal(item.meal.id) }
-                    is FeedItem.WorkoutEntry -> WorkoutRow(item.workout, units) { actions.onOpenWorkout(item.workout.id) }
-                    is FeedItem.SleepEntry -> SleepRow(item.session, actions.onOpenSleep)
-                    is FeedItem.InsightEntry -> CoachNote(item.insight, commander, onClick = { actions.onOpenInsight(item.insight.id) })
-                }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        day.items.forEach { item ->
+            when (item) {
+                is FeedItem.MealEntry -> MealRow(item.meal) { actions.onOpenMeal(item.meal.id) }
+                is FeedItem.WorkoutEntry -> WorkoutRow(item.workout, units) { actions.onOpenWorkout(item.workout.id) }
+                is FeedItem.SleepEntry -> SleepRow(item.session, actions.onOpenSleep)
+                is FeedItem.InsightEntry -> CoachNote(item.insight, commander, onClick = { actions.onOpenInsight(item.insight.id) })
             }
         }
     }

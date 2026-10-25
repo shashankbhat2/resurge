@@ -92,11 +92,11 @@ class ScoreDetailScreenshotTest {
         ScoreDetailScreen(kind, period, h, onBack = {}, onPeriodChange = {})
 
     @Test fun rings() = capture("rings") {
-        Column(Modifier.padding(16.dp)) { ScoreRings(history, ScorePeriod.TODAY, {}, {}) }
+        Column(Modifier.padding(16.dp)) { ScoreRings(history, history.today, {}) }
     }
 
-    @Test fun ringsWeek() = capture("rings_week") {
-        Column(Modifier.padding(16.dp)) { ScoreRings(history, ScorePeriod.WEEK, {}, {}) }
+    @Test fun ringsYesterday() = capture("rings_yesterday") {
+        Column(Modifier.padding(16.dp)) { ScoreRings(history, history.today.minusDays(1), {}) }
     }
 
     @Test fun recoveryToday() = capture("recovery_today") { detail(ScoreKind.RECOVERY, ScorePeriod.TODAY) }

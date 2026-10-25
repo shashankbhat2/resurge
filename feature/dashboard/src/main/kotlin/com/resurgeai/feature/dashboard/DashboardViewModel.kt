@@ -32,6 +32,9 @@ import com.resurgeai.core.data.food.MealsRepository
 import com.resurgeai.core.model.Meal
 import com.resurgeai.core.model.Nutrition
 import com.resurgeai.core.model.Workout
+import com.resurgeai.core.model.SleepSession
+import com.resurgeai.core.model.Weather
+import com.resurgeai.core.data.weather.WeatherRepository
 import java.time.Instant
 import com.resurgeai.core.data.session.SessionRepository
 import com.resurgeai.core.data.user.UserRepository
@@ -105,9 +108,15 @@ data class DashboardUiState(
     val compactList: Boolean = false,
     /** Recovery, Effort and Fuel by day. */
     val scores: ScoreHistory = ScoreHistory(),
+    /** The day the strip is on; the rings, feed and coach note follow it. */
+    val selectedDay: LocalDate = LocalDate.now(),
+    /** Nights over the strip's days, by the day each ended. */
+    val sleep: List<SleepSession> = emptyList(),
+    /** Now and by day; null until read, or without the location permission. */
+    val weather: Weather? = null,
+    /** Approximate location is allowed, so the weather can be read. */
+    val weatherAllowed: Boolean = false,
 ) {
-    /** The latest insight, pinned above the tide until it's seen. */
-    val pinnedInsight: CoachInsight? get() = latestInsight?.takeIf { !it.seen && it.id !in dismissedInsights }
 
     val healthReady: Boolean get() = availability == HealthConnectAvailability.AVAILABLE &&
         (permissions == PermissionState.PARTIAL || permissions == PermissionState.ALL)
@@ -141,6 +150,7 @@ class DashboardViewModel @Inject constructor(
     private val users: UserRepository,
     private val plans: PlanRepository,
     private val scoresEngine: ScoresEngine,
+    private val weatherRepository: WeatherRepository,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
     private val _state = MutableStateFlow(DashboardUiState())
@@ -153,7 +163,25 @@ class DashboardViewModel @Inject constructor(
 
     private val deviceWorkouts = MutableStateFlow<List<Workout>>(emptyList())
 
-    private fun feedStart(): Instant = LocalDate.now().minusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()
+    /** The first day the strip can go back to; the feed reads from then on. */
+    private fun feedStart(): Instant = LocalDate.now().minusDays(STRIP_DAYS - 1).atStartOfDay(ZoneId.systemDefault()).toInstant()
+
+    fun selectDay(date: LocalDate) {
+        _state.update { it.copy(selectedDay = date) }
+    }
+
+    /** Called once the location permission is answered, to read the weather straight away. */
+    fun onLocationResult(granted: Boolean) {
+        _state.update { it.copy(weatherAllowed = granted) }
+        if (granted) viewModelScope.launch { loadWeather(force = true) }
+    }
+
+    private suspend fun loadWeather(force: Boolean = false) {
+        val allowed = weatherRepository.hasPermission()
+        _state.update { it.copy(weatherAllowed = allowed) }
+        if (!allowed) return
+        weatherRepository.weather(force)?.let { w -> _state.update { it.copy(weather = w) } }
+    }
 
     /** Ticks on resume so the habit day rolls over at the reset time. */
     private val clock = MutableStateFlow(Instant.now())
@@ -238,13 +266,12 @@ class DashboardViewModel @Inject constructor(
             preferences.dismissedInsights.collect { ids -> _state.update { it.copy(dismissedInsights = it.dismissedInsights + ids) } }
         }
         viewModelScope.launch {
-            coachRepository.insights(limit = 12)
+            coachRepository.insights(limit = INSIGHT_LIMIT)
                 .catch { Log.w(TAG, "Insights listener failed", it) }
                 .collect { list -> _state.update { it.copy(latestInsight = list.firstOrNull(), insights = list) } }
         }
-        val yesterday = LocalDate.now().minusDays(1)
         viewModelScope.launch {
-            meals.meals(yesterday)
+            meals.meals(LocalDate.now().minusDays(STRIP_DAYS - 1))
                 .catch { Log.w(TAG, "Meals listener failed", it) }
                 .collect { list -> _state.update { it.copy(meals = list) } }
         }
@@ -297,6 +324,7 @@ class DashboardViewModel @Inject constructor(
         clock.value = Instant.now()
         streakEngine.tick()
         scoresEngine.refresh(force)
+        viewModelScope.launch { loadWeather(force) }
         if (!force && loadJob?.isActive == true) return
         if (!force && now - lastLoadedAt < MIN_REFRESH_INTERVAL_MS && _state.value.today != null) return
         loadJob = viewModelScope.launch { load() }
@@ -329,6 +357,7 @@ class DashboardViewModel @Inject constructor(
                 val week = async { HealthMath.exerciseDays(healthData.exerciseThisWeek(zone), zone) }
                 val series = SPARKLINE_METRICS.map { m -> async { m to healthData.readSeries(m, 7, zone) } }
                 val device = async { runCatching { workouts.deviceWorkouts(feedStart(), Instant.now()) }.getOrDefault(emptyList()) }
+                val nights = async { runCatching { healthData.sleepSessions(feedStart(), Instant.now()) }.getOrDefault(emptyList()) }
                 val activeDays = week.await()
                 deviceWorkouts.value = device.await()
                 val read = day.await()
@@ -340,6 +369,7 @@ class DashboardViewModel @Inject constructor(
                         exerciseWeek = (0 until 7).map { i -> weekStart.plusDays(i.toLong()) in activeDays },
                         todayIndex = HealthMath.dayOfWeekIndex(today),
                         sparklines = series.awaitAll().associate { (m, s) -> m to s.points.map { p -> p.value } },
+                        sleep = nights.await(),
                     )
                 }
             }
@@ -372,6 +402,8 @@ class DashboardViewModel @Inject constructor(
     private companion object {
         const val TAG = "Dashboard"
         const val MIN_REFRESH_INTERVAL_MS = 30_000L
+        /** Insights kept for the strip's days. */
+        const val INSIGHT_LIMIT = 40L
         val SPARKLINE_METRICS = listOf(
             HealthMetric.STEPS, HealthMetric.CALORIES_BURNED,
             HealthMetric.SLEEP, HealthMetric.HEART_RATE,

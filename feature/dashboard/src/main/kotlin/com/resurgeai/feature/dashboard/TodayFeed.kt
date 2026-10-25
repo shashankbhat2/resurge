@@ -39,30 +39,31 @@ data class FeedDay(val date: LocalDate, val items: List<FeedItem>)
 
 object TodayFeed {
     /**
-     * Today's and yesterday's meals, workouts, sleep and insights, grouped by day, newest first.
-     * The insight shown at the top of the page ([lead]) isn't repeated in the timeline.
+     * One day's meals, workouts, sleep and insights, newest first. Sleep counts on the day it ended.
+     * The insight shown in the coach card ([lead]) isn't repeated in the list.
      */
     fun build(
-        today: LocalDate,
+        date: LocalDate,
         meals: List<Meal>,
         workouts: List<Workout>,
         sleep: List<SleepSession>,
         insights: List<CoachInsight>,
         lead: CoachInsight?,
         zone: ZoneId = ZoneId.systemDefault(),
-    ): List<FeedDay> {
-        val from = today.minusDays(1)
+    ): FeedDay {
         val items = buildList<FeedItem> {
-            meals.forEach { add(FeedItem.MealEntry(it)) }
+            meals.filter { it.date == date }.forEach { add(FeedItem.MealEntry(it)) }
             workouts.forEach { add(FeedItem.WorkoutEntry(it)) }
             sleep.forEach { add(FeedItem.SleepEntry(it)) }
             insights.filter { it.id != lead?.id }.forEach { add(FeedItem.InsightEntry(it)) }
         }
-        return items
-            .filter { !it.time.atZone(zone).toLocalDate().isBefore(from) && !it.time.atZone(zone).toLocalDate().isAfter(today) }
-            .sortedByDescending { it.time }
-            .groupBy { it.time.atZone(zone).toLocalDate() }
-            .map { (date, list) -> FeedDay(date, list) }
-            .sortedByDescending { it.date }
+        return FeedDay(
+            date,
+            items.filter { it is FeedItem.MealEntry || it.time.atZone(zone).toLocalDate() == date }.sortedByDescending { it.time },
+        )
     }
+
+    /** The day's newest insight not yet seen, for the coach card; null when there's none. */
+    fun lead(date: LocalDate, insights: List<CoachInsight>, dismissed: Set<String>, zone: ZoneId = ZoneId.systemDefault()): CoachInsight? =
+        insights.filter { it.createdAt.atZone(zone).toLocalDate() == date && !it.seen && it.id !in dismissed }.maxByOrNull { it.createdAt }
 }

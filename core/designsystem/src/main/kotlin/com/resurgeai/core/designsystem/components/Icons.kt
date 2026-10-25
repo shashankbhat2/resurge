@@ -45,6 +45,15 @@ object ResurgeIcons {
     @DrawableRes val LogOut = Tabler.drawable.tabler_ic_logout_outline
     @DrawableRes val Sun = Tabler.drawable.tabler_ic_sun_outline
     @DrawableRes val Moon = Tabler.drawable.tabler_ic_moon_outline
+
+    // Weather
+    @DrawableRes val WeatherClear = Tabler.drawable.tabler_ic_sun_high_outline
+    @DrawableRes val WeatherPartlyCloudy = Tabler.drawable.tabler_ic_sun_low_outline
+    @DrawableRes val WeatherCloudy = Tabler.drawable.tabler_ic_cloud_outline
+    @DrawableRes val WeatherFog = Tabler.drawable.tabler_ic_cloud_fog_outline
+    @DrawableRes val WeatherRain = Tabler.drawable.tabler_ic_cloud_rain_outline
+    @DrawableRes val WeatherSnow = Tabler.drawable.tabler_ic_cloud_snow_outline
+    @DrawableRes val WeatherStorm = Tabler.drawable.tabler_ic_cloud_storm_outline
     @DrawableRes val Monitor = Tabler.drawable.tabler_ic_device_desktop_outline
     @DrawableRes val Sparkles = Tabler.drawable.tabler_ic_sparkles_outline
     @DrawableRes val Target = Tabler.drawable.tabler_ic_target_outline

@@ -1,6 +1,18 @@
 package com.resurgeai.feature.dashboard
 
 import androidx.compose.runtime.key
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import android.Manifest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.remember
 import com.resurgeai.core.designsystem.components.SectionLabel
@@ -79,6 +91,9 @@ fun TodayRoute(
     val writeWeightLauncher = rememberLauncherForActivityResult(viewModel.permissionContract) { granted ->
         viewModel.importWeights(alsoWrite = viewModel.weightWritePermission in granted)
     }
+    val locationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        viewModel.onLocationResult(granted)
+    }
     LifecycleResumeEffect(Unit) {
         viewModel.refresh()
         onPauseOrDispose {}
@@ -86,6 +101,8 @@ fun TodayRoute(
     TodayScreen(
         state = state,
         onConnect = { permissionLauncher.launch(viewModel.permissionsToRequest) },
+        onSelectDay = viewModel::selectDay,
+        onAllowWeather = { locationLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION) },
         onInstall = { runCatching { context.startActivity(viewModel.installIntent()) } },
         onRetry = { viewModel.refresh(force = true) },
         onOpenMetric = onOpenMetric,
@@ -112,9 +129,9 @@ fun TodayRoute(
 }
 
 /**
- * Today (Resurge Mono), top to bottom: the day streak, this week against its target, the major goal,
- * today's list (the planned session, then each goal of the day), today's vitals, the newest coach
- * note, and a feed of today's and yesterday's meals, workouts, sleep and notes.
+ * Today (Resurge Mono), top to bottom: the day strip, the chosen day's name and weather, its three
+ * scores, the day streak with this week, the major goal, then the rest of the chosen day (swipe
+ * between days): today's list and vitals when it's today, its feed, and the coach's note.
  */
 @Composable
 fun TodayScreen(
@@ -123,6 +140,8 @@ fun TodayScreen(
     onInstall: () -> Unit,
     onRetry: () -> Unit,
     onOpenMetric: (HealthMetric) -> Unit,
+    onSelectDay: (LocalDate) -> Unit = {},
+    onAllowWeather: () -> Unit = {},
     onOpenInsights: () -> Unit = {},
     onOpenInsight: (String) -> Unit = {},
     onOpenMeal: (String) -> Unit = {},
@@ -142,22 +161,20 @@ fun TodayScreen(
     reelCard: (@Composable () -> Unit)? = null,
     today: LocalDate = LocalDate.now(),
 ) {
-    val commander = state.profile?.coachStyle == CoachStyle.COMMANDER
-    val pinned = state.pinnedInsight
-    val feed = TodayFeed.build(
-        today = today,
-        meals = state.meals,
-        workouts = state.workouts,
-        sleep = state.today?.sleep.orEmpty(),
-        insights = state.insights,
-        // The newest unseen note has its own card, so the feed leaves it out until it's seen.
-        lead = pinned,
-    )
     val goal = state.profile?.majorGoal
     val units = state.profile?.units ?: UnitSystem.METRIC
-    val losingWeight = goal?.takeIf { it.type.byWeight }?.let { g -> (g.targetKg ?: 0.0) < (g.startKg ?: 0.0) }
     var detail by rememberSaveable { mutableStateOf<StreakDetail?>(null) }
-    var scorePeriod by rememberSaveable { mutableStateOf(ScorePeriod.TODAY) }
+    val first = today.minusDays(STRIP_DAYS - 1)
+    val selected = state.selectedDay.coerceIn(first, today)
+    val pager = rememberPagerState(initialPage = (selected.toEpochDay() - first.toEpochDay()).toInt()) { STRIP_DAYS.toInt() }
+    // The strip moves the pages; a swipe between pages moves the strip.
+    LaunchedEffect(selected) {
+        val page = (selected.toEpochDay() - first.toEpochDay()).toInt()
+        if (pager.currentPage != page) pager.animateScrollToPage(page)
+    }
+    LaunchedEffect(pager) {
+        snapshotFlow { pager.settledPage }.collect { page -> onSelectDay(first.plusDays(page.toLong())) }
+    }
     Column(
         Modifier
             .fillMaxSize()
@@ -165,98 +182,151 @@ fun TodayScreen(
             .padding(horizontal = 16.dp),
     ) {
         Spacer(Modifier.height(LocalHeaderInset.current + 4.dp))
-        StreakHero(state.streak) { detail = StreakDetail.STREAK }
-        Spacer(Modifier.height(14.dp))
-        ScoreRings(state.scores, scorePeriod, onPeriodChange = { scorePeriod = it }, onOpen = { onOpenScore(it, scorePeriod) })
+        DayStrip(today = today, selected = selected, onSelect = onSelectDay)
+        Spacer(Modifier.height(16.dp))
+        DayHeader(
+            date = selected,
+            today = today,
+            weather = state.weather,
+            weatherAllowed = state.weatherAllowed,
+            units = units,
+            onBackToToday = { onSelectDay(today) },
+            onAllowWeather = onAllowWeather,
+        )
+        Spacer(Modifier.height(16.dp))
+        // The day's scores slide in from the side the day is on.
+        AnimatedContent(
+            targetState = selected,
+            transitionSpec = {
+                val forward = targetState.isAfter(initialState)
+                (slideInHorizontally { w -> if (forward) w else -w } + fadeIn()) togetherWith
+                    (slideOutHorizontally { w -> if (forward) -w else w } + fadeOut())
+            },
+            label = "dayScores",
+        ) { date ->
+            ScoreRings(state.scores, date, onOpen = { onOpenScore(it, ScorePeriod.TODAY) })
+        }
         Spacer(Modifier.height(10.dp))
-        WeekCard(state.streak, goal, today) { detail = StreakDetail.WEEK }
+        StreakWeekCard(state.streak, goal, today, onOpenStreak = { detail = StreakDetail.STREAK }, onOpenWeek = { detail = StreakDetail.WEEK })
         goal?.let { g ->
             Spacer(Modifier.height(10.dp))
             GoalCard(g, state.streak, state.weight, units, today) {
                 if (g.type.byWeight) onOpenMetric(HealthMetric.WEIGHT) else detail = StreakDetail.WEEK
             }
         }
-
-        val session = state.plan?.days?.firstOrNull { it.day == today.dayOfWeek }
-        val sessionDone = session != null && state.workouts.any { it.date() == today && PlanMatch.matches(session, it) }
-        TodayChecklist(
-            state = state.streak,
-            session = session,
-            sessionDone = sessionDone,
-            compact = state.compactList,
-            onCompactChange = onCompactListChange,
-            onStartSession = onStartSession,
-            onToggleHabit = onToggleHabit,
-            onOpenHabits = onOpenHabits,
-            onOpenSettings = { detail = StreakDetail.GOALS },
-        )
-        if (state.habits?.isEmpty() == true) {
-            Spacer(Modifier.height(4.dp))
-            Button("Add a habit", onClick = onAddHabit, variant = ButtonVariant.Ghost, modifier = Modifier.fillMaxWidth())
+        HorizontalPager(
+            state = pager,
+            pageSpacing = 16.dp,
+            verticalAlignment = Alignment.Top,
+            modifier = Modifier.fillMaxWidth(),
+        ) { page ->
+            val date = first.plusDays(page.toLong())
+            DayPage(
+                date = date,
+                today = today,
+                state = state,
+                units = units,
+                onConnect = onConnect,
+                onInstall = onInstall,
+                onRetry = onRetry,
+                onOpenMetric = onOpenMetric,
+                onOpenInsights = onOpenInsights,
+                onOpenInsight = onOpenInsight,
+                onOpenMeal = onOpenMeal,
+                onOpenWorkout = onOpenWorkout,
+                onToggleHabit = onToggleHabit,
+                onAddHabit = onAddHabit,
+                onOpenHabits = onOpenHabits,
+                onStartSession = onStartSession,
+                onCompactListChange = onCompactListChange,
+                onOpenGoals = { detail = StreakDetail.GOALS },
+                onDismissInsight = onDismissInsight,
+                onImportWeights = onImportWeights,
+                onDismissWeightImport = onDismissWeightImport,
+                reelCard = reelCard,
+            )
         }
+        Spacer(Modifier.height(32.dp + LocalFloatingBarInset.current))
+    }
 
-        SectionLabel("Vitals")
-        when (state.availability) {
-            null -> TodaySkeleton()
-            HealthConnectAvailability.NOT_SUPPORTED -> InfoCard(
-                icon = ResurgeIcons.Activity,
-                title = "Health Connect isn't available",
-                body = "This device doesn't support Health Connect, so sleep, steps and heart rate can't be shown.",
+    if (state.showDayComplete) DayCompleteDialog(state, onDismissDayComplete)
+    detail?.let { StreakDetailDialog(it, state.streak, state.profile?.habitSettings ?: HabitSettings(), onSaveDayGoals) { detail = null } }
+}
+
+/** One day on Today: today's list and vitals (today only), its feed, then the coach's note. */
+@Composable
+private fun DayPage(
+    date: LocalDate,
+    today: LocalDate,
+    state: DashboardUiState,
+    units: UnitSystem,
+    onConnect: () -> Unit,
+    onInstall: () -> Unit,
+    onRetry: () -> Unit,
+    onOpenMetric: (HealthMetric) -> Unit,
+    onOpenInsights: () -> Unit,
+    onOpenInsight: (String) -> Unit,
+    onOpenMeal: (String) -> Unit,
+    onOpenWorkout: (String) -> Unit,
+    onToggleHabit: (String) -> Unit,
+    onAddHabit: () -> Unit,
+    onOpenHabits: () -> Unit,
+    onStartSession: (PlanDay) -> Unit,
+    onCompactListChange: (Boolean) -> Unit,
+    onOpenGoals: () -> Unit,
+    onDismissInsight: (String) -> Unit,
+    onImportWeights: (alsoWrite: Boolean) -> Unit,
+    onDismissWeightImport: () -> Unit,
+    reelCard: (@Composable () -> Unit)?,
+) {
+    val isToday = date == today
+    val lead = TodayFeed.lead(date, state.insights, state.dismissedInsights)
+    val feed = TodayFeed.build(
+        date = date,
+        meals = state.meals,
+        workouts = state.workouts,
+        sleep = state.sleep.ifEmpty { if (isToday) state.today?.sleep.orEmpty() else emptyList() },
+        insights = state.insights,
+        lead = lead,
+    )
+    Column(Modifier.fillMaxWidth()) {
+        if (isToday) {
+            val losingWeight = state.profile?.majorGoal?.takeIf { it.type.byWeight }?.let { g -> (g.targetKg ?: 0.0) < (g.startKg ?: 0.0) }
+            val session = state.plan?.days?.firstOrNull { it.day == today.dayOfWeek }
+            val sessionDone = session != null && state.workouts.any { it.date() == today && PlanMatch.matches(session, it) }
+            TodayChecklist(
+                state = state.streak,
+                session = session,
+                sessionDone = sessionDone,
+                compact = state.compactList,
+                onCompactChange = onCompactListChange,
+                onStartSession = onStartSession,
+                onToggleHabit = onToggleHabit,
+                onOpenHabits = onOpenHabits,
+                onOpenSettings = onOpenGoals,
             )
-            HealthConnectAvailability.NOT_INSTALLED, HealthConnectAvailability.UPDATE_REQUIRED -> InfoCard(
-                icon = ResurgeIcons.Activity,
-                title = if (state.availability == HealthConnectAvailability.NOT_INSTALLED) "Install Health Connect" else "Update Health Connect",
-                body = "Resurge reads your steps, sleep and workouts through Health Connect, so they count toward your streak.",
-                action = "Open Play Store",
-                onAction = onInstall,
-            )
-            HealthConnectAvailability.AVAILABLE -> when (state.permissions) {
-                PermissionState.UNKNOWN -> TodaySkeleton()
-                PermissionState.NONE -> InfoCard(
-                    icon = ResurgeIcons.Watch,
-                    title = "Connect your health data",
-                    body = "Allow Resurge to read sleep, steps, calories, workouts and heart rate via Health Connect. Runs and walks then log themselves.",
-                    action = "Connect Health Connect",
-                    onAction = onConnect,
-                )
-                PermissionState.PARTIAL, PermissionState.ALL -> {
-                    if (state.permissions == PermissionState.PARTIAL) {
-                        PartialBanner(onConnect)
-                        Spacer(Modifier.height(10.dp))
-                    }
-                    state.error?.let {
-                        InfoCard(ResurgeIcons.Activity, "Couldn't read Health Connect", "Check that Health Connect is set up, then try again.", action = "Retry", onAction = onRetry)
-                        Spacer(Modifier.height(10.dp))
-                    }
-                }
+            if (state.habits?.isEmpty() == true) {
+                Spacer(Modifier.height(4.dp))
+                Button("Add a habit", onClick = onAddHabit, variant = ButtonVariant.Ghost, modifier = Modifier.fillMaxWidth())
             }
-        }
-        // Draws nothing (and takes no space) unless a reel is waiting; it brings its own spacing.
-        reelCard?.invoke()
-        state.weightImport?.let { count ->
-            WeightImportCard(count, state.importingWeight, onImport = onImportWeights, onDismiss = onDismissWeightImport)
-            Spacer(Modifier.height(10.dp))
-        }
-        val day = state.today
-        if (state.healthReady) {
-            if (day != null) {
-                VitalTiles(
-                    day = day,
-                    targets = state.profile?.targets ?: Targets(),
-                    sparklines = state.sparklines,
-                    weight = state.weight,
-                    eatenKcal = state.eaten.kcal,
-                    units = units,
-                    losingWeight = losingWeight,
-                    onOpen = onOpenMetric,
-                )
-            } else if (state.error == null) TodaySkeleton()
-        } else if (state.availability != null) {
-            Spacer(Modifier.height(10.dp))
-            WeightVitalRow(state.weight, units, losingWeight, onOpenMetric)
+            Vitals(state, units, losingWeight, onConnect, onInstall, onRetry, onOpenMetric, onImportWeights, onDismissWeightImport, reelCard)
         }
 
-        pinned?.let { insight ->
+        Feed(
+            day = feed,
+            today = today,
+            units = units,
+            commander = state.profile?.coachStyle == CoachStyle.COMMANDER,
+            actions = FeedActions(
+                onOpenMeal = onOpenMeal,
+                onOpenWorkout = onOpenWorkout,
+                onOpenSleep = { onOpenMetric(HealthMetric.SLEEP) },
+                onOpenInsights = onOpenInsights,
+                onOpenInsight = onOpenInsight,
+            ),
+        )
+
+        lead?.let { insight ->
             SectionLabel("From your coach")
             key(insight.id) {
                 CoachCard(
@@ -266,25 +336,83 @@ fun TodayScreen(
                 )
             }
         }
-
-        Feed(
-            days = feed,
-            today = today,
-            units = units,
-            commander = commander,
-            actions = FeedActions(
-                onOpenMeal = onOpenMeal,
-                onOpenWorkout = onOpenWorkout,
-                onOpenSleep = { onOpenMetric(HealthMetric.SLEEP) },
-                onOpenInsights = onOpenInsights,
-                onOpenInsight = onOpenInsight,
-            ),
-        )
-        Spacer(Modifier.height(32.dp + LocalFloatingBarInset.current))
     }
+}
 
-    if (state.showDayComplete) DayCompleteDialog(state, onDismissDayComplete)
-    detail?.let { StreakDetailDialog(it, state.streak, state.profile?.habitSettings ?: HabitSettings(), onSaveDayGoals) { detail = null } }
+/** Today's vitals, or what Health Connect needs first. */
+@Composable
+private fun Vitals(
+    state: DashboardUiState,
+    units: UnitSystem,
+    losingWeight: Boolean?,
+    onConnect: () -> Unit,
+    onInstall: () -> Unit,
+    onRetry: () -> Unit,
+    onOpenMetric: (HealthMetric) -> Unit,
+    onImportWeights: (alsoWrite: Boolean) -> Unit,
+    onDismissWeightImport: () -> Unit,
+    reelCard: (@Composable () -> Unit)?,
+) {
+    SectionLabel("Vitals")
+    when (state.availability) {
+        null -> TodaySkeleton()
+        HealthConnectAvailability.NOT_SUPPORTED -> InfoCard(
+            icon = ResurgeIcons.Activity,
+            title = "Health Connect isn't available",
+            body = "This device doesn't support Health Connect, so sleep, steps and heart rate can't be shown.",
+        )
+        HealthConnectAvailability.NOT_INSTALLED, HealthConnectAvailability.UPDATE_REQUIRED -> InfoCard(
+            icon = ResurgeIcons.Activity,
+            title = if (state.availability == HealthConnectAvailability.NOT_INSTALLED) "Install Health Connect" else "Update Health Connect",
+            body = "Resurge reads your steps, sleep and workouts through Health Connect, so they count toward your streak.",
+            action = "Open Play Store",
+            onAction = onInstall,
+        )
+        HealthConnectAvailability.AVAILABLE -> when (state.permissions) {
+            PermissionState.UNKNOWN -> TodaySkeleton()
+            PermissionState.NONE -> InfoCard(
+                icon = ResurgeIcons.Watch,
+                title = "Connect your health data",
+                body = "Allow Resurge to read sleep, steps, calories, workouts and heart rate via Health Connect. Runs and walks then log themselves.",
+                action = "Connect Health Connect",
+                onAction = onConnect,
+            )
+            PermissionState.PARTIAL, PermissionState.ALL -> {
+                if (state.permissions == PermissionState.PARTIAL) {
+                    PartialBanner(onConnect)
+                    Spacer(Modifier.height(10.dp))
+                }
+                state.error?.let {
+                    InfoCard(ResurgeIcons.Activity, "Couldn't read Health Connect", "Check that Health Connect is set up, then try again.", action = "Retry", onAction = onRetry)
+                    Spacer(Modifier.height(10.dp))
+                }
+            }
+        }
+    }
+    // Draws nothing (and takes no space) unless a reel is waiting; it brings its own spacing.
+    reelCard?.invoke()
+    state.weightImport?.let { count ->
+        WeightImportCard(count, state.importingWeight, onImport = onImportWeights, onDismiss = onDismissWeightImport)
+        Spacer(Modifier.height(10.dp))
+    }
+    val day = state.today
+    if (state.healthReady) {
+        if (day != null) {
+            VitalTiles(
+                day = day,
+                targets = state.profile?.targets ?: Targets(),
+                sparklines = state.sparklines,
+                weight = state.weight,
+                eatenKcal = state.eaten.kcal,
+                units = units,
+                losingWeight = losingWeight,
+                onOpen = onOpenMetric,
+            )
+        } else if (state.error == null) TodaySkeleton()
+    } else if (state.availability != null) {
+        Spacer(Modifier.height(10.dp))
+        WeightVitalRow(state.weight, units, losingWeight, onOpenMetric)
+    }
 }
 
 @DrawableRes

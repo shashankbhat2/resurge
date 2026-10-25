@@ -45,8 +45,7 @@ import com.resurgeai.core.designsystem.components.MainHeader
 import com.resurgeai.core.designsystem.components.MainHeaderHeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.composeunstyled.Text
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
+import java.time.LocalTime
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -594,10 +593,12 @@ private fun TabsShell(
                     // Blur tapers evenly to none at the fade's end, so there's no hard edge at the bottom.
                     progressive = HazeProgressive.verticalGradient(easing = LinearEasing, startIntensity = 1f, endIntensity = 0f)
                 },
-            // Today's header is the date, left of the profile photo.
+            // Today's header greets by the time of day, left of the profile photo.
             leading = if (currentTab == Tab.Today) {
-                { Text(LocalDate.now().format(TODAY_HEADER), style = Resurge.type.headline, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                { Text(greeting(LocalTime.now(), profile.firstName), style = Resurge.type.headline, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             } else null,
+            // On Today the blur stops where the day strip starts.
+            fade = if (currentTab == Tab.Today) 0.dp else 40.dp,
             trailing = {
                 // Fitness and Food get a "+" to log, left of the profile photo.
                 val onAdd = when (currentTab) {
@@ -658,7 +659,16 @@ data class ProgressSignal(val count: Int = 0, val capture: Boolean = false, val 
 /** Scale notifications and the weight widget: open Weight, its log sheet, or Smart scale settings. */
 data class WeightSignal(val count: Int = 0, val log: Boolean = false, val smartScale: Boolean = false)
 
-private val TODAY_HEADER = DateTimeFormatter.ofPattern("EEEE, d MMMM")
+/** "Good morning, Sam" and so on through the day. */
+private fun greeting(now: LocalTime, firstName: String?): String {
+    val part = when (now.hour) {
+        in 5..11 -> "Good morning"
+        in 12..16 -> "Good afternoon"
+        in 17..21 -> "Good evening"
+        else -> "Good night"
+    }
+    return firstName?.let { "$part, $it" } ?: part
+}
 
 private fun NavHostController.switchTab(route: Any) = navigate(route) {
     popUpTo(graph.findStartDestination().id) { saveState = true }

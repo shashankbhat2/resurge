@@ -25,19 +25,31 @@ class TodayFeedTest {
     private fun insight(id: String, time: Instant) = CoachInsight(id, InsightKind.ACTIVITY, null, id, "", emptyList(), null, time, null)
 
     @Test
-    fun `mixes entries newest first by day, drops older days and the lead insight`() {
+    fun `one day newest first, without other days or the lead insight`() {
         val lead = insight("lead", at(today, 9))
-        val days = TodayFeed.build(
-            today = today,
-            meals = listOf(meal("lunch", at(today, 13)), meal("old", at(today.minusDays(2), 13))),
-            workouts = listOf(workout("run", at(today, 7)), workout("gym", at(today.minusDays(1), 18))),
-            sleep = listOf(SleepSession(at(today.minusDays(1), 23), at(today, 6), emptyMap(), null, id = "s")),
-            insights = listOf(lead, insight("older", at(today.minusDays(1), 19))),
-            lead = lead,
-            zone = zone,
+        val meals = listOf(meal("lunch", at(today, 13)), meal("old", at(today.minusDays(2), 13)))
+        val workouts = listOf(workout("run", at(today, 7)), workout("gym", at(today.minusDays(1), 18)))
+        val sleep = listOf(SleepSession(at(today.minusDays(1), 23), at(today, 6), emptyMap(), null, id = "s"))
+        val insights = listOf(lead, insight("older", at(today.minusDays(1), 19)))
+
+        val day = TodayFeed.build(today, meals, workouts, sleep, insights, lead, zone)
+        assertEquals(listOf("meal_lunch", "workout_run", "sleep_s"), day.items.map { it.key })
+
+        // Yesterday has its own entries; the night that ended this morning belongs to today.
+        val yesterday = TodayFeed.build(today.minusDays(1), meals, workouts, sleep, insights, lead = null, zone = zone)
+        assertEquals(listOf("insight_older", "workout_gym"), yesterday.items.map { it.key })
+    }
+
+    @Test
+    fun `the lead is the day's newest unseen insight`() {
+        val insights = listOf(
+            insight("seen", at(today, 11)).copy(seen = true),
+            insight("dismissed", at(today, 10)),
+            insight("morning", at(today, 7)),
+            insight("yesterday", at(today.minusDays(1), 20)),
         )
-        assertEquals(listOf(today, today.minusDays(1)), days.map { it.date })
-        assertEquals(listOf("meal_lunch", "workout_run", "sleep_s"), days[0].items.map { it.key })
-        assertEquals(listOf("insight_older", "workout_gym"), days[1].items.map { it.key })
+        assertEquals("morning", TodayFeed.lead(today, insights, dismissed = setOf("dismissed"), zone = zone)?.id)
+        assertEquals("yesterday", TodayFeed.lead(today.minusDays(1), insights, emptySet(), zone)?.id)
+        assertEquals(null, TodayFeed.lead(today.minusDays(2), insights, emptySet(), zone))
     }
 }

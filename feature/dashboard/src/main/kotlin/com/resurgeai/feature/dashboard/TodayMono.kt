@@ -59,90 +59,77 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/** The day streak as one big number, with the best run beside it. Tapping opens the streak sheet. */
-@Composable
-internal fun StreakHero(state: DayStreakState, onOpen: () -> Unit) {
-    val current = state.streak.current
-    UnstyledButton(
-        onClick = onOpen,
-        modifier = Modifier.fillMaxWidth().clip(Resurge.shape.md).semantics { contentDescription = "Day streak: ${days(current)}. Open" },
-        indication = LocalIndication.current,
-        contentPadding = PaddingValues(vertical = 4.dp),
-    ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
-            Column(Modifier.weight(1f)) {
-                Text("$current", style = Resurge.type.tide.copy(fontSize = 64.sp, lineHeight = 64.sp, letterSpacing = (-2.5).sp, fontFeatureSettings = "tnum"))
-                Text(
-                    if (current == 0) "Finish today to start a streak" else "day streak",
-                    style = Resurge.type.body,
-                    color = Resurge.colors.textMuted,
-                )
-            }
-            if (state.streak.best > 0) {
-                Text(
-                    if (current > 0 && current >= state.streak.best) "Your best yet" else "Best ${state.streak.best}",
-                    style = Resurge.type.label,
-                    color = Resurge.colors.textSubtle,
-                    modifier = Modifier.padding(bottom = 4.dp),
-                )
-            }
-        }
-    }
-}
-
 /**
- * This week as seven squares (met in up, a freeze in mid, missed in down, today outlined in the
- * accent) with the count against the weekly target and what it still takes.
+ * The day streak and this week in one card: the streak as one big number with the best run beside
+ * it, then this week as seven squares (met in up, a freeze in mid, missed in down, today outlined in
+ * the accent) with the count against the weekly target. Each half opens its own sheet.
  */
 @Composable
-internal fun WeekCard(state: DayStreakState, goal: MajorGoal?, today: LocalDate, onOpen: () -> Unit) {
+internal fun StreakWeekCard(state: DayStreakState, goal: MajorGoal?, today: LocalDate, onOpenStreak: () -> Unit, onOpenWeek: () -> Unit) {
+    val current = state.streak.current
     val week = state.week
     val weekNumber = goal?.let { ChronoUnit.WEEKS.between(DayStreakMath.weekStart(it.startDate), week.start).toInt() + 1 }
-    MonoCard(onClick = onOpen, description = "This week: ${week.metDays} of ${week.target} good days. Open") {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
-            Text(
-                if (weekNumber != null && weekNumber >= 1) "Week $weekNumber" else "This week",
-                style = Resurge.type.headline,
-                modifier = Modifier.weight(1f),
-            )
-            Text("${week.metDays}", style = Resurge.type.headline.copy(fontFeatureSettings = "tnum"))
-            Text(" / ${week.target} good days", style = Resurge.type.label, color = Resurge.colors.textSubtle)
-        }
-        Spacer(Modifier.height(14.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            (0 until 7).forEach { i ->
-                val date = week.start.plusDays(i.toLong())
-                // Days before the goal began don't count for or against it.
-                val status = if (goal != null && date.isBefore(goal.startDate)) DayStatus.NONE else state.streak.days[date]
-                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    DaySquare(status, isToday = date == today, future = date.isAfter(today))
-                    Spacer(Modifier.height(6.dp))
+    Column(Modifier.fillMaxWidth().clip(Resurge.shape.md).background(Resurge.colors.surface)) {
+        UnstyledButton(
+            onClick = onOpenStreak,
+            modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Day streak: ${days(current)}. Open" },
+            indication = LocalIndication.current,
+            contentAlignment = Alignment.TopStart,
+        ) {
+            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 14.dp), verticalAlignment = Alignment.Bottom) {
+                Column(Modifier.weight(1f)) {
+                    Text("$current", style = Resurge.type.tide.copy(fontSize = 64.sp, lineHeight = 64.sp, letterSpacing = (-2.5).sp, fontFeatureSettings = "tnum"))
                     Text(
-                        date.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.getDefault()),
-                        style = Resurge.type.caption,
-                        color = if (date == today) Resurge.colors.accent else Resurge.colors.textSubtle,
+                        if (current == 0) "Finish today to start a streak" else "day streak",
+                        style = Resurge.type.body,
+                        color = Resurge.colors.textMuted,
+                    )
+                }
+                if (state.streak.best > 0) {
+                    Text(
+                        if (current > 0 && current >= state.streak.best) "Your best yet" else "Best ${state.streak.best}",
+                        style = Resurge.type.label,
+                        color = Resurge.colors.textSubtle,
+                        modifier = Modifier.padding(bottom = 4.dp),
                     )
                 }
             }
         }
-        Spacer(Modifier.height(12.dp))
-        val needed = week.target - week.metDays
-        val partFirstWeek = goal != null && goal.startDate.isAfter(week.start) && !goal.startDate.isAfter(today)
-        // Days still to play this week, today included while it's open.
-        val left = ChronoUnit.DAYS.between(today, week.start.plusDays(7)).toInt() - (if (state.todayMet) 1 else 0)
-        val (text, signal) = when {
-            needed <= 0 -> "Week won" to PaceSignal.UP
-            partFirstWeek -> "A short first week. Full weeks count from ${week.start.plusDays(7).dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())}." to null
-            needed > left -> "Out of reach this week. Keep the streak going." to PaceSignal.DOWN
-            needed >= left - 1 -> "$needed more good ${if (needed == 1) "day" else "days"} needed, $left left" to PaceSignal.MID
-            else -> "$needed more good ${if (needed == 1) "day" else "days"} needed, $left left" to null
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (signal != null) {
-                Box(Modifier.size(6.dp).clip(Resurge.shape.pill).background(signalColor(signal)))
-                Spacer(Modifier.width(8.dp))
+        Box(Modifier.padding(horizontal = 16.dp).fillMaxWidth().height(1.dp).background(Resurge.colors.border))
+        UnstyledButton(
+            onClick = onOpenWeek,
+            modifier = Modifier.fillMaxWidth().semantics { contentDescription = "This week: ${week.metDays} of ${week.target} good days. Open" },
+            indication = LocalIndication.current,
+            contentAlignment = Alignment.TopStart,
+        ) {
+            Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 16.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        if (weekNumber != null && weekNumber >= 1) "Week $weekNumber" else "This week",
+                        style = Resurge.type.headline,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text("${week.metDays}", style = Resurge.type.headline.copy(fontFeatureSettings = "tnum"))
+                    Text(" / ${week.target} good days", style = Resurge.type.label, color = Resurge.colors.textSubtle)
+                }
+                Spacer(Modifier.height(14.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    (0 until 7).forEach { i ->
+                        val date = week.start.plusDays(i.toLong())
+                        // Days before the goal began don't count for or against it.
+                        val status = if (goal != null && date.isBefore(goal.startDate)) DayStatus.NONE else state.streak.days[date]
+                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                            DaySquare(status, isToday = date == today, future = date.isAfter(today))
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                date.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.getDefault()),
+                                style = Resurge.type.caption,
+                                color = if (date == today) Resurge.colors.accent else Resurge.colors.textSubtle,
+                            )
+                        }
+                    }
+                }
             }
-            Text(text, style = Resurge.type.caption, color = Resurge.colors.textMuted)
         }
     }
 }

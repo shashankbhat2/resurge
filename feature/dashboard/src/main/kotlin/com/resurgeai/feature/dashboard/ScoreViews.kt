@@ -19,7 +19,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.contentDescription
@@ -31,8 +34,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composeunstyled.Text
 import com.composeunstyled.UnstyledButton
-import com.resurgeai.core.designsystem.components.SegmentOption
-import com.resurgeai.core.designsystem.components.SegmentedControl
 import com.resurgeai.core.designsystem.components.SkeletonCircle
 import com.resurgeai.core.designsystem.components.SkeletonGroup
 import com.resurgeai.core.designsystem.components.SkeletonLine
@@ -100,6 +101,30 @@ internal fun ringValue(history: ScoreHistory, kind: ScoreKind, period: ScorePeri
     return RingValue(avg, signal, note, false)
 }
 
+/** A score on one day, for the ring on Today when the strip is on that day. */
+internal fun ringValueOn(history: ScoreHistory, kind: ScoreKind, date: LocalDate): RingValue {
+    val s = history.days.firstOrNull { it.recovery.date == date }?.get(kind) ?: return RingValue(null, null, "No score", false)
+    val note = when {
+        s.value == null -> s.missing.orEmpty()
+        s.soFar && kind == ScoreKind.EFFORT -> "So far · ${s.headline}"
+        else -> s.headline
+    }
+    return RingValue(s.value, s.signal, note, s.soFar)
+}
+
+/** Each score's own hue, light where the ring starts to dark where it ends. */
+internal data class ScoreHue(val light: Color, val dark: Color)
+
+@Composable
+internal fun scoreHue(kind: ScoreKind): ScoreHue {
+    val darkTheme = Resurge.colors.bg.luminance() < 0.5f
+    return when (kind) {
+        ScoreKind.RECOVERY -> if (darkTheme) ScoreHue(Color(0xFFBDFFEF), Color(0xFF14C9A0)) else ScoreHue(Color(0xFF7DE8CF), Color(0xFF007A62))
+        ScoreKind.EFFORT -> if (darkTheme) ScoreHue(Color(0xFFFFE2A6), Color(0xFFFF7A2E)) else ScoreHue(Color(0xFFFFC37A), Color(0xFFC2410C))
+        ScoreKind.FUEL -> if (darkTheme) ScoreHue(Color(0xFFDCD7FF), Color(0xFF7B6CF6)) else ScoreHue(Color(0xFFB4AAFF), Color(0xFF4B3BC7))
+    }
+}
+
 /** Ring colour: the signal, or grey while it isn't a verdict yet. */
 @Composable
 internal fun scoreColor(signal: PaceSignal?): Color = signal?.let { signalColor(it) } ?: Resurge.colors.textSubtle
@@ -114,6 +139,8 @@ internal fun ScoreRing(
     numberStyle: TextStyle,
     modifier: Modifier = Modifier,
     caption: String? = null,
+    /** Fills the ring light to dark instead of in [color]. */
+    hue: ScoreHue? = null,
 ) {
     val track = Resurge.colors.border
     Box(modifier.size(size), contentAlignment = Alignment.Center) {
@@ -123,7 +150,22 @@ internal fun ScoreRing(
             val arcSize = Size(this.size.width - w, this.size.height - w)
             drawArc(track, 0f, 360f, false, Offset(inset, inset), arcSize, style = Stroke(w))
             if (value != null && value > 0) {
-                drawArc(color, -90f, 360f * value / 100f, false, Offset(inset, inset), arcSize, style = Stroke(w, cap = StrokeCap.Round))
+                val sweep = 360f * value / 100f
+                if (hue == null) {
+                    drawArc(color, -90f, sweep, false, Offset(inset, inset), arcSize, style = Stroke(w, cap = StrokeCap.Round))
+                } else {
+                    // The sweep gradient starts at 3 o'clock, so turn the canvas to start it at the top.
+                    val end = sweep / 360f
+                    val brush = Brush.sweepGradient(
+                        0f to hue.light,
+                        end to hue.dark,
+                        (end + 0.02f).coerceAtMost(1f) to hue.dark,
+                        1f to hue.light,
+                    )
+                    rotate(-90f) {
+                        drawArc(brush, 0f, sweep, false, Offset(inset, inset), arcSize, style = Stroke(w, cap = StrokeCap.Round))
+                    }
+                }
             }
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -133,34 +175,20 @@ internal fun ScoreRing(
     }
 }
 
-/** Today's three scores under the streak, with a Today / Week / Month switch. Each ring opens its detail. */
+/** The three scores for one day. Each ring opens its detail. */
 @Composable
-internal fun ScoreRings(
-    history: ScoreHistory,
-    period: ScorePeriod,
-    onPeriodChange: (ScorePeriod) -> Unit,
-    onOpen: (ScoreKind) -> Unit,
-) {
-    Column(Modifier.fillMaxWidth()) {
-        SegmentedControl(
-            options = ScorePeriod.entries.map { SegmentOption(it, it.label) },
-            selected = period,
-            onSelect = onPeriodChange,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(10.dp))
-        if (!history.loaded) {
-            SkeletonGroup {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ScoreKind.entries.forEach { kind -> RingCardSkeleton(kind, Modifier.weight(1f)) }
-                }
+internal fun ScoreRings(history: ScoreHistory, date: LocalDate, onOpen: (ScoreKind) -> Unit) {
+    if (!history.loaded) {
+        SkeletonGroup {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ScoreKind.entries.forEach { kind -> RingCardSkeleton(kind, Modifier.weight(1f)) }
             }
-            return@Column
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ScoreKind.entries.forEach { kind ->
-                RingCard(kind, ringValue(history, kind, period), Modifier.weight(1f)) { onOpen(kind) }
-            }
+        return
+    }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        ScoreKind.entries.forEach { kind ->
+            RingCard(kind, ringValueOn(history, kind, date), Modifier.weight(1f)) { onOpen(kind) }
         }
     }
 }
@@ -190,7 +218,8 @@ private fun RingCardSkeleton(kind: ScoreKind, modifier: Modifier) {
 
 @Composable
 private fun RingCard(kind: ScoreKind, ring: RingValue, modifier: Modifier, onClick: () -> Unit) {
-    val color = scoreColor(ring.signal)
+    val hue = scoreHue(kind)
+    val color = if (ring.value == null) Resurge.colors.textSubtle else hue.dark
     UnstyledButton(
         onClick = onClick,
         modifier = modifier
@@ -203,14 +232,14 @@ private fun RingCard(kind: ScoreKind, ring: RingValue, modifier: Modifier, onCli
             Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 14.dp, bottom = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            ScoreRing(ring.value, color, size = 76.dp, stroke = 7.dp, numberStyle = Resurge.type.headline.copy(fontSize = 24.sp, lineHeight = 26.sp))
+            ScoreRing(ring.value, color, size = 76.dp, stroke = 7.dp, numberStyle = Resurge.type.headline.copy(fontSize = 24.sp, lineHeight = 26.sp), hue = hue)
             Spacer(Modifier.height(8.dp))
             Text(kind.label, style = Resurge.type.label, color = Resurge.colors.text)
             Spacer(Modifier.height(2.dp))
             Text(
                 ring.note,
                 style = Resurge.type.caption,
-                color = if (ring.signal == null) Resurge.colors.textSubtle else color,
+                color = color,
                 textAlign = TextAlign.Center,
                 minLines = 2,
                 maxLines = 2,
