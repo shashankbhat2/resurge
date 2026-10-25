@@ -132,10 +132,13 @@ async function anthropicWebLookup(
   try {
     const res = await client.messages.create({
       model: opts.model ?? WEB_LOOKUP_MODEL,
-      max_tokens: 1500,
+      // Haiku 5.5 thinks by default; with a small cap the answer was cut off before the numbers.
+      max_tokens: 4000,
+      output_config: { effort: "low" },
       messages: [{ role: "user", content: PROMPT(query) }],
       tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 1 }],
     });
+    if (res.stop_reason === "max_tokens") return null;
     text = res.content.filter((c) => c.type === "text").map((c) => c.text).join("\n");
     for (const block of res.content) {
       if (block.type === "web_search_tool_result" && Array.isArray(block.content)) {
