@@ -1,0 +1,240 @@
+@import "tailwindcss";
+
+/* Resurge Mono: the app's own tokens. */
+@theme {
+  --color-bg: #000000;
+  --color-surface: #0d0d0d;
+  --color-surface-2: #161616;
+  --color-line: #1f1f1f;
+  --color-line-strong: #333333;
+  --color-muted: #a3a3a3;
+  --color-subtle: #7a7a7a;
+  --color-faint: #5c5c5c;
+  --color-dim: #8f8f8f;
+  --color-accent: #8b7cff;
+  --color-accent-soft: #c9c2ff;
+  --color-accent-tint: #1a1730;
+  --color-up: #22f5c3;
+  --color-recovery: #14c9a0;
+  --color-effort: #ff7a2e;
+  --color-fuel: #9c90ff;
+  --color-energy: #ff9a57;
+  --color-water: #5cc8f2;
+
+  --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("/fonts/bricolage.ttf") format("truetype");
+  font-weight: 200 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Figtree";
+  src: url("/fonts/figtree.ttf") format("truetype");
+  font-weight: 300 900;
+  font-display: swap;
+}
+
+@layer base {
+  html {
+    background: var(--color-bg);
+    color: #fff;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    scroll-behavior: smooth;
+  }
+  ::selection {
+    background: var(--color-accent);
+    color: #000;
+  }
+}
+
+/* Big two-line headlines: the second line steps back. */
+@utility headline {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.045em;
+}
+
+/* Intro on scroll: rise, sharpen and fade in. Children can stagger with --d (0, 1, 2…). */
+.reveal {
+  --delay: calc(var(--d, 0) * 90ms);
+  opacity: 0;
+  transform: translateY(28px);
+  filter: blur(10px);
+  /* Hover lifts (translate, border) stay quick and undelayed. */
+  transition:
+    opacity 0.9s var(--ease-out-soft) var(--delay),
+    transform 0.9s var(--ease-out-soft) var(--delay),
+    filter 0.9s var(--ease-out-soft) var(--delay),
+    translate 0.5s var(--ease-out-soft),
+    border-color 0.5s var(--ease-out-soft);
+}
+.reveal.is-in {
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+
+/* A score ring that fills from nothing when it comes into view. */
+@property --p {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+.score-ring {
+  --p: 0;
+  position: relative;
+  width: var(--size, 56px);
+  height: var(--size, 56px);
+  flex-shrink: 0;
+}
+.score-ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: conic-gradient(
+    var(--light) 0deg,
+    var(--dark) calc(var(--p) * 3.6deg),
+    #222 calc(var(--p) * 3.6deg)
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--w, 6px)), #000 calc(100% - var(--w, 6px) + 0.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - var(--w, 6px)), #000 calc(100% - var(--w, 6px) + 0.5px));
+  transition: --p 1.6s var(--ease-out-soft);
+}
+.score-ring > * {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.is-in .score-ring,
+.score-ring.is-in {
+  --p: var(--target);
+}
+
+/* Bars that grow to their value. */
+.bar > span {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  transition: width 1.2s var(--ease-out-soft) 0.2s;
+}
+.is-in .bar > span {
+  width: var(--target);
+}
+
+/* The hero glow breathes slowly. */
+@keyframes breathe {
+  50% {
+    opacity: 0.55;
+    transform: scale(1.06);
+  }
+}
+.glow {
+  animation: breathe 9s ease-in-out infinite;
+}
+
+/* Floating cards bob gently around the hero phone. */
+@keyframes float {
+  50% {
+    translate: 0 -10px;
+  }
+}
+.float {
+  animation: float 7s ease-in-out infinite;
+  animation-delay: calc(var(--d, 0) * -1.6s);
+}
+
+/* The score story: steps step back unless they're the one in view. */
+.story-step {
+  opacity: 0.22;
+  transition: opacity 0.5s var(--ease-out-soft);
+}
+.story-step.is-active {
+  opacity: 1;
+}
+.story-panel {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: translateY(16px) scale(0.98);
+  transition:
+    opacity 0.55s var(--ease-out-soft),
+    transform 0.55s var(--ease-out-soft);
+  pointer-events: none;
+}
+.story-panel.is-active {
+  opacity: 1;
+  transform: none;
+}
+
+/* Release notes come from GitHub as Markdown. */
+.notes h3 {
+  margin: 2rem 0 0;
+  font-size: 1.375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #fff;
+}
+.notes h3:first-child {
+  margin-top: 0;
+}
+.notes p {
+  margin: 0.75rem 0 0;
+}
+.notes ul {
+  margin: 0.75rem 0 0;
+  padding-left: 1.25rem;
+  list-style: disc;
+}
+.notes li + li {
+  margin-top: 0.35rem;
+}
+.notes a {
+  color: var(--color-accent-soft);
+}
+
+details > summary {
+  list-style: none;
+}
+details > summary::-webkit-details-marker {
+  display: none;
+}
+details[open] .faq-plus {
+  transform: rotate(45deg);
+}
+
+/*
+ * Reduce motion: no rising, blurring, floating or scrolling strips, but things still fade in, rings
+ * still fill and the score story still crossfades, since none of that moves across the screen.
+ */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .reveal {
+    transform: none;
+    filter: none;
+    transition: opacity 0.8s ease var(--delay);
+  }
+  .story-panel {
+    transform: none;
+  }
+  .glow,
+  .float {
+    animation: none;
+  }
+}

@@ -1,0 +1,72 @@
+---
+import Ring from './Ring.astro';
+
+/** One screen of the score story: a score's ring and what went into it, or the coach chat. */
+interface Props {
+  step: number;
+}
+
+const SCREENS = [
+  { kind: 'recovery', eyebrow: 'Recovery · today', value: 92, label: 'of 100', headline: 'Ready to train', color: '#14C9A0',
+    rows: [['Sleep', '7h 12m', 92], ['Resting heart rate', '52 bpm', 80], ['HRV', '48 ms', 70]] },
+  { kind: 'effort', eyebrow: 'Effort · so far', value: 56, label: 'range 45–70', headline: 'In range', color: '#FF7A2E',
+    rows: [['Long run', '58 min', 85], ['Steps', '9,175', 70], ['Planned session', 'Done', 100]] },
+  { kind: 'fuel', eyebrow: 'Fuel · so far', value: 84, label: 'on pace', headline: 'On track', color: '#9C90FF',
+    rows: [['Protein', '112 of 130 g', 86], ['Meals', '3 of 3', 100], ['Water', '2.1 of 3 L', 70]] },
+] as const;
+
+const { step } = Astro.props;
+const s = SCREENS[step];
+---
+
+<div class="flex h-full flex-col gap-3.5 px-[18px] pt-[52px]">
+  {
+    s ? (
+      <>
+        <span class="text-[13px] text-subtle">{s.eyebrow}</span>
+        <div class="flex flex-col items-center gap-3.5 pt-3.5 pb-1.5">
+          <Ring value={s.value} kind={s.kind} size={170} stroke={13}>
+            <span class="font-display text-[54px] leading-none font-semibold tracking-[-0.04em]">{s.value}</span>
+            <span class="mt-1 text-[13px] text-muted">{s.label}</span>
+          </Ring>
+          <span class="text-[15px] font-semibold" style={`color:${s.color}`}>{s.headline}</span>
+        </div>
+        <div class="flex flex-col gap-2">
+          {s.rows.map(([label, value, pct]) => (
+            <div class="flex flex-col gap-2 rounded-[14px] bg-surface px-3.5 py-3">
+              <div class="flex justify-between text-[13px]">
+                <span class="font-semibold">{label}</span>
+                <span class="text-muted">{value}</span>
+              </div>
+              <div class="bar h-1 overflow-hidden rounded bg-[#1C1C1C]">
+                <span style={`--target:${pct}%;background:${s.color}`} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </>
+    ) : (
+      <>
+        <span class="text-[13px] text-subtle">Coach</span>
+        <div class="flex flex-col gap-2.5 pt-1.5">
+          <div class="max-w-[80%] self-end rounded-[18px_18px_4px_18px] bg-accent-tint px-3.5 py-3 text-sm leading-snug">
+            Should I still do intervals today?
+          </div>
+          <div class="flex items-start gap-2.5">
+            <span class="flex size-[26px] shrink-0 items-center justify-center rounded-full bg-white text-black">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.2 6.3 6.3 2.2-6.3 2.2L12 19.5l-2.2-6.3L3.5 11l6.3-2.2z" /></svg>
+            </span>
+            <div class="rounded-[18px_18px_18px_4px] bg-surface px-3.5 py-3 text-sm leading-normal text-[#D4D4D4]">
+              Recovery is 92, so yes, but your Fuel is at 47 by lunch. Eat something with protein first, then do the 6 × 400 m from your plan.
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-1.5 pl-9 text-[11px]">
+            <span class="rounded-full bg-surface-2 px-2.5 py-1 text-recovery">Recovery 92</span>
+            <span class="rounded-full bg-surface-2 px-2.5 py-1 text-effort">Effort 56</span>
+            <span class="rounded-full bg-surface-2 px-2.5 py-1 text-fuel">Fuel 47</span>
+          </div>
+        </div>
+      </>
+    )
+  }
+</div>

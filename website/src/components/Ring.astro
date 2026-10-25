@@ -1,0 +1,30 @@
+---
+/**
+ * A score ring in the app's style: fills light to dark in the score's hue, from empty to [value]
+ * the first time it (or its .reveal parent) comes into view.
+ */
+interface Props {
+  value: number;
+  kind: 'recovery' | 'effort' | 'fuel';
+  size?: number;
+  stroke?: number;
+  class?: string;
+}
+
+const HUES = {
+  recovery: ['#BDFFEF', '#14C9A0'],
+  effort: ['#FFE2A6', '#FF7A2E'],
+  fuel: ['#DCD7FF', '#9C90FF'],
+};
+const { value, kind, size = 56, stroke = 6, class: className = '' } = Astro.props;
+const [light, dark] = HUES[kind];
+---
+
+<div
+  class:list={['score-ring', className]}
+  style={`--target:${value};--light:${light};--dark:${dark};--size:${size}px;--w:${stroke}px`}
+  role="img"
+  aria-label={`${kind[0].toUpperCase()}${kind.slice(1)} ${value}`}
+>
+  <div><slot /></div>
+</div>

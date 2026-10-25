@@ -1,0 +1,89 @@
+---
+import Phone from './Phone.astro';
+import StoryScreen from './StoryScreen.astro';
+
+const STEPS = [
+  { kicker: 'Recovery', color: '#14C9A0', title: 'How ready you are, before you get up.',
+    body: 'Sleep, resting heart rate and heart rate variability against your own normal, plus how hard yesterday was. One number for whether today is a push or an easy day.' },
+  { kicker: 'Effort', color: '#FF7A2E', title: 'A target that moves with you.',
+    body: 'Workouts, active minutes, steps and the session on your plan. On a well-rested day the range asks more; after a short night it asks less.' },
+  { kicker: 'Fuel', color: '#9C90FF', title: 'Eating to match the day.',
+    body: 'Calories, protein, meals and water, on pace with the clock. Fuel counts the morning as the morning, so 9 am never looks like a failure.' },
+  { kicker: 'The coach', color: '#FFFFFF', title: 'One coach that reads all three.',
+    body: 'Ask anything and the answer starts from your scores, not a generic plan. A note after every workout and night of sleep, and a weekly review on Saturday.' },
+];
+---
+
+<!--
+  The scores, told by scrolling: on wide screens the phone stays put while the steps pass by, and
+  whichever step is mid-screen sets the phone's screen. On phones, each step carries its own screen.
+-->
+<section id="scores" class="mx-auto max-w-[1200px] scroll-mt-24 px-6 pt-40">
+  <p class="reveal text-[13px] tracking-[0.08em] text-accent uppercase">Every morning</p>
+  <h2 class="reveal headline mt-3.5 max-w-[760px] text-[clamp(40px,5.2vw,72px)]" style="--d:1">
+    Three numbers.<br /><span class="text-dim">The whole picture.</span>
+  </h2>
+
+  <div class="mt-6 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-16" data-story>
+    <div>
+      {
+        STEPS.map((s, i) => (
+          <div class:list={['story-step flex flex-col justify-center py-16 lg:min-h-[48vh] lg:py-0', i === 0 && 'is-active']} data-step={i}>
+            <span class="text-sm font-semibold" style={`color:${s.color}`}>{s.kicker}</span>
+            <h3 class="headline mt-3 max-w-[520px] text-[clamp(32px,3.4vw,46px)] leading-[1.04] tracking-[-0.035em]">{s.title}</h3>
+            <p class="mt-4 max-w-[470px] text-lg leading-relaxed text-muted">{s.body}</p>
+            <div class="reveal mt-10 flex justify-center lg:hidden">
+              <Phone width={300} height={600}>
+                <StoryScreen step={i} />
+              </Phone>
+            </div>
+          </div>
+        ))
+      }
+    </div>
+
+    <div class="hidden lg:block">
+      <div class="sticky top-[calc(50vh-320px)] flex justify-center">
+        <Phone width={320} height={640}>
+          {
+            STEPS.map((_, i) => (
+              <div class:list={['story-panel', i === 0 && 'is-active is-in']} data-panel={i}>
+                <StoryScreen step={i} />
+              </div>
+            ))
+          }
+        </Phone>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  const root = document.querySelector<HTMLElement>('[data-story]');
+  if (root) {
+    const steps = [...root.querySelectorAll<HTMLElement>('[data-step]')];
+    const panels = [...root.querySelectorAll<HTMLElement>('[data-panel]')];
+    let active = -1;
+
+    const show = (i: number) => {
+      if (i === active) return;
+      active = i;
+      steps.forEach((el, k) => el.classList.toggle('is-active', k === i));
+      // Leaving a panel empties its ring, so it fills again next time.
+      panels.forEach((el, k) => {
+        el.classList.toggle('is-active', k === i);
+        el.classList.toggle('is-in', k === i);
+      });
+    };
+
+    // The step crossing the middle band of the screen is the one shown.
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) if (e.isIntersecting) show(Number((e.target as HTMLElement).dataset.step));
+      },
+      { rootMargin: '-45% 0px -45% 0px' },
+    );
+    steps.forEach((el) => io.observe(el));
+    show(0);
+  }
+</script>

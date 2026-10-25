@@ -1,0 +1,21 @@
+{
+  "name": "resurge-website",
+  "private": true,
+  "type": "module",
+  "description": "Website for Resurge, the free, open-source AI health coach for Android.",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "deploy": "astro build && wrangler deploy"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "astro": "5.18.2",
+    "marked": "18.1.1",
+    "tailwindcss": "4.3.3"
+  },
+  "devDependencies": {
+    "wrangler": "4.152.0"
+  }
+}

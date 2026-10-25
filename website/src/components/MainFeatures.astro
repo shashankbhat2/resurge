@@ -1,0 +1,54 @@
+---
+import Phone from './Phone.astro';
+
+/** The three big things Resurge does, each with the real screen rising out of its card. */
+const FEATURES = [
+  {
+    title: 'Scores',
+    body: 'Recovery, Effort and Fuel every morning, each against your own normal, with exactly what moved it.',
+    img: '/ui/screen-scores.webp',
+    alt: 'The Recovery screen: a score of 85, ready to train, with sleep, resting heart rate and HRV below.',
+    tint: 'rgba(20,201,160,0.08)',
+  },
+  {
+    title: 'Food',
+    body: 'Snap a photo, say it, or scan a barcode. Numbers come from nutrition tables, so the same dish gets the same values.',
+    img: '/ui/screen-food.webp',
+    alt: 'A logged meal, paneer butter masala with rice, with calories, protein, carbs and fat.',
+    tint: 'rgba(255,154,87,0.07)',
+  },
+  {
+    title: 'Coach',
+    body: 'Ask anything. It knows your plan, your goal and how you slept, and can move a session for you.',
+    img: '/ui/screen-coach.webp',
+    alt: 'A coach chat suggesting moving Friday’s strength session to Thursday after a short night.',
+    tint: 'rgba(139,124,255,0.1)',
+  },
+];
+---
+
+<section class="mx-auto max-w-[1200px] px-6 pt-40">
+  <div class="text-center">
+    <h2 class="reveal headline mx-auto text-[clamp(40px,5.2vw,72px)]">Start the day<br /><span class="text-dim">knowing where you stand.</span></h2>
+    <p class="reveal mx-auto mt-5 max-w-[540px] text-lg leading-relaxed text-muted" style="--d:1">Your watch, your meals and your habits, turned into clear answers you can act on.</p>
+  </div>
+
+  <div class="mt-16 grid gap-4 md:grid-cols-3">
+    {
+      FEATURES.map((f, i) => (
+        <article
+          class="reveal group relative flex h-[600px] flex-col overflow-hidden rounded-[32px] border border-[#1A1A1A] px-8 pt-9"
+          style={`--d:${i};background:radial-gradient(120% 70% at 50% 100%, ${f.tint}, transparent 70%), #0D0D0D`}
+        >
+          <h3 class="headline text-[34px] tracking-[-0.035em]">{f.title}</h3>
+          <p class="mt-3 text-[17px] leading-relaxed text-muted">{f.body}</p>
+          <div class="absolute inset-x-0 -bottom-[220px] flex justify-center transition-[translate] duration-700 ease-out group-hover:-translate-y-3">
+            <Phone width={290} height={600} class="shadow-[0_-20px_80px_rgba(0,0,0,0.6)]">
+              <img src={f.img} alt={f.alt} loading="lazy" decoding="async" class="w-full" />
+            </Phone>
+          </div>
+        </article>
+      ))
+    }
+  </div>
+</section>

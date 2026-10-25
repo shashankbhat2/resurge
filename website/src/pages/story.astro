@@ -1,0 +1,71 @@
+---
+import Base from '../layouts/Base.astro';
+import { REPO } from '../lib/site';
+
+const beliefs = [
+  ['Calm over noise.', 'Three scores and one note in the morning, not forty charts. Streaks forgive an off day, so one bad Tuesday never wipes out a month.'],
+  ['Honest numbers.', "Scores are measured against your own normal, and say when they're still learning it. Weight is a trend, not a verdict. Every number shows what went into it."],
+  ['Open by default.', 'The whole app and its backend are GPL-3.0. You can read how a score is worked out, run your own server, and keep your improvements open for everyone.'],
+  ['Your data stays yours.', 'Per-user security rules, no API keys in the app, meal photos kept only as a thumbnail, and progress photos end-to-end encrypted.'],
+];
+
+const stack = [
+  ['The app', 'text-up', 'Kotlin and Jetpack Compose, Hilt, Firestore with an offline cache, WorkManager, and screenshot-tested UI.'],
+  ['Your health data', 'text-effort', 'Read through Health Connect, so Fitbit, Pixel Watch, Samsung Health and Garmin all work. Scores are worked out on your phone.'],
+  ['The coach', 'text-fuel', "Firebase Cloud Functions that call Claude with your day's numbers. No keys in the app; deploy your own if you'd rather."],
+];
+---
+
+<Base title="Story" description="Why Resurge exists, what it believes, and how it's built: an AI health coach for Android, built in the open.">
+  <section class="mx-auto max-w-[1200px] px-6 pt-44">
+    <p class="reveal text-[13px] tracking-[0.08em] text-accent uppercase">Story</p>
+    <h1 class="reveal headline mt-[18px] max-w-[1000px] text-[clamp(44px,6.4vw,92px)]" style="--d:1">Health apps count.<br /><span class="text-dim">Resurge reads.</span></h1>
+    <p class="reveal mt-8 max-w-[640px] text-xl leading-relaxed text-muted" style="--d:2">
+      Your phone and watch already know how you slept, how far you walked and how hard you trained. What's usually missing is someone who looks at all of it together and tells you, plainly, what to do today. That's the job Resurge does.
+    </p>
+  </section>
+
+  <section class="mx-auto grid max-w-[1200px] gap-12 px-6 pt-36 md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] md:gap-16">
+    <h2 class="reveal headline text-[clamp(34px,3.6vw,52px)] leading-[1.02] tracking-[-0.04em]">What we<br /><span class="text-dim">believe.</span></h2>
+    <div class="flex flex-col gap-2">
+      {
+        beliefs.map(([title, body], i) => (
+          <div class="reveal grid grid-cols-[40px_minmax(0,1fr)] gap-4 rounded-[20px] border border-[#1A1A1A] bg-surface p-6 transition-colors duration-500 hover:bg-[#101010]" style={`--d:${i}`}>
+            <span class="font-display text-xl font-semibold text-faint">0{i + 1}</span>
+            <div>
+              <h3 class="text-[22px] font-semibold tracking-[-0.01em]">{title}</h3>
+              <p class="mt-2.5 text-[17px] leading-relaxed text-muted">{body}</p>
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="mx-auto max-w-[1200px] px-6 pt-36">
+    <h2 class="reveal headline text-[clamp(34px,3.6vw,52px)] leading-[1.02] tracking-[-0.04em]">How it's built.</h2>
+    <div class="reveal mt-10 grid gap-px overflow-hidden rounded-[28px] border border-line bg-line md:grid-cols-3">
+      {
+        stack.map(([title, color, body]) => (
+          <div class="bg-surface p-7 transition-colors duration-500 hover:bg-[#101010]">
+            <span class:list={['text-[13px] font-semibold', color]}>{title}</span>
+            <p class="mt-3.5 leading-relaxed text-muted">{body}</p>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="mx-auto max-w-[1200px] px-6 pt-36">
+    <div class="reveal flex flex-wrap items-end justify-between gap-8 rounded-[28px] border border-line bg-surface p-8 sm:p-12">
+      <div class="max-w-[620px]">
+        <h2 class="headline text-[clamp(32px,3.4vw,48px)] leading-[1.04] tracking-[-0.04em]">Built in the open.</h2>
+        <p class="mt-4 text-[17px] leading-relaxed text-muted">Resurge is made by Shashank Bhat, with every change on GitHub. Ideas, bug reports and pull requests are all welcome.</p>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <a href={REPO} class="inline-flex h-[52px] items-center rounded-full bg-white px-6 text-[15px] font-semibold text-black transition-transform hover:scale-[1.03]">View on GitHub</a>
+        <a href={`${REPO}/issues`} class="inline-flex h-[52px] items-center rounded-full bg-white/[0.06] px-[22px] text-[15px] font-medium transition-colors hover:bg-white/[0.12]">Report an issue</a>
+      </div>
+    </div>
+  </section>
+</Base>

@@ -1,0 +1,63 @@
+---
+import Logo from './Logo.astro';
+import { REPO } from '../lib/site';
+
+const links = [
+  { href: '/download', label: 'Download' },
+  { href: '/releases', label: 'Release notes' },
+  { href: '/story', label: 'Story' },
+  { href: REPO, label: 'Source code' },
+  { href: `${REPO}/issues`, label: 'Report an issue' },
+];
+---
+
+<!--
+  One card that runs to the bottom of the page: the closing banner flows into the footer links,
+  and a huge wordmark is pressed into the card underneath, bleeding off the edge.
+-->
+<footer class="pt-40">
+  <div class="reveal relative overflow-hidden bg-[linear-gradient(180deg,#000_0%,#070707_45%,#111111_100%)]">
+    <div class="relative mx-auto max-w-[1200px] px-6 pt-20 text-center">
+      <Logo size={72} class="mx-auto" />
+      <h2 class="headline mt-6 text-[clamp(36px,5vw,72px)]">Start tomorrow<br /><span class="text-dim">on a better note.</span></h2>
+      <div class="mt-9 flex flex-wrap justify-center gap-3">
+        <a href="/download" class="inline-flex h-14 items-center rounded-full bg-white px-7 font-semibold text-black transition-transform hover:scale-[1.03] active:scale-[0.98]">Try for free</a>
+        <a href={REPO} class="inline-flex h-14 items-center rounded-full bg-white/[0.06] px-6 font-medium transition-colors hover:bg-white/[0.12]">Star on GitHub</a>
+      </div>
+    </div>
+
+    <div class="relative mx-auto mt-24 flex max-w-[1200px] flex-wrap items-center justify-between gap-4 px-6 text-sm text-subtle">
+      <span>Resurge · GPL-3.0</span>
+      <div class="flex flex-wrap gap-6">
+        {links.map((l) => <a href={l.href} class="text-muted transition-colors hover:text-white">{l.label}</a>)}
+      </div>
+    </div>
+
+    <!-- Embossed into the card: dark on dark, a light edge above and a shadow below. -->
+    <div class="emboss pointer-events-none relative mt-10 -mb-[3.2vw] flex items-end justify-center gap-[2.4vw] px-6 select-none" aria-hidden="true">
+      <span class="emboss-mark"></span>
+      <span class="font-display text-[clamp(88px,17vw,232px)] leading-[0.82] font-semibold tracking-[-0.05em]">Resurge</span>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .emboss {
+    filter: drop-shadow(0 -1px 0 rgba(255, 255, 255, 0.07)) drop-shadow(0 2px 1px rgba(0, 0, 0, 0.9));
+  }
+  .emboss > * {
+    background: linear-gradient(180deg, #1a1a1a, #0e0e0e 85%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .emboss-mark {
+    width: clamp(88px, 15vw, 200px);
+    aspect-ratio: 176 / 160;
+    margin-bottom: 0.05em;
+    -webkit-mask: url('/mark.png') center / contain no-repeat;
+    mask: url('/mark.png') center / contain no-repeat;
+    background-clip: border-box !important;
+    -webkit-background-clip: border-box !important;
+  }
+</style>
