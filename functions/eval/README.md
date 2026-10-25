@@ -55,5 +55,22 @@ change are not directly comparable. Other cases still test typical serving assum
 failure alone can reflect portion ambiguity rather than incorrect nutrient data. The runner exits
 with status 1 when a case fails and prints its missing foods and calorie range.
 
-The text suite disables web lookup, so it does not validate Gemini search, photographs, label OCR,
+The text suite disables web lookup, so it does not validate Anthropic web search, photographs, label OCR,
 voice recognition, or the phone's barcode camera. Test those paths separately.
+
+## Web search providers
+
+The production Mastra `web_lookup` tool uses Anthropic Haiku's native web search first, with the
+existing Anthropic key. If no usable or verified result is returned, it tries OpenRouter when
+`OPENROUTER_API_KEY` is configured. The default backup is `openai/gpt-4.1-mini` with OpenRouter's
+Parallel basic search engine; set `OPENROUTER_SEARCH_MODEL` to reuse a different configured model.
+Each provider gets at most one search per lookup (up to two searches when fallback is needed).
+The existing per-meal and daily lookup limits and shared 30-day cache still apply. Both providers'
+source pages go through the same verification check; citations alone do not mark a result verified.
+
+Before deploying, bind `OPENROUTER_API_KEY` in Firebase Secret Manager. Gemini is no longer a
+runtime dependency. The direct Anthropic path was tested live; OpenRouter needs a configured key
+for live verification. Unit tests cover primary success, fallback success and both providers failing.
+
+The current page check confirms numeric presence, not a full semantic match of food, serving and
+nutrient labels. Treat web nutrition as less reliable than a matching food-table or label entry.

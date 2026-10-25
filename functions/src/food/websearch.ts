@@ -1,18 +1,18 @@
 import { createHash } from "node:crypto";
-import { GoogleGenAI } from "@google/genai";
+import Anthropic from "@anthropic-ai/sdk";
 import type { FoodRecord } from "./db";
 import { emptyNutrients, type NutrientKey } from "./nutrients";
 
 /**
  * Last-resort web lookup for foods no table has (restaurant and chain items, regional brands):
- * Gemini with Grounding with Google Search finds a page that lists the nutrition, then the server
- * fetches that page and keeps the result only if the numbers are actually on it. Uses the free
- * GEMINI_API_KEY from Google AI Studio.
+ * Anthropic server-side web search finds a page that lists the nutrition, then the server
+ * fetches that page and keeps the result only if the numbers are actually on it. Uses the
+ * existing ANTHROPIC_API_KEY. Search is capped at one per lookup.
  */
-export const WEB_LOOKUP_MODEL = "gemini-3.5-flash-lite";
+export const WEB_LOOKUP_MODEL = "claude-haiku-5-5";
 
 const PROMPT = (query: string) => `Find the published nutrition facts for this food: "${query}".
-Prefer the brand's or restaurant's own page, then a nutrition database page. Don't use recipe blogs.
+Search the web before answering. Prefer the brand's or restaurant's own page, then a nutrition database page. Don't use recipe blogs.
 Reply with exactly these lines and nothing else (use "?" for anything the page doesn't list):
 NAME: <food as named on the page>
 BASIS: <"100 g" or the serving size in grams, e.g. "1 piece (85 g)">
@@ -118,34 +118,43 @@ export function webId(query: string): string {
 
 /**
  * One grounded lookup. Returns null when nothing usable was found. The page check runs against the
- * cited source pages (Gemini's grounding chunks, plus the URL it named); if none of them shows the
+ * cited source pages returned by Anthropic search; if none of them shows the
  * numbers, the result comes back unverified.
  */
-export async function webLookup(
+async function anthropicWebLookup(
   query: string,
-  opts: { apiKey: string; model?: string; fetchImpl?: typeof fetch; client?: Pick<GoogleGenAI, "models"> },
+  opts: { apiKey: string; model?: string; fetchImpl?: typeof fetch; client?: Pick<Anthropic, "messages"> },
 ): Promise<WebLookupResult | null> {
   const fetchImpl = opts.fetchImpl ?? fetch;
-  const client = opts.client ?? new GoogleGenAI({ apiKey: opts.apiKey });
+  const client = opts.client ?? new Anthropic({ apiKey: opts.apiKey, timeout: 20_000, maxRetries: 0 });
   let text = "";
   let sources: string[] = [];
   try {
-    const res = await client.models.generateContent({
+    const res = await client.messages.create({
       model: opts.model ?? WEB_LOOKUP_MODEL,
-      contents: PROMPT(query),
-      config: { tools: [{ googleSearch: {} }], abortSignal: AbortSignal.timeout(20_000) },
+      max_tokens: 1500,
+      messages: [{ role: "user", content: PROMPT(query) }],
+      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 1 }],
     });
-    text = res.text ?? "";
-    sources = (res.candidates?.[0]?.groundingMetadata?.groundingChunks ?? [])
-      .map((c) => c.web?.uri)
-      .filter((u): u is string => !!u);
+    text = res.content.filter((c) => c.type === "text").map((c) => c.text).join("\n");
+    for (const block of res.content) {
+      if (block.type === "web_search_tool_result" && Array.isArray(block.content)) {
+        sources.push(...block.content.map((result) => result.url));
+      }
+    }
+    // No search evidence means no usable lookup, even if the model supplied numbers and a URL.
+    if (sources.length === 0) return null;
   } catch {
     return null;
   }
+  return resolveWebResult(query, text, sources, fetchImpl);
+}
+
+async function resolveWebResult(query: string, text: string, sources: string[], fetchImpl: typeof fetch): Promise<WebLookupResult | null> {
   const parsed = parseLookup(text);
   if (!parsed) return null;
 
-  const candidates = [...new Set([parsed.url, ...sources].filter((u): u is string => !!u))].slice(0, 4);
+  const candidates = [...new Set([...(parsed.url && sources.includes(parsed.url) ? [parsed.url] : []), ...sources])].slice(0, 4);
   let verifiedUrl: string | null = null;
   for (const url of candidates) {
     const page = await fetchPage(url, fetchImpl);
@@ -179,4 +188,51 @@ export async function webLookup(
       servingGrams: parsed.basisGrams !== 100 ? parsed.basisGrams : null,
     },
   };
+}
+
+/** Anthropic first; OpenRouter is only called for missing or unverified results. */
+export async function webLookup(
+  query: string,
+  opts: {
+    apiKey: string;
+    model?: string;
+    fetchImpl?: typeof fetch;
+    client?: Pick<Anthropic, "messages">;
+    openRouterApiKey?: string;
+    openRouterModel?: string;
+    openRouterFetch?: typeof fetch;
+  },
+): Promise<WebLookupResult | null> {
+  const primary = await anthropicWebLookup(query, opts);
+  if (primary?.verified || !opts.openRouterApiKey) return primary;
+  const backup = await openRouterLookup(query, opts);
+  return backup?.verified ? backup : primary ?? backup;
+}
+
+async function openRouterLookup(
+  query: string,
+  opts: { openRouterApiKey?: string; openRouterModel?: string; openRouterFetch?: typeof fetch; fetchImpl?: typeof fetch },
+): Promise<WebLookupResult | null> {
+  try {
+    const response = await (opts.openRouterFetch ?? fetch)("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${opts.openRouterApiKey}`, "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(20_000),
+      body: JSON.stringify({
+        model: opts.openRouterModel ?? "openai/gpt-4.1-mini",
+        messages: [{ role: "user", content: PROMPT(query) }],
+        max_tokens: 1500,
+        max_tool_calls: 1,
+        tools: [{ type: "openrouter:web_search", parameters: { engine: "parallel", mode: "basic", max_uses: 1, max_results: 3 } }],
+      }),
+    });
+    if (!response.ok) return null;
+    const data = await response.json() as { choices?: { message?: { content?: string; annotations?: { type?: string; url_citation?: { url?: string } }[] } }[] };
+    const message = data.choices?.[0]?.message;
+    const sources = (message?.annotations ?? []).filter((a) => a.type === "url_citation").map((a) => a.url_citation?.url).filter((url): url is string => !!url);
+    if (!sources.length || typeof message?.content !== "string") return null;
+    return await resolveWebResult(query, message.content, sources, opts.fetchImpl ?? fetch);
+  } catch {
+    return null;
+  }
 }

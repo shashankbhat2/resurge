@@ -6,7 +6,7 @@ import { userDoc } from "../lib/firebase";
 import { LIMITS } from "../lib/models";
 import { consumeOrThrow } from "../lib/quota";
 import { isValidTimeZone, localParts } from "../lib/time";
-import { GEMINI_API_KEY, MASTRA_PLATFORM_ACCESS_TOKEN, MASTRA_PROJECT_ID, USDA_FDC_API_KEY } from "./secrets";
+import { OPENROUTER_API_KEY, MASTRA_PLATFORM_ACCESS_TOKEN, MASTRA_PROJECT_ID, USDA_FDC_API_KEY } from "./secrets";
 
 /** About 1.5 MB of JPEG once decoded; the app sends ~1568 px images well under this. */
 const MAX_IMAGE_BASE64 = 2_000_000;
@@ -36,7 +36,7 @@ function isJpeg(base64: string): boolean {
  */
 export const analyzeMeal = onCall(
   {
-    secrets: [ANTHROPIC_API_KEY, USDA_FDC_API_KEY, GEMINI_API_KEY, MASTRA_PLATFORM_ACCESS_TOKEN, MASTRA_PROJECT_ID],
+    secrets: [ANTHROPIC_API_KEY, OPENROUTER_API_KEY, USDA_FDC_API_KEY, MASTRA_PLATFORM_ACCESS_TOKEN, MASTRA_PROJECT_ID],
     enforceAppCheck: ENFORCE_APP_CHECK,
     timeoutSeconds: 120,
     memory: "1GiB",

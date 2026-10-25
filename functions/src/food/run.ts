@@ -8,24 +8,23 @@ import { MEAL_MODEL_ID, MealAgentError, runMealAgent, type MealRequest } from ".
 import { isBarcode } from "./openfoodfacts";
 import { cachedWebLookup, lookupProduct, saveLabelProduct } from "./products";
 import { toResponse, type MealResponse } from "./schema";
-import { GEMINI_API_KEY, USDA_FDC_API_KEY } from "./secrets";
+import { OPENROUTER_API_KEY, USDA_FDC_API_KEY } from "./secrets";
 import { setUsdaKey } from "./usda";
 import { webId } from "./websearch";
 
 /** One analyzeMeal request after auth, validation and the daily limit (see analyze.ts). */
 export async function analyzeMealRequest(input: MealRequest, uid: string, today: string): Promise<MealResponse> {
   setUsdaKey(() => USDA_FDC_API_KEY.value() || "DEMO_KEY");
-  const geminiKey = GEMINI_API_KEY.value();
+  const anthropicKey = ANTHROPIC_API_KEY.value();
   try {
     const { meal, usage } = await runMealAgent(input, {
       agent: mastra().getAgent("mealLogger"),
-      anthropicApiKey: ANTHROPIC_API_KEY.value(),
+      anthropicApiKey: anthropicKey,
       traceTags: [input.image ? "photo" : input.barcode ? "barcode" : "text"],
       lookupBarcode: lookupProduct,
       webLookup: async (query) => {
-        if (!geminiKey) return null;
         if (!(await tryConsume(uid, today, "webLookups", LIMITS.webLookups))) return null;
-        return cachedWebLookup(query, geminiKey, webId(query));
+        return cachedWebLookup(query, anthropicKey, webId(query), { openRouterApiKey: OPENROUTER_API_KEY.value(), openRouterModel: process.env.OPENROUTER_SEARCH_MODEL });
       },
       onLabel: (record) => {
         if (input.barcode && isBarcode(input.barcode)) {

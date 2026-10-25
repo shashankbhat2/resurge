@@ -67,7 +67,7 @@ export async function saveLabelProduct(barcode: string, record: FoodRecord, uid:
 }
 
 /** Web lookup with a shared 30-day cache, so the same restaurant item is only searched once. */
-export async function cachedWebLookup(query: string, apiKey: string, id: string): Promise<WebLookupResult | null> {
+export async function cachedWebLookup(query: string, apiKey: string, id: string, backup: { openRouterApiKey?: string; openRouterModel?: string } = {}): Promise<WebLookupResult | null> {
   const ref = webCache().doc(id.replace(/^web:/, ""));
   try {
     const hit = await ref.get();
@@ -78,7 +78,7 @@ export async function cachedWebLookup(query: string, apiKey: string, id: string)
   } catch (e) {
     logger.warn("foodWebCache read failed", { error: (e as Error).message });
   }
-  const result = await webLookup(query, { apiKey });
+  const result = await webLookup(query, { apiKey, ...backup });
   if (result) {
     ref
       .set({ ...toStored(result.record, "web"), query, url: result.url, verified: result.verified, createdAtMs: Date.now() })

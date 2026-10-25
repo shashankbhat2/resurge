@@ -14,7 +14,6 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",
-    "@google/genai": "^2.31.0",
     "@mastra/core": "^1.79.0",
     "@mastra/observability": "^1.21.0",
     "firebase-admin": "^14.5.0",

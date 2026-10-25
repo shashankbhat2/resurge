@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { localFood, localFoodCount, searchLocal } from "../src/food/db";
 import { dishPer100g, emptyNutrients } from "../src/food/nutrients";
 import { lookupOff, offNutrients, servingGrams } from "../src/food/openfoodfacts";
@@ -91,7 +91,7 @@ describe("web lookup grounding", () => {
     const parsed = parseLookup(answer)!;
     expect(parsed.basisGrams).toBe(120);
     const page = `<html><body><h1>Raj Kachori</h1><td>Energy</td><td>320 kcal</td><td>Protein 8 g</td><td>Carbohydrate 38g</td><script>var x = 999</script></body></html>`;
-    const client = { models: { generateContent: async () => ({ text: answer, candidates: [] }) } } as never;
+    const client = { messages: { create: async () => ({ content: [{ type: "text", text: answer }, { type: "web_search_tool_result", content: [{ type: "web_search_result", url: "https://example.com/raj-kachori" }] }] }) } } as never;
     const fetchImpl = (async () => new Response(page, { headers: { "content-type": "text/html" } })) as typeof fetch;
     const result = (await webLookup("haldiram raj kachori", { apiKey: "x", client, fetchImpl }))!;
     expect(result.verified).toBe(true);
@@ -100,10 +100,53 @@ describe("web lookup grounding", () => {
   });
 
   it("marks the result unverified when the page doesn't show the numbers", async () => {
-    const client = { models: { generateContent: async () => ({ text: answer, candidates: [] }) } } as never;
+    const client = { messages: { create: async () => ({ content: [{ type: "text", text: answer }, { type: "web_search_tool_result", content: [{ type: "web_search_result", url: "https://example.com/raj-kachori" }] }] }) } } as never;
     const fetchImpl = (async () => new Response("<p>Raj kachori recipe, 1400 kcal</p>", { headers: { "content-type": "text/html" } })) as typeof fetch;
     const result = (await webLookup("raj kachori", { apiKey: "x", client, fetchImpl }))!;
     expect(result.verified).toBe(false);
+  });
+
+  it("caps native search at one use and rejects answers without search evidence", async () => {
+    const create = vi.fn(async () => ({ content: [{ type: "text", text: answer }] }));
+    const client = { messages: { create } } as never;
+    expect(await webLookup("raj kachori", { apiKey: "x", client })).toBeNull();
+    expect(create.mock.calls[0]).toBeDefined();
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({
+      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 1 }],
+    }));
+  });
+
+  it("returns no match for a server-side search error", async () => {
+    const client = { messages: { create: async () => ({ content: [{ type: "web_search_tool_result", content: { type: "web_search_tool_result_error", error_code: "unavailable" } }] }) } } as never;
+    expect(await webLookup("raj kachori", { apiKey: "x", client })).toBeNull();
+  });
+
+  it("uses OpenRouter only after primary search fails and keeps source verification", async () => {
+    const client = { messages: { create: async () => { throw new Error("primary unavailable"); } } } as never;
+    const openRouterFetch = vi.fn(async (_url: unknown, _init?: RequestInit) => new Response(JSON.stringify({ choices: [{ message: {
+      content: answer,
+      annotations: [{ type: "url_citation", url_citation: { url: "https://example.com/raj-kachori" } }],
+    } }] })));
+    const fetchImpl = (async () => new Response("Raj Kachori 320 kcal Protein 8 g Carbs 38 g", { headers: { "content-type": "text/html" } })) as typeof fetch;
+    const result = await webLookup("raj kachori", { apiKey: "x", client, openRouterApiKey: "backup", openRouterFetch: openRouterFetch as typeof fetch, fetchImpl });
+    expect(result?.verified).toBe(true);
+    expect(openRouterFetch).toHaveBeenCalledTimes(1);
+    const request = JSON.parse(openRouterFetch.mock.calls[0]![1]!.body as string);
+    expect(request.tools[0].parameters).toMatchObject({ engine: "parallel", max_uses: 1 });
+  });
+
+  it("does not spend OpenRouter credits when primary evidence verifies", async () => {
+    const client = { messages: { create: async () => ({ content: [{ type: "text", text: answer }, { type: "web_search_tool_result", content: [{ url: "https://example.com/raj-kachori" }] }] }) } } as never;
+    const openRouterFetch = vi.fn();
+    const fetchImpl = (async () => new Response("320 kcal 8 g protein 38 g carbs", { headers: { "content-type": "text/html" } })) as typeof fetch;
+    expect((await webLookup("raj kachori", { apiKey: "x", client, openRouterApiKey: "backup", openRouterFetch, fetchImpl }))?.verified).toBe(true);
+    expect(openRouterFetch).not.toHaveBeenCalled();
+  });
+
+  it("returns no result when both providers fail", async () => {
+    const client = { messages: { create: async () => { throw new Error("offline"); } } } as never;
+    const openRouterFetch = (async () => new Response("unavailable", { status: 503 })) as typeof fetch;
+    expect(await webLookup("raj kachori", { apiKey: "x", client, openRouterApiKey: "backup", openRouterFetch })).toBeNull();
   });
 
   it("matches numbers on a page exactly, not as part of other numbers", () => {
