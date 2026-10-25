@@ -2,6 +2,8 @@ package com.resurgeai.feature.food
 
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.lifecycle.SavedStateHandle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.composeunstyled.theme.ColorScheme
@@ -99,6 +101,32 @@ class FoodScreenshotTest {
     private fun reviewVm() = MealReviewViewModel(mockk<MealsRepository>(relaxed = true), MealDraftStore(), SavedStateHandle(), mockk(relaxed = true))
 
     @Test fun review() = capture("review", { MealReviewScreen(reviewState, reviewVm(), onBack = {}) })
+
+    @Test fun reviewSources() {
+        compose.mainClock.autoAdvance = false
+        compose.setContent { ResurgeTheme { Screen { MealReviewScreen(reviewState, reviewVm(), onBack = {}) } } }
+        compose.mainClock.advanceTimeBy(1_200)
+        compose.onNodeWithText("Fix results").performClick()
+        compose.mainClock.advanceTimeBy(1_200)
+        compose.onRoot().captureRoboImage("src/test/screenshots/food_review_sources.png")
+    }
+
+    @Test fun barcodeReview() = capture("barcode_review", {
+        val product = item(
+            "Maggi 2-minute masala noodles", 70.0, 384.0, 8.0, 58.0, 13.0,
+            source = FoodSource("off:8901058815387", "Open Food Facts", "Maggi 2-minute masala noodles"),
+            micros = mapOf(Micro.SODIUM to 890.0, Micro.SUGAR to 3.0, Micro.SAT_FAT to 6.0),
+        )
+        MealReviewScreen(reviewState.copy(
+            title = "Maggi masala noodles",
+            type = MealType.SNACK,
+            source = MealSource.BARCODE,
+            items = listOf(EditableItem(0, product)),
+            question = null,
+            options = emptyList(),
+            notes = "Nutrition is for the dry product. Check the portion against your pack.",
+        ), reviewVm(), onBack = {})
+    })
 
     @Test fun reviewDark() = capture(
         "review_dark",
