@@ -2,7 +2,7 @@
 #
 #   git tag v0.4.0 && git push origin v0.4.0
 #
-# The tag must match versionName in app/build.gradle.kts, and CHANGELOG.md must have a
+# The tag must be on main and match versionName in app/build.gradle.kts, and CHANGELOG.md must have a
 # "## 0.4.0 (...)" section; its contents become the release notes.
 #
 # Secrets (Settings > Secrets and variables > Actions):
@@ -29,6 +29,16 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # Releases only ship what's already on main.
+      - name: Check tag is on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Tag $GITHUB_REF_NAME points to a commit that isn't on main"
+            exit 1
+          fi
 
       - uses: actions/setup-java@v5
         with:
