@@ -22,7 +22,7 @@ const needs = [
 
 <Base title="Download" description="Download Resurge for Android and try it for free, straight from GitHub.">
   <section class="relative mx-auto max-w-[1200px] px-6 pt-44 text-center">
-    <div class="glow pointer-events-none absolute top-20 left-1/2 h-[520px] w-[800px] -translate-x-1/2 bg-[radial-gradient(closest-side,rgba(139,124,255,0.1),transparent)]" aria-hidden="true"></div>
+    <div class="glow pointer-events-none absolute top-20 left-1/2 h-[520px] w-[min(800px,100vw)] -translate-x-1/2 bg-[radial-gradient(closest-side,rgba(139,124,255,0.1),transparent)]" aria-hidden="true"></div>
     <div class="reveal relative inline-block"><Logo size={104} /></div>
     <h1 class="reveal headline relative mt-7 text-[clamp(48px,7vw,100px)] leading-[0.98]" style="--d:1">Get Resurge.</h1>
     <p class="reveal relative mx-auto mt-[22px] max-w-[520px] text-[19px] leading-relaxed text-muted" style="--d:2">Try it for free on Android. Download the app straight from GitHub.</p>
@@ -52,14 +52,14 @@ const needs = [
   </section>
 
   <section class="mx-auto mt-4 max-w-[1200px] px-6">
-    <div class="reveal grid gap-px overflow-hidden rounded-[28px] border border-line bg-line md:grid-cols-2">
-    <div class="bg-surface p-7">
+    <div class="reveal grid grid-cols-1 gap-px overflow-hidden rounded-[28px] border border-line bg-line md:grid-cols-2">
+    <div class="min-w-0 bg-surface p-7">
       <span class="text-[13px] font-semibold text-muted">You'll need</span>
       <div class="mt-4 flex flex-col gap-2">
         {needs.map(([k, v]) => <div class="flex justify-between gap-4 rounded-2xl bg-surface-2 px-4 py-3"><span>{k}</span><span class="text-muted">{v}</span></div>)}
       </div>
     </div>
-    <div class="flex flex-col bg-surface p-7">
+    <div class="flex min-w-0 flex-col bg-surface p-7">
       <span class="text-[13px] font-semibold text-muted">Or build it yourself</span>
       <pre class="mt-4 grow overflow-x-auto rounded-2xl bg-black p-5 font-mono text-[13px] leading-[1.8] text-muted">git clone {REPO}.git
 cd resurge

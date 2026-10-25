@@ -44,6 +44,8 @@
 
 @layer base {
   html {
+    /* Nothing may widen the page sideways; phones would zoom out and push the header off-centre. */
+    overflow-x: clip;
     background: var(--color-bg);
     color: #fff;
     font-family: var(--font-sans);
