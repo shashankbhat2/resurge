@@ -3,7 +3,7 @@ import { HttpsError } from "firebase-functions/v2/https";
 import { userDoc } from "./firebase";
 import type { UsageSummary } from "./anthropic";
 
-export type QuotaField = "fastTurns" | "smartTurns" | "activityInsights" | "foodScans";
+export type QuotaField = "fastTurns" | "smartTurns" | "activityInsights" | "foodScans" | "webLookups";
 
 /**
  * Atomically consumes one unit of [field] for the user's local [date]. Returns false (and consumes

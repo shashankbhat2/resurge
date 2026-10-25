@@ -17,6 +17,7 @@
       "ignore": [
         "node_modules",
         "test",
+        "scripts",
         ".git",
         "*.log"
       ]

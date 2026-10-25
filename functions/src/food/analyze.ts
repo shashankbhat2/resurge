@@ -1,16 +1,12 @@
-import type Anthropic from "@anthropic-ai/sdk";
-import { logger } from "firebase-functions";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { ENFORCE_APP_CHECK } from "../coach/chat";
-import { generateStructured, InsightGenerationError } from "../insights/generate";
 import { ANTHROPIC_API_KEY } from "../lib/anthropic";
 import { userDoc } from "../lib/firebase";
-import { LIMITS, MEAL_ANALYSIS_MODEL } from "../lib/models";
-import { consumeOrThrow, recordUsage } from "../lib/quota";
+import { LIMITS } from "../lib/models";
+import { consumeOrThrow } from "../lib/quota";
 import { isValidTimeZone, localParts } from "../lib/time";
-import { MEAL_ANALYSIS_SYSTEM } from "../prompts/food";
-import { MEAL_ESTIMATE_JSON_SCHEMA, MealEstimate } from "./schema";
+import { GEMINI_API_KEY, MASTRA_PLATFORM_ACCESS_TOKEN, MASTRA_PROJECT_ID, USDA_FDC_API_KEY } from "./secrets";
 
 /** About 1.5 MB of JPEG once decoded; the app sends ~1568 px images well under this. */
 const MAX_IMAGE_BASE64 = 2_000_000;
@@ -20,10 +16,11 @@ const Input = z
     image: z.string().max(MAX_IMAGE_BASE64).optional(),
     text: z.string().trim().max(500).optional(),
     answer: z.string().trim().max(120).optional(),
+    barcode: z.string().trim().regex(/^\d{8,14}$/).optional(),
     mealType: z.enum(["breakfast", "lunch", "dinner", "snack"]),
     localTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
   })
-  .refine((v) => !!v.image || !!v.text, { message: "Send a photo or a description" });
+  .refine((v) => !!v.image || !!v.text || !!v.barcode, { message: "Send a photo, a description or a barcode" });
 
 /** JPEG files start with FF D8 FF ("/9j/" in base64). */
 function isJpeg(base64: string): boolean {
@@ -31,22 +28,25 @@ function isJpeg(base64: string): boolean {
 }
 
 /**
- * Estimates a meal's foods, portions and nutrition from a photo and/or description. Returns a draft
- * for the app's review screen; nothing is stored until the person logs it.
+ * Logs a meal from a photo, description, nutrition label or barcode. A Mastra agent on Claude Haiku
+ * identifies the foods and portions and matches each to a nutrition table entry (IFCT, CoFID,
+ * Indian packaged foods, USDA, Open Food Facts, a label, or a checked web page); the numbers come
+ * from those entries, not from the model. Returns a draft for the review screen; nothing is stored
+ * until the person logs it.
  */
 export const analyzeMeal = onCall(
   {
-    secrets: [ANTHROPIC_API_KEY],
+    secrets: [ANTHROPIC_API_KEY, USDA_FDC_API_KEY, GEMINI_API_KEY, MASTRA_PLATFORM_ACCESS_TOKEN, MASTRA_PROJECT_ID],
     enforceAppCheck: ENFORCE_APP_CHECK,
-    timeoutSeconds: 90,
-    memory: "512MiB",
+    timeoutSeconds: 120,
+    memory: "1GiB",
   },
   async (request) => {
     const uid = request.auth?.uid;
-    if (!uid) throw new HttpsError("unauthenticated", "Sign in to scan meals.");
+    if (!uid) throw new HttpsError("unauthenticated", "Sign in to log meals.");
 
     const parsed = Input.safeParse(request.data);
-    if (!parsed.success) throw new HttpsError("invalid-argument", "Send a photo or a description of the meal.");
+    if (!parsed.success) throw new HttpsError("invalid-argument", "Send a photo, a description or a barcode of the meal.");
     const input = parsed.data;
     if (input.image && !isJpeg(input.image)) throw new HttpsError("invalid-argument", "Photos must be JPEG.");
 
@@ -55,35 +55,9 @@ export const analyzeMeal = onCall(
     const today = localParts(tz).date;
     await consumeOrThrow(uid, today, "foodScans", LIMITS.foodScans);
 
-    // Image first, then the text, as the vision docs recommend.
-    const content: Anthropic.Beta.BetaContentBlockParam[] = [];
-    if (input.image) {
-      content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: input.image } });
-    }
-    const lines = [`Meal slot: ${input.mealType}. Local time: ${input.localTime.slice(0, 5)}.`];
-    if (input.text) lines.push(`Description: ${input.text}`);
-    if (input.answer) lines.push(`Answer to your earlier question: ${input.answer}`);
-    if (!input.image) lines.push("No photo; estimate from the description.");
-    content.push({ type: "text", text: lines.join("\n") });
-
-    try {
-      const { value, usage } = await generateStructured({
-        model: MEAL_ANALYSIS_MODEL,
-        system: MEAL_ANALYSIS_SYSTEM,
-        context: content,
-        jsonSchema: MEAL_ESTIMATE_JSON_SCHEMA,
-        schema: MealEstimate,
-      });
-      await recordUsage(uid, today, usage);
-      if (value.items.length === 0) {
-        throw new HttpsError("invalid-argument", "No food found. Try a clearer photo or describe the meal.");
-      }
-      return value;
-    } catch (e) {
-      if (e instanceof HttpsError) throw e;
-      logger.error("analyzeMeal failed", { uid, error: (e as Error).message });
-      if (e instanceof InsightGenerationError) throw new HttpsError("internal", "Couldn't analyse the meal. Try again.");
-      throw new HttpsError("unavailable", "Couldn't analyse the meal. Try again.");
-    }
+    // Required here, not imported at the top, so the other functions in this codebase don't load
+    // Mastra (most of a second) at cold start.
+    const { analyzeMealRequest } = require("./run") as typeof import("./run");
+    return analyzeMealRequest(input, uid, today);
   },
 );
