@@ -1,6 +1,6 @@
 import { Agent } from "@mastra/core/agent";
 import { describe, expect, it } from "vitest";
-import { Evidence, groundMeal, MAX_REQUEST_INPUT_TOKENS, runMealAgent, type MealRunDeps } from "../src/food/agent";
+import { Evidence, groundMeal, MAX_REQUEST_INPUT_TOKENS, promptTokens, runMealAgent, type MealRunDeps } from "../src/food/agent";
 import { localFood } from "../src/food/db";
 
 type Part = Record<string, unknown>;
@@ -217,5 +217,12 @@ describe("groundMeal", () => {
   it("rejects ingredient weights no cooking explains", () => {
     const r = groundMeal({ ...base, items: [{ name: "Rice", grams: 100, components: [{ sourceId: "ifct:A015", grams: 400 }], confidence: 1 }] }, evidence());
     expect("problems" in r && r.problems[0]).toContain("no cooking explains");
+  });
+});
+
+describe("prompt size for the 99k cap", () => {
+  it("uses the provider's raw total, else counts cached tokens too (never under)", () => {
+    expect(promptTokens({ inputTokens: 1_000, cachedInputTokens: 30_000, raw: { inputTokens: { total: 31_000 } } })).toBe(31_000);
+    expect(promptTokens({ inputTokens: 1_000, cachedInputTokens: 30_000, cacheCreationInputTokens: 2_000 })).toBe(33_000);
   });
 });

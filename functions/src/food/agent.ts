@@ -350,7 +350,24 @@ interface StepUsage {
   inputTokens?: number;
   outputTokens?: number;
   cachedInputTokens?: number;
-  inputTokenDetails?: { cacheReadTokens?: number; cacheWriteTokens?: number };
+  cacheCreationInputTokens?: number;
+  raw?: unknown;
+}
+
+interface RawInput {
+  inputTokens?: { total?: number; cacheRead?: number; cacheWrite?: number };
+}
+const rawInput = (u: StepUsage) => (u.raw as RawInput | undefined)?.inputTokens;
+
+/**
+ * The whole prompt of one request. Haiku's price tier depends on all of it, cached or not. Providers
+ * differ on whether inputTokens includes cache reads and writes, so without the raw total this adds
+ * them, which can only overestimate.
+ */
+export function promptTokens(u: StepUsage): number {
+  const total = rawInput(u)?.total;
+  if (typeof total === "number") return total;
+  return (u.inputTokens ?? 0) + (u.cachedInputTokens ?? 0) + (u.cacheCreationInputTokens ?? 0);
 }
 
 /** Rough tokens for text the model will read next step (tool results): ~3.5 chars per token. */
@@ -393,12 +410,14 @@ export async function runMealAgent(
     stopWhen: () => state.submitted !== null,
     onStepFinish: (step: { usage?: StepUsage; toolResults?: unknown[]; content?: unknown }) => {
       const u = step.usage ?? {};
-      const input = u.inputTokens ?? 0;
+      const input = promptTokens(u);
+      const cacheRead = rawInput(u)?.cacheRead ?? u.cachedInputTokens ?? 0;
+      const cacheWrite = rawInput(u)?.cacheWrite ?? u.cacheCreationInputTokens ?? 0;
       usage.steps++;
-      usage.inputTokens += input;
+      usage.inputTokens += Math.max(0, input - cacheRead - cacheWrite);
       usage.outputTokens += u.outputTokens ?? 0;
-      usage.cacheReadTokens += u.inputTokenDetails?.cacheReadTokens ?? u.cachedInputTokens ?? 0;
-      usage.cacheWriteTokens += u.inputTokenDetails?.cacheWriteTokens ?? 0;
+      usage.cacheReadTokens += cacheRead;
+      usage.cacheWriteTokens += cacheWrite;
       usage.maxRequestInputTokens = Math.max(usage.maxRequestInputTokens, input);
       // The next request resends everything: this prompt, this step's output and its tool results.
       projectedNext = input + (u.outputTokens ?? 0) + tokensOf(step.toolResults) + 500;

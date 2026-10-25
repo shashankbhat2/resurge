@@ -18,6 +18,7 @@
         "node_modules",
         "test",
         "scripts",
+        "eval",
         ".git",
         "*.log"
       ]
