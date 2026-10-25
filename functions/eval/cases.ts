@@ -47,11 +47,11 @@ export const CASES: EvalCase[] = [
   // ---- Indian home meals ----
   {
     id: "roti-toor-dal",
-    text: "2 rotis and a bowl of toor dal",
+    text: "2 rotis, 80 g total, and a 200 g bowl of toor dal",
     mealType: "lunch",
     expect: [
       { label: "roti", accept: ROTI },
-      { label: "toor dal", accept: [/^ifct:B021$/, /^cofid:15-77\d$/, /^cofid:13-10[45]$/, /^fdc:/, "components"] },
+      { label: "toor dal", accept: [/^ifct:B021$/, /^cofid:15-(77\d|780)$/, /^cofid:13-10[45]$/, /^fdc:/, "components"] },
     ],
     // 2 rotis × 40 g; a 200 g bowl ≈ 60 g raw toor dal + 5 g ghee.
     ref: [{ id: "cofid:11-459", grams: 80 }, { id: "ifct:B021", grams: 60 }, { id: "ifct:T013", grams: 5 }],
@@ -67,10 +67,10 @@ export const CASES: EvalCase[] = [
   },
   {
     id: "rajma-chawal",
-    text: "a plate of rajma chawal",
+    text: "a plate of rajma chawal: 200 g rajma curry and 200 g cooked rice",
     mealType: "lunch",
     expect: [
-      { label: "rajma", accept: [/^ifct:B0(18|19|20)$/, "inpf:697", /^cofid:13-1\d\d$/, "cofid:15-859", /^fdc:/, "components"] },
+      { label: "rajma", accept: [/^ifct:B0(18|19|20)$/, "inpf:697", "cofid:15-146", /^cofid:13-1\d\d$/, "cofid:15-859", /^fdc:/, "components"] },
       { label: "rice", accept: RICE },
     ],
     // 200 g rajma curry ≈ 50 g raw rajma + 7 g oil; 200 g boiled rice.
@@ -90,7 +90,7 @@ export const CASES: EvalCase[] = [
     id: "bhindi-roti",
     text: "bhindi sabzi and 2 chapatis",
     mealType: "lunch",
-    expect: [{ label: "bhindi", accept: [/^cofid:15-(68[456]|707|82[45])$/, ...ANY_DISH] }, { label: "chapati", accept: ROTI }],
+    expect: [{ label: "bhindi", accept: [/^cofid:15-(627|68[456]|707|82[45])$/, ...ANY_DISH] }, { label: "chapati", accept: ROTI }],
     // 150 g okra bhaji; 2 × 40 g chapati.
     ref: [{ id: "cofid:15-685", grams: 150 }, { id: "cofid:11-459", grams: 80 }],
     tolerance: 0.3,
@@ -363,7 +363,7 @@ export const CASES: EvalCase[] = [
   // ---- Global foods ----
   {
     id: "porridge",
-    text: "a bowl of porridge oats made with milk",
+    text: "250 g cooked porridge oats made with semi-skimmed milk",
     mealType: "breakfast",
     expect: [{ label: "porridge", accept: [/^cofid:11-7(8[89]|9\d)$/, ...ANY_DISH] }],
     // 250 g cooked.
@@ -427,7 +427,7 @@ export const CASES: EvalCase[] = [
   },
   {
     id: "cappuccino",
-    text: "a cappuccino",
+    text: "a 250 ml cappuccino",
     mealType: "snack",
     expect: [{ label: "cappuccino", accept: ["cofid:17-632", /^fdc:/] }],
     // 250 ml.

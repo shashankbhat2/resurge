@@ -17,7 +17,7 @@ import { emptyNutrients } from "../src/food/nutrients";
 import { lookupOff } from "../src/food/openfoodfacts";
 import { setUsdaKey } from "../src/food/usda";
 import { CASES, type EvalCase } from "./cases";
-import { formatTable, kcalRange, scoreCase, summarize, type CaseResult } from "./score";
+import { accepts, formatTable, kcalRange, scoreCase, summarize, type CaseResult } from "./score";
 
 const args = new Map(
   process.argv.slice(2).map((a) => {
@@ -85,7 +85,7 @@ async function main() {
   const started = Date.now();
   const results = await pool(cases, concurrency, async (c) => {
     const r = await runCase(c, apiKey, agent);
-    console.log(`${r.ok ? "PASS" : "FAIL"} ${r.id}`);
+    console.log(`${r.ok ? "PASS" : "FAIL"} ${r.id}${r.ok ? "" : `: ${r.error ?? `missing=${r.missing.join(",") || "none"}, kcal=${r.kcal} (${r.kcalRange.join("–")})`}`}`);
     return r;
   });
   await flush();
@@ -98,6 +98,7 @@ async function main() {
   const file = join(dir, `${new Date().toISOString().replace(/[:.]/g, "-")}.json`);
   writeFileSync(file, JSON.stringify({ summary, results }, null, 2));
   console.log(`Results: ${file}`);
+  if (summary.passed !== summary.cases) process.exitCode = 1;
 }
 
 /** Scores made-up agent results to check the scoring itself. */
@@ -127,6 +128,24 @@ function selfTest() {
   assert.deepEqual(bad.missing, ["toor dal"]);
   assert.equal(bad.grounding, 0.5);
   assert.equal(bad.kcalOk, false);
+
+  // Valid cooked Indian entries must not be rejected by the source allowlists.
+  for (const [caseId, label, sourceId] of [
+    ["roti-toor-dal", "toor dal", "cofid:15-780"],
+    ["rajma-chawal", "rajma", "cofid:15-146"],
+    ["bhindi-roti", "bhindi", "cofid:15-627"],
+  ]) {
+    const expected = CASES.find((c) => c.id === caseId)!.expect.find((e) => e.label === label)!;
+    assert.ok(localFood(sourceId), sourceId);
+    assert.ok(accepts(expected.accept, sourceId), `${caseId}: ${sourceId}`);
+    assert.equal(accepts(expected.accept, "cofid:11-459"), false, `${caseId}: chapati is not ${label}`);
+  }
+
+  // Composed items retain their actual sources, so valid cereal and milk still match.
+  const cereal = CASES.find((c) => c.id === "cornflakes-milk")!;
+  const composed = (id: string, grams: number) => ({ ...item(id, grams), sourceId: "components", componentSourceIds: [id] });
+  assert.equal(scoreCase(cereal, { meal: meal([composed("cofid:11-742", 30), composed("ifct:L002", 150)]), usage }).ok, true);
+  assert.equal(scoreCase(cereal, { meal: meal([composed("cofid:11-459", 30), composed("ifct:L002", 150)]), usage }).ok, false);
 
   // One item can't satisfy two expected foods.
   const one = scoreCase(roti, { meal: meal([item("components", 280, 150)]), usage });

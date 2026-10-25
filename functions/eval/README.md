@@ -42,3 +42,18 @@ on the agent's structured result, so an LLM judge or the scorer pipeline would a
 
 About 3 steps and 15–30K input tokens per meal, so roughly $0.002–0.004 a meal and **$0.10–0.20 for
 all 41 cases**. The exact figure is printed at the end of each run.
+
+## Interpreting portions and failures
+
+Source allowlists include the cooked CoFID entries for pigeon-pea dal (15-780), Punjabi kidney-bean
+curry (15-146), and bhindi subji (15-627). The self-test checks these entries and rejects chapati
+as a match for those dishes. Composed items retain their ingredient source IDs, which the scorer also checks.
+
+The roti/toor-dal, rajma-chawal, porridge, and cappuccino cases state serving weights explicitly. Earlier versions
+left those portions unspecified while scoring against one fixed portion, so results before this
+change are not directly comparable. Other cases still test typical serving assumptions; a calorie
+failure alone can reflect portion ambiguity rather than incorrect nutrient data. The runner exits
+with status 1 when a case fails and prints its missing foods and calorie range.
+
+The text suite disables web lookup, so it does not validate Gemini search, photographs, label OCR,
+voice recognition, or the phone's barcode camera. Test those paths separately.

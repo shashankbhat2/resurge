@@ -129,6 +129,7 @@ describe("meal agent (Mastra loop with a scripted model)", () => {
     const ghee = localFood("ifct:T013")!.per100g;
     const expectedKcal = ((dal.kcal! * 60 + ghee.kcal! * 5) / 100 / 200) * 100;
     expect(d.sourceId).toBe("components");
+    expect(d.componentSourceIds).toEqual(["ifct:B021", "ifct:T013"]);
     expect(d.per100g.kcal).toBeCloseTo(expectedKcal, 0);
     expect(d.sourceDetail).toContain("Red gram, dal 60 g");
     expect(usage.steps).toBe(3);

@@ -24,7 +24,7 @@ export interface CaseResult {
   maxRequestInputTokens: number;
   underTokenCap: boolean;
   costUsd: number;
-  items: { name: string; grams: number; sourceId: string; kcal: number; verified: boolean }[];
+  items: { name: string; grams: number; sourceId: string; componentSourceIds?: string[]; kcal: number; verified: boolean }[];
 }
 
 /** kcal of the reference portion and the accepted range around it. */
@@ -52,8 +52,8 @@ export function accepts(patterns: Accept[], sourceId: string): boolean {
  * are tried in order of how few items could match them, so a broad pattern doesn't take an item a
  * narrow one needs.
  */
-export function matchItems(c: EvalCase, sourceIds: string[]): { matched: number; missing: string[] } {
-  const candidates = c.expect.map((e) => ({ e, ids: sourceIds.map((id, i) => (accepts(e.accept, id) ? i : -1)).filter((i) => i >= 0) }));
+export function matchItems(c: EvalCase, sourceIds: (string | string[])[]): { matched: number; missing: string[] } {
+  const candidates = c.expect.map((e) => ({ e, ids: sourceIds.map((id, i) => ((Array.isArray(id) ? id.some((part) => accepts(e.accept, part)) : accepts(e.accept, id)) ? i : -1)).filter((i) => i >= 0) }));
   candidates.sort((a, b) => a.ids.length - b.ids.length);
   const used = new Set<number>();
   const missing: string[] = [];
@@ -95,6 +95,7 @@ export function scoreCase(c: EvalCase, outcome: { meal: GroundedMeal; usage: Mea
     name: i.name,
     grams: Math.round(i.grams),
     sourceId: i.sourceId,
+    componentSourceIds: i.componentSourceIds,
     kcal: Math.round(((i.per100g.kcal ?? 0) * i.grams) / 100),
     verified: i.verified,
   }));
@@ -106,7 +107,7 @@ export function scoreCase(c: EvalCase, outcome: { meal: GroundedMeal; usage: Mea
   }
   const { matched, missing } = matchItems(
     c,
-    items.map((i) => i.sourceId),
+    items.map((i) => [i.sourceId, ...(i.componentSourceIds ?? [])]),
   );
   const kcalOk = kcal >= range[0] && kcal <= range[1];
   return { ...base, ok: missing.length === 0 && kcalOk && base.underTokenCap, grounding, matched, missing, kcal, kcalOk, items };

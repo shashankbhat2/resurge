@@ -39,6 +39,8 @@ export interface GroundedItem {
   confidence: number;
   /** "ifct:A015", "components", "estimate", … */
   sourceId: string;
+  /** Source IDs retained for auditing composed dishes and eval matching. */
+  componentSourceIds?: string[];
   /** "IFCT 2017 (ICMR-NIN)", "Built from 4 ingredients", "Estimate" */
   sourceName: string;
   /** The matched entry's own name ("Rice, white, basmati, boiled"), or the ingredients. */
@@ -140,6 +142,7 @@ export function groundMeal(input: SubmitMealInput, evidence: Evidence): { proble
         per100g: rounded(dishPer100g(parts.map((p) => ({ per100g: p.record.per100g, grams: p.grams })), item.grams)),
         confidence: item.confidence,
         sourceId: "components",
+        componentSourceIds: parts.map((p) => p.record.id),
         sourceName: `Built from ${parts.length} ingredient${parts.length === 1 ? "" : "s"}`,
         sourceDetail: parts.map((p) => `${p.record.name} ${Math.round(p.grams)} g`).join("; "),
         verified: parts.every((p) => evidence.get(p.record.id)!.verified),
