@@ -33,6 +33,9 @@ import com.composeunstyled.Text
 import com.composeunstyled.UnstyledButton
 import com.resurgeai.core.designsystem.components.SegmentOption
 import com.resurgeai.core.designsystem.components.SegmentedControl
+import com.resurgeai.core.designsystem.components.SkeletonCircle
+import com.resurgeai.core.designsystem.components.SkeletonGroup
+import com.resurgeai.core.designsystem.components.SkeletonLine
 import com.resurgeai.core.designsystem.components.signalColor
 import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.model.PaceSignal
@@ -146,11 +149,41 @@ internal fun ScoreRings(
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(10.dp))
+        if (!history.loaded) {
+            SkeletonGroup {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ScoreKind.entries.forEach { kind -> RingCardSkeleton(kind, Modifier.weight(1f)) }
+                }
+            }
+            return@Column
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ScoreKind.entries.forEach { kind ->
-                val ring = if (history.loaded) ringValue(history, kind, period) else RingValue(null, null, "", false)
-                RingCard(kind, ring, Modifier.weight(1f)) { onOpen(kind) }
+                RingCard(kind, ringValue(history, kind, period), Modifier.weight(1f)) { onOpen(kind) }
             }
+        }
+    }
+}
+
+/** [RingCard]'s shape while the scores are still being worked out. */
+@Composable
+private fun RingCardSkeleton(kind: ScoreKind, modifier: Modifier) {
+    Column(
+        modifier
+            .clip(Resurge.shape.md)
+            .background(Resurge.colors.surface)
+            .semantics { contentDescription = "${kind.label}: loading" }
+            .padding(start = 8.dp, end = 8.dp, top = 14.dp, bottom = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        SkeletonCircle(76.dp)
+        Spacer(Modifier.height(8.dp))
+        Text(kind.label, style = Resurge.type.label, color = Resurge.colors.text)
+        // Two caption lines, the same height as the real card's note.
+        Spacer(Modifier.height(6.dp))
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            SkeletonLine(56.dp, 10.dp)
+            SkeletonLine(40.dp, 10.dp)
         }
     }
 }

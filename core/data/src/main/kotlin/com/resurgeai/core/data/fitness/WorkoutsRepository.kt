@@ -1,5 +1,6 @@
 package com.resurgeai.core.data.fitness
 
+import android.content.Context
 import kotlinx.coroutines.flow.first
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
@@ -16,6 +17,7 @@ import com.resurgeai.core.model.Workout
 import com.resurgeai.core.model.WorkoutDraft
 import com.resurgeai.core.model.WorkoutMetricsInput
 import com.resurgeai.core.model.WorkoutSource
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -55,11 +57,28 @@ class WorkoutsRepository @Inject constructor(
     private val auth: FirebaseAuth,
     private val healthData: HealthDataSource,
     private val weights: WeightRepository,
+    @param:ApplicationContext private val context: Context,
 ) {
     private fun user() = auth.currentUser?.uid?.let { firestore.collection("users").document(it) }
 
     /** Distance, calories and heart rate per session; sessions don't change once finished. */
     private val metricsCache = ConcurrentHashMap<String, WorkoutMetricsInput>()
+
+    /**
+     * The same totals kept across launches, so a cold start doesn't aggregate every session again
+     * (each one is a slow Health Connect call). Only sessions a day old are kept, by when late watch
+     * syncs have landed.
+     */
+    private val savedMetrics by lazy { context.getSharedPreferences(METRICS_PREFS, Context.MODE_PRIVATE) }
+
+    private fun savedMetrics(id: String): WorkoutMetricsInput? =
+        savedMetrics.getString(id, null)?.split(',')?.takeIf { it.size == 3 }?.let { (distance, hr, kcal) ->
+            WorkoutMetricsInput(distanceM = distance.toDoubleOrNull(), avgHr = hr.toIntOrNull(), kcal = kcal.toIntOrNull())
+        }
+
+    private fun saveMetrics(id: String, m: WorkoutMetricsInput) {
+        savedMetrics.edit().putString(id, listOf(m.distanceM, m.avgHr, m.kcal).joinToString(",") { it?.toString().orEmpty() }).apply()
+    }
 
     fun records(since: Instant): Flow<List<WorkoutRecord>> {
         val ref = user() ?: return flowOf(emptyList())
@@ -89,13 +108,18 @@ class WorkoutsRepository @Inject constructor(
     suspend fun latestWeightKg(): Double? = weights.latestKg()
 
     private suspend fun ExerciseSession.toWorkout(): Workout {
-        val metrics = metricsCache[id] ?: runCatching { healthData.metricsBetween(start, end) }.getOrNull()?.let { m ->
-            WorkoutMetricsInput(
-                distanceM = m.distanceMeters?.takeIf { it >= 50 },
-                avgHr = m.avgBpm?.toInt(),
-                kcal = (m.activeKcal ?: m.totalKcal)?.roundToInt(),
-            ).also { if (end.isBefore(Instant.now())) metricsCache[id] = it }
-        } ?: WorkoutMetricsInput()
+        val now = Instant.now()
+        val metrics = metricsCache[id] ?: savedMetrics(id)?.also { metricsCache[id] = it }
+            ?: runCatching { healthData.metricsBetween(start, end) }.getOrNull()?.let { m ->
+                WorkoutMetricsInput(
+                    distanceM = m.distanceMeters?.takeIf { it >= 50 },
+                    avgHr = m.avgBpm?.toInt(),
+                    kcal = (m.activeKcal ?: m.totalKcal)?.roundToInt(),
+                ).also {
+                    if (end.isBefore(now)) metricsCache[id] = it
+                    if (end.isBefore(now.minus(Duration.ofDays(1)))) saveMetrics(id, it)
+                }
+            } ?: WorkoutMetricsInput()
         return Workout(
             id = id,
             source = WorkoutSource.HEALTH_CONNECT,
@@ -202,6 +226,7 @@ class WorkoutsRepository @Inject constructor(
     }
 
     companion object {
+        private const val METRICS_PREFS = "workout_metrics"
         private const val HC = "health_connect"
         private const val MANUAL = "manual"
 

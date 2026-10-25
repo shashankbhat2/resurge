@@ -158,9 +158,10 @@ class ScoresEngine @javax.inject.Inject constructor(
             readLock.withLock {
                 val now = SystemClock.elapsedRealtime()
                 if (!force && health.value != null && now - readAt < MIN_READ_INTERVAL_MS) return@withLock
-                health.value = runCatching { readHealth() }.onFailure { Log.w(TAG, "Health read failed", it) }.getOrNull()
-                    ?: health.value ?: HealthWindow(false, emptyMap(), emptyMap(), emptyMap(), emptyMap(), emptyMap(), emptyList(), false)
-                readAt = now
+                val read = runCatching { readHealth() }.onFailure { Log.w(TAG, "Health read failed", it) }.getOrNull()
+                health.value = read ?: health.value ?: HealthWindow(false, emptyMap(), emptyMap(), emptyMap(), emptyMap(), emptyMap(), emptyList(), false)
+                // A failed read is tried again on the next refresh rather than kept for the interval.
+                if (read != null) readAt = now
             }
         }
     }
