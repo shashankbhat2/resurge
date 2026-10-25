@@ -1,6 +1,7 @@
 [versions]
 # In-app meal scanner.
 camerax = "1.5.3"
+mlkitBarcode = "17.3.0"
 # Backdrop blur for the tab header (content scrolls under it).
 haze = "1.7.2"
 agp = "9.4.1"
@@ -44,6 +45,8 @@ camerax-core = { module = "androidx.camera:camera-core", version.ref = "camerax"
 camerax-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
 camerax-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
 camerax-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
+# On-device barcode scanning with the model bundled in the app (works offline, no Play services download).
+mlkit-barcode = { module = "com.google.mlkit:barcode-scanning", version.ref = "mlkitBarcode" }
 haze = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "coreSplashscreen" }

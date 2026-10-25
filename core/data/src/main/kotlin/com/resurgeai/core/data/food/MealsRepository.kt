@@ -10,11 +10,14 @@ import com.google.firebase.firestore.SetOptions
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.resurgeai.core.data.listen
+import com.resurgeai.core.model.BarcodeProduct
 import com.resurgeai.core.model.FoodItem
+import com.resurgeai.core.model.FoodSource
 import com.resurgeai.core.model.Meal
 import com.resurgeai.core.model.MealEstimate
 import com.resurgeai.core.model.MealSource
 import com.resurgeai.core.model.MealType
+import com.resurgeai.core.model.Micro
 import com.resurgeai.core.model.Nutrition
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -32,10 +35,12 @@ class MealAnalysisException(message: String) : Exception(message)
 
 /**
  * Food log:
- *   users/{uid}/meals/{id}        type, loggedAtMs, localDate, source, title, items[] (nutrition per 100 g),
- *                                 thumb (small JPEG), aiTotals (the model's original totals)
+ *   users/{uid}/meals/{id}        type, loggedAtMs, localDate, source, title, items[] (nutrition per 100 g,
+ *                                 micronutrients and where the numbers came from), thumb (small JPEG),
+ *                                 aiTotals (the agent's original totals)
  *   users/{uid}/waterDays/{date}  { date, ml }
- * Photos are analysed by the analyzeMeal function; only a thumbnail is stored.
+ * Photos, descriptions and labels are analysed by the analyzeMeal function, which matches each food
+ * to a nutrition table; barcodes go to lookupBarcode first. Only a thumbnail is stored.
  */
 @Singleton
 class MealsRepository @Inject constructor(
@@ -118,20 +123,22 @@ class MealsRepository @Inject constructor(
     }
 
     /**
-     * Asks the coach model to identify foods and estimate portions from a photo (JPEG) and/or a
-     * description. [answer] replies to a previous clarifying question.
+     * Asks the meal agent to identify foods and portions from a photo (JPEG: a meal or a nutrition
+     * label), a description and/or a [barcode], and to match each food to a nutrition table.
+     * [answer] replies to a previous clarifying question.
      */
-    suspend fun analyze(photo: ByteArray?, text: String?, mealType: MealType, answer: String? = null): MealEstimate {
-        require(photo != null || !text.isNullOrBlank()) { "Nothing to analyse" }
+    suspend fun analyze(photo: ByteArray?, text: String?, mealType: MealType, answer: String? = null, barcode: String? = null): MealEstimate {
+        require(photo != null || !text.isNullOrBlank() || barcode != null) { "Nothing to analyse" }
         val data = buildMap<String, Any?> {
             photo?.let { put("image", Base64.encodeToString(it, Base64.NO_WRAP)) }
             text?.trim()?.takeIf { it.isNotEmpty() }?.let { put("text", it) }
             answer?.let { put("answer", it) }
+            barcode?.let { put("barcode", it) }
             put("mealType", mealType.wire)
             put("localTime", LocalTime.now().withNano(0).toString())
         }
         val result = try {
-            functions.getHttpsCallable("analyzeMeal").withTimeout(90, TimeUnit.SECONDS).call(data).await()
+            functions.getHttpsCallable("analyzeMeal").withTimeout(120, TimeUnit.SECONDS).call(data).await()
         } catch (e: FirebaseFunctionsException) {
             throw MealAnalysisException(
                 when (e.code) {
@@ -145,6 +152,27 @@ class MealsRepository @Inject constructor(
             throw MealAnalysisException("Couldn't reach the server. Check your connection and try again.")
         }
         return parseEstimate(result.getData() as? Map<*, *> ?: throw MealAnalysisException("Couldn't analyse the meal. Try again."))
+    }
+
+    /**
+     * A packaged product by barcode (our cache, then Open Food Facts), with no model call. Null when
+     * it isn't known: then a photo of the nutrition label goes to [analyze] with the barcode.
+     */
+    suspend fun lookupBarcode(barcode: String): BarcodeProduct? {
+        val result = try {
+            functions.getHttpsCallable("lookupBarcode").withTimeout(20, TimeUnit.SECONDS).call(mapOf("barcode" to barcode)).await()
+        } catch (e: FirebaseFunctionsException) {
+            throw MealAnalysisException(
+                when (e.code) {
+                    FirebaseFunctionsException.Code.INVALID_ARGUMENT -> "That isn't a product barcode."
+                    FirebaseFunctionsException.Code.UNAUTHENTICATED -> "Please sign in again."
+                    else -> "Couldn't look up that product. Try again."
+                },
+            )
+        } catch (e: Exception) {
+            throw MealAnalysisException("Couldn't reach the server. Check your connection and try again.")
+        }
+        return parseProduct(result.getData() as? Map<*, *> ?: return null)
     }
 
     private fun toMeal(d: DocumentSnapshot): Meal? {
@@ -167,31 +195,77 @@ class MealsRepository @Inject constructor(
     companion object {
         const val MAX_ITEMS = 20
 
-        fun FoodItem.toMap(): Map<String, Any?> = mapOf(
-            "name" to name.take(60),
-            "grams" to grams,
-            "kcal" to per100g.kcal,
-            "protein" to per100g.protein,
-            "carbs" to per100g.carbs,
-            "fat" to per100g.fat,
-            "fiber" to per100g.fiber,
-            "confidence" to confidence,
-        )
+        fun FoodItem.toMap(): Map<String, Any?> = buildMap {
+            put("name", name.take(60))
+            put("grams", grams)
+            put("kcal", per100g.kcal)
+            put("protein", per100g.protein)
+            put("carbs", per100g.carbs)
+            put("fat", per100g.fat)
+            put("fiber", per100g.fiber)
+            put("confidence", confidence)
+            if (per100g.micros.isNotEmpty()) put("micros", per100g.micros.mapKeys { it.key.wire })
+            source?.let { s ->
+                put("source", mapOf("id" to s.id.take(80), "name" to s.name.take(60), "detail" to s.detail?.take(200), "verified" to s.verified))
+            }
+        }
 
         private fun Nutrition.toMap() = mapOf("kcal" to kcal, "protein" to protein, "carbs" to carbs, "fat" to fat, "fiber" to fiber)
 
-        fun itemFrom(m: Map<*, *>): FoodItem? {
-            val name = m["name"] as? String ?: return null
-            fun num(key: String) = (m[key] as? Number)?.toDouble() ?: 0.0
-            return FoodItem(
-                name = name,
-                grams = num("grams"),
-                per100g = Nutrition(num("kcal"), num("protein"), num("carbs"), num("fat"), num("fiber")),
-                confidence = (m["confidence"] as? Number)?.toDouble(),
+        /** Micronutrients from a { "sodium": 120.0, … } map; unknown keys and nulls are skipped. */
+        private fun microsFrom(value: Any?): Map<Micro, Double> = (value as? Map<*, *>).orEmpty().mapNotNull { (k, v) ->
+            val micro = (k as? String)?.let(Micro::fromWire) ?: return@mapNotNull null
+            val n = (v as? Number)?.toDouble()?.takeIf { it.isFinite() && it >= 0 } ?: return@mapNotNull null
+            micro to n
+        }.toMap()
+
+        private fun sourceFrom(value: Any?): FoodSource? {
+            val m = value as? Map<*, *> ?: return null
+            val id = m["id"] as? String ?: m["sourceId"] as? String ?: return null
+            return FoodSource(
+                id = id,
+                name = m["name"] as? String ?: m["sourceName"] as? String ?: "Source",
+                detail = (m["detail"] as? String ?: m["sourceDetail"] as? String)?.takeIf { it.isNotBlank() },
+                verified = m["verified"] as? Boolean ?: true,
             )
         }
 
-        /** Parses the analyzeMeal response; item nutrition arrives per 100 g. */
+        /**
+         * A stored or analysed food. Stored items keep micronutrients under "micros"; the analyzeMeal
+         * response carries every nutrient under "nutrients" and the source fields flat.
+         */
+        fun itemFrom(m: Map<*, *>): FoodItem? {
+            val name = m["name"] as? String ?: return null
+            fun num(key: String) = (m[key] as? Number)?.toDouble() ?: 0.0
+            val micros = microsFrom(m["micros"]) + microsFrom(m["nutrients"])
+            return FoodItem(
+                name = name,
+                grams = num("grams"),
+                per100g = Nutrition(num("kcal"), num("protein"), num("carbs"), num("fat"), num("fiber"), micros),
+                confidence = (m["confidence"] as? Number)?.toDouble(),
+                source = sourceFrom(m["source"]) ?: sourceFrom(m),
+            )
+        }
+
+        /** Parses the lookupBarcode response. */
+        fun parseProduct(map: Map<*, *>): BarcodeProduct? {
+            if (map["found"] != true) return null
+            val p = map["product"] as? Map<*, *> ?: return null
+            val n = p["nutrients"] as? Map<*, *> ?: return null
+            fun num(key: String) = (n[key] as? Number)?.toDouble() ?: 0.0
+            return BarcodeProduct(
+                name = p["name"] as? String ?: return null,
+                per100g = Nutrition(num("kcal"), num("protein"), num("carbs"), num("fat"), num("fiber"), microsFrom(n)),
+                servingGrams = (p["servingGrams"] as? Number)?.toDouble()?.takeIf { it > 0 },
+                source = FoodSource(
+                    id = p["sourceId"] as? String ?: "off:unknown",
+                    name = p["sourceName"] as? String ?: "Open Food Facts",
+                    detail = p["name"] as? String,
+                ),
+            )
+        }
+
+        /** Parses the analyzeMeal response; item nutrition arrives per 100 g, with its source. */
         fun parseEstimate(map: Map<*, *>): MealEstimate {
             val items = (map["items"] as? List<*>).orEmpty().mapNotNull { (it as? Map<*, *>)?.let(::itemFrom) }
             if (items.isEmpty()) throw MealAnalysisException("No food found. Try a clearer photo or describe the meal.")

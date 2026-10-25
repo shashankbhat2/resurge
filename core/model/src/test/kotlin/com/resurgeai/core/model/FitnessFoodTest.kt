@@ -54,6 +54,16 @@ class FitnessFoodTest {
     }
 
     @Test
+    fun `micronutrient totals add what is known and scale with the portion`() {
+        val dal = FoodItem("Dal", 200.0, Nutrition(kcal = 100.0, micros = mapOf(Micro.IRON to 1.0, Micro.SODIUM to 300.0)))
+        val rice = FoodItem("Rice", 150.0, Nutrition(kcal = 130.0, micros = mapOf(Micro.IRON to 0.2)))
+        val meal = Meal("m", MealType.LUNCH, java.time.Instant.EPOCH, java.time.LocalDate.EPOCH, MealSource.SCAN, "Lunch", listOf(dal, rice))
+        assertEquals(2.3, meal.totals[Micro.IRON]!!, 0.001)
+        assertEquals(600.0, meal.totals[Micro.SODIUM]!!, 0.001)
+        assertNull(meal.totals[Micro.VIT_C])
+    }
+
+    @Test
     fun `meal slot from time of day and reminder toggles`() {
         assertEquals(MealType.BREAKFAST, MealType.forTime(LocalTime.of(8, 0)))
         assertEquals(MealType.LUNCH, MealType.forTime(LocalTime.of(13, 30)))

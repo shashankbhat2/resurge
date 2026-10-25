@@ -94,6 +94,9 @@ object ResurgeIcons {
     @DrawableRes val Photo = Tabler.drawable.tabler_ic_photo_outline
     @DrawableRes val Bolt = Tabler.drawable.tabler_ic_bolt_outline
     @DrawableRes val Keyboard = Tabler.drawable.tabler_ic_keyboard_outline
+    @DrawableRes val Barcode = Tabler.drawable.tabler_ic_barcode_outline
+    @DrawableRes val Microphone = Tabler.drawable.tabler_ic_microphone_outline
+    @DrawableRes val Database = Tabler.drawable.tabler_ic_database_outline
     @DrawableRes val Search = Tabler.drawable.tabler_ic_search_outline
     @DrawableRes val Clock = Tabler.drawable.tabler_ic_clock_outline
     @DrawableRes val Stopwatch = Tabler.drawable.tabler_ic_stopwatch_outline
