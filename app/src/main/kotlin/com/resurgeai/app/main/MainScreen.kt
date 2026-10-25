@@ -38,7 +38,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.UnstyledButton
 import com.resurgeai.core.designsystem.components.Avatar
-import com.resurgeai.core.designsystem.components.NavCoach
+import com.resurgeai.core.designsystem.components.NavAdd
+import com.resurgeai.core.designsystem.components.CoachButton
+import com.resurgeai.core.designsystem.components.CoachButtonClearance
+import com.resurgeai.core.designsystem.components.BottomSheet
 import androidx.compose.foundation.layout.size
 import com.resurgeai.core.designsystem.components.LocalHeaderInset
 import com.resurgeai.core.designsystem.components.MainHeader
@@ -48,6 +51,12 @@ import com.composeunstyled.Text
 import java.time.LocalTime
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import com.resurgeai.core.designsystem.components.Icon
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.asPaddingValues
@@ -71,8 +80,8 @@ import androidx.navigation.compose.rememberNavController
 import com.resurgeai.app.BuildConfig
 import com.resurgeai.app.widget.WeightWidget
 import com.resurgeai.core.designsystem.catalog.DesignCatalog
-import com.resurgeai.core.designsystem.components.FloatingNavBar
-import com.resurgeai.core.designsystem.components.FloatingNavBarHeight
+import com.resurgeai.core.designsystem.components.NavBar
+import com.resurgeai.core.designsystem.components.NavBarHeight
 import com.resurgeai.core.designsystem.components.LocalFloatingBarInset
 import com.resurgeai.core.designsystem.components.NavItem
 import com.resurgeai.core.designsystem.components.ResurgeIcons
@@ -284,6 +293,7 @@ fun MainScreen(
                 onOpenWorkout = { id -> rootNav.navigate(WorkoutEditorRoute(workoutId = id)) },
                 onLogMeal = { rootNav.navigate(FoodLogRoute()) },
                 onScanMeal = { rootNav.navigate(FoodLogRoute(mode = "scan")) },
+                onLogWeight = { rootNav.navigate(WeightScreenRoute(log = true)) },
                 onOpenMeal = { id -> rootNav.navigate(MealReviewRoute(mealId = id)) },
                 onOpenReel = { id -> rootNav.navigate(ReelRoute(id)) },
                 openFoodTabSignal = if (openFoodSignal.mode == null) openFoodSignal.count else 0,
@@ -511,6 +521,7 @@ private fun TabsShell(
     onOpenWorkout: (String) -> Unit,
     onLogMeal: () -> Unit,
     onScanMeal: () -> Unit,
+    onLogWeight: () -> Unit,
     onOpenMeal: (String) -> Unit,
     onOpenReel: (String) -> Unit,
     openFoodTabSignal: Int,
@@ -521,6 +532,8 @@ private fun TabsShell(
     val headerHaze = remember { HazeState() }
     // The Fitness header's "+" opens quick add on the tab.
     var fitnessQuickAdd by remember { mutableIntStateOf(0) }
+    // Add in the navbar opens the quick logging sheet.
+    var quickAdd by remember { mutableStateOf(false) }
     // The habit reminder notification opens the Habits tab.
     LaunchedEffect(openHabitsSignal) {
         if (openHabitsSignal > 0) {
@@ -541,7 +554,7 @@ private fun TabsShell(
     } ?: Tab.Today
 
     // Header, ask bar and navbar float over the content; scrolling screens pad with these insets.
-    val bottomInset = FloatingNavBarHeight + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val bottomInset = NavBarHeight + CoachButtonClearance + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val topInset = MainHeaderHeight + WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     Box(Modifier.fillMaxSize()) {
         CompositionLocalProvider(LocalFloatingBarInset provides bottomInset, LocalHeaderInset provides topInset) {
@@ -637,14 +650,65 @@ private fun TabsShell(
                 }
             },
         )
-        // The coach sits in the middle of the navbar, between the first two and last two tabs.
-        FloatingNavBar(
+        // Add sits in the middle of the navbar, between the first two and last two tabs.
+        NavBar(
             items = Tab.entries.map { NavItem(it, it.label, it.icon, it.selectedIcon) },
             selected = currentTab,
             onSelect = { tab -> tabsNav.switchTab(tab.route) },
             modifier = Modifier.align(Alignment.BottomCenter),
-            center = { NavCoach(onClick = onOpenCoach) },
+            center = { NavAdd(onClick = { quickAdd = true }) },
         )
+        // The coach floats over the right end of the navbar.
+        CoachButton(onClick = onOpenCoach, modifier = Modifier.align(Alignment.BottomEnd))
+    }
+    if (quickAdd) {
+        QuickAddSheet(
+            onDismiss = { quickAdd = false },
+            onLogMeal = { quickAdd = false; onLogMeal() },
+            onScanMeal = { quickAdd = false; onScanMeal() },
+            onLogWorkout = { quickAdd = false; onLogWorkout() },
+            onLogWeight = { quickAdd = false; onLogWeight() },
+            onAddHabit = { quickAdd = false; onAddHabit() },
+        )
+    }
+}
+
+/** What Add in the navbar offers: the quick ways to log something from any tab. */
+@Composable
+private fun QuickAddSheet(
+    onDismiss: () -> Unit,
+    onLogMeal: () -> Unit,
+    onScanMeal: () -> Unit,
+    onLogWorkout: () -> Unit,
+    onLogWeight: () -> Unit,
+    onAddHabit: () -> Unit,
+) {
+    BottomSheet(onDismiss) {
+        Text("Add", style = Resurge.type.title)
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            QuickAddRow(ResurgeIcons.Bowl, "Log a meal", onLogMeal)
+            QuickAddRow(ResurgeIcons.Scan, "Scan a meal", onScanMeal)
+            QuickAddRow(ResurgeIcons.Fitness, "Log a workout", onLogWorkout)
+            QuickAddRow(ResurgeIcons.Scale, "Log weight", onLogWeight)
+            QuickAddRow(ResurgeIcons.Habits, "Add a habit", onAddHabit)
+        }
+    }
+}
+
+@Composable
+private fun QuickAddRow(@DrawableRes icon: Int, label: String, onClick: () -> Unit) {
+    UnstyledButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().clip(Resurge.shape.md).background(Resurge.colors.surfaceMuted),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        indication = LocalIndication.current,
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = Resurge.colors.textMuted, size = 22.dp)
+            Spacer(Modifier.width(12.dp))
+            Text(label, style = Resurge.type.label.copy(fontSize = Resurge.type.body.fontSize))
+        }
     }
 }
 

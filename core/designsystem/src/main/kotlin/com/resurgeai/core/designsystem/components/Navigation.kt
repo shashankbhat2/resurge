@@ -49,45 +49,44 @@ data class NavItem<T>(
     @DrawableRes val selectedIcon: Int = icon,
 )
 
-/** Space the navbar takes at the bottom (bar plus system navigation inset); scrolling tab content should end with at least this much space. */
+/** Space the navbar takes at the bottom (bar plus system navigation inset, and room for the Coach button); scrolling tab content should end with at least this much space. */
 val LocalFloatingBarInset = compositionLocalOf { 0.dp }
 
-private val BarHeight = 72.dp
-private val BarMarginX = 16.dp
-private val BarMarginBottom = 12.dp
+private val BarHeight = 80.dp
 private val TabHeight = 56.dp
+private val CoachSize = 56.dp
+private val CoachMargin = 16.dp
 
-/** Space the floating navbar takes above the system navigation-bar inset (bar plus its margin). */
-val FloatingNavBarHeight: Dp = BarHeight + BarMarginBottom
+/** Height of the navbar above the system navigation-bar inset. */
+val NavBarHeight: Dp = BarHeight
+
+/** How far the Coach button sticks up above the navbar, for content padding. */
+val CoachButtonClearance: Dp = CoachSize + CoachMargin
 
 /**
- * Navigation bar (Resurge Mono): a floating pill inset from the screen edges, icons only. The
- * selected tab sits on a lighter pill; tabs are a full 56dp tall so they're easy to hit, and each
- * is announced by its label. An optional [center] item (the Coach) sits between the two halves.
+ * Navigation bar (Resurge Mono): docked to the bottom edge, full width, icons only. The selected
+ * tab sits on a lighter pill; tabs are a full 56dp tall so they're easy to hit, and each is announced
+ * by its label. An optional [center] item (Add) sits between the two halves.
  */
 @Composable
-fun <T> FloatingNavBar(
+fun <T> NavBar(
     items: List<NavItem<T>>,
     selected: T,
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
     center: (@Composable RowScope.() -> Unit)? = null,
 ) {
-    val shape = Resurge.shape.pill
-    Box(
+    Column(
         modifier
             .fillMaxWidth()
-            .windowInsetsPadding(WindowInsets.navigationBars)
-            .padding(start = BarMarginX, end = BarMarginX, bottom = BarMarginBottom),
+            .background(Resurge.colors.navBar)
+            .windowInsetsPadding(WindowInsets.navigationBars),
     ) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(Resurge.colors.border))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(BarHeight)
-                .shadow(20.dp, shape, ambientColor = Color.Black.copy(alpha = 0.4f), spotColor = Color.Black.copy(alpha = 0.4f))
-                .clip(shape)
-                .background(Resurge.colors.navBar)
-                .border(1.dp, Resurge.colors.border, shape)
+                .height(BarHeight - 1.dp)
                 .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -138,9 +137,27 @@ private fun NavTab(
     }
 }
 
+/** Add, in the middle of [NavBar]: a plus drawn like an unselected tab. It opens quick logging. */
+@Composable
+fun RowScope.NavAdd(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(modifier.weight(1f), contentAlignment = Alignment.Center) {
+        UnstyledButton(
+            onClick = onClick,
+            role = Role.Button,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(TabHeight)
+                .padding(horizontal = 2.dp)
+                .clip(Resurge.shape.pill)
+                .semantics { contentDescription = "Add" },
+            indication = LocalIndication.current,
+        ) { Icon(ResurgeIcons.Plus, contentDescription = null, tint = Resurge.colors.navInactive, size = 28.dp) }
+    }
+}
+
 /**
  * The coach's mark: a sparkle in a solid circle (white on black, black on white). Used for the Coach
- * in the navbar and beside its notes; there's no character, so it reads the same in every persona.
+ * button and beside its notes; there's no character, so it reads the same in every persona.
  */
 @Composable
 fun CoachBadge(size: Dp = 32.dp, modifier: Modifier = Modifier) {
@@ -152,20 +169,25 @@ fun CoachBadge(size: Dp = 32.dp, modifier: Modifier = Modifier) {
     }
 }
 
-/** The Coach in the middle of [FloatingNavBar]: a 48dp [CoachBadge]. Tapping starts a new chat. */
+/**
+ * The Coach, floating over the right end of [NavBar]: a 56dp [CoachBadge] with a shadow. Place it
+ * at the bottom end of the screen; it keeps clear of the bar and the system navigation inset.
+ * Tapping starts a new chat.
+ */
 @Composable
-fun RowScope.NavCoach(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(modifier.weight(1f), contentAlignment = Alignment.Center) {
-        UnstyledButton(
-            onClick = onClick,
-            role = Role.Button,
-            modifier = Modifier
-                .size(TabHeight)
-                .clip(Resurge.shape.pill)
-                .semantics { contentDescription = "Coach" },
-            indication = LocalIndication.current,
-        ) { CoachBadge(size = 48.dp) }
-    }
+fun CoachButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    UnstyledButton(
+        onClick = onClick,
+        role = Role.Button,
+        modifier = modifier
+            .windowInsetsPadding(WindowInsets.navigationBars)
+            .padding(end = CoachMargin, bottom = BarHeight + CoachMargin)
+            .size(CoachSize)
+            .shadow(16.dp, Resurge.shape.pill, ambientColor = Color.Black.copy(alpha = 0.4f), spotColor = Color.Black.copy(alpha = 0.4f))
+            .clip(Resurge.shape.pill)
+            .semantics { contentDescription = "Coach" },
+        indication = LocalIndication.current,
+    ) { CoachBadge(size = CoachSize) }
 }
 
 /** Simple top bar: optional back button, title, optional trailing action. Applies status bar insets. */

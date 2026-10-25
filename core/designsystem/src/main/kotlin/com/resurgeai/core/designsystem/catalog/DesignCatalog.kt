@@ -45,9 +45,10 @@ import com.resurgeai.core.designsystem.components.RingSegment
 import com.resurgeai.core.designsystem.components.RangeBar
 import com.resurgeai.core.designsystem.components.SegmentsBar
 import com.resurgeai.core.designsystem.components.WindowBar
-import com.resurgeai.core.designsystem.components.FloatingNavBar
+import com.resurgeai.core.designsystem.components.NavBar
 import com.resurgeai.core.designsystem.components.IconButton
-import com.resurgeai.core.designsystem.components.NavCoach
+import com.resurgeai.core.designsystem.components.NavAdd
+import com.resurgeai.core.designsystem.components.CoachBadge
 import com.resurgeai.core.designsystem.components.NavItem
 import com.resurgeai.core.designsystem.components.MetricCard
 import com.resurgeai.core.designsystem.components.NumberStepper
@@ -260,7 +261,7 @@ private fun MetricsSection() {
 
 @Composable
 private fun MiscSection() {
-    FloatingNavBar(
+    NavBar(
         items = listOf(
             NavItem(0, "Today", ResurgeIcons.Today, ResurgeIcons.TodayFilled),
             NavItem(1, "Fitness", ResurgeIcons.Fitness, ResurgeIcons.FitnessFilled),
@@ -269,8 +270,10 @@ private fun MiscSection() {
         ),
         selected = 0,
         onSelect = {},
-        center = { NavCoach(onClick = {}) },
+        center = { NavAdd(onClick = {}) },
     )
+    Spacer(Modifier.height(12.dp))
+    CoachBadge(size = 56.dp)
     Spacer(Modifier.height(12.dp))
     Card {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {

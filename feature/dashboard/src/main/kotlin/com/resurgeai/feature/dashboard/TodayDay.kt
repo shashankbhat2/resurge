@@ -120,14 +120,13 @@ internal fun DayStrip(
             ),
     ) {
         val centre = constraints.maxWidth / 2f
-        // The lens, and a notch above it.
+        // The lens: its fill under the days, its outline (below) over the ruler.
         Box(
             Modifier
                 .align(Alignment.Center)
                 .size(CELL, 68.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(Resurge.colors.accentTint)
-                .border(1.5.dp, accent, RoundedCornerShape(12.dp)),
+                .background(Resurge.colors.accentTint),
         )
         Canvas(Modifier.align(Alignment.TopCenter).size(10.dp, 5.dp)) {
             drawPath(Path().apply { moveTo(0f, 0f); lineTo(size.width, 0f); lineTo(size.width / 2, size.height); close() }, accent)
@@ -162,6 +161,7 @@ internal fun DayStrip(
                 }
             }
         }
+        Box(Modifier.align(Alignment.Center).size(CELL, 68.dp).border(1.5.dp, accent, RoundedCornerShape(12.dp)))
     }
 }
 
