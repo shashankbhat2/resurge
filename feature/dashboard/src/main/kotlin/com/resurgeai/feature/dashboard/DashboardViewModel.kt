@@ -116,6 +116,8 @@ data class DashboardUiState(
     val weather: Weather? = null,
     /** Approximate location is allowed, so the weather can be read. */
     val weatherAllowed: Boolean = false,
+    /** A pull to refresh is reading Health Connect, the scores and the weather again. */
+    val refreshing: Boolean = false,
 ) {
 
     val healthReady: Boolean get() = availability == HealthConnectAvailability.AVAILABLE &&
@@ -328,6 +330,24 @@ class DashboardViewModel @Inject constructor(
         if (!force && loadJob?.isActive == true) return
         if (!force && now - lastLoadedAt < MIN_REFRESH_INTERVAL_MS && _state.value.today != null) return
         loadJob = viewModelScope.launch { load() }
+    }
+
+    /** Pull to refresh: reads everything again now, and says when it's done. */
+    fun pullRefresh() {
+        if (_state.value.refreshing) return
+        _state.update { it.copy(refreshing = true) }
+        clock.value = Instant.now()
+        streakEngine.tick()
+        scoresEngine.refresh(force = true)
+        viewModelScope.launch {
+            loadJob?.cancel()
+            val job = launch { load() }
+            loadJob = job
+            val weather = launch { loadWeather(force = true) }
+            job.join()
+            weather.join()
+            _state.update { it.copy(refreshing = false) }
+        }
     }
 
     fun onPermissionsResult(@Suppress("UNUSED_PARAMETER") granted: Set<String>) = refresh(force = true)

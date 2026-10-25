@@ -1,6 +1,11 @@
 package com.resurgeai.feature.dashboard
 
 import androidx.compose.runtime.key
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.delay
+import com.resurgeai.core.designsystem.components.PullToRefresh
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -98,9 +103,20 @@ fun TodayRoute(
         viewModel.refresh()
         onPauseOrDispose {}
     }
+    // Health Connect fills in as phones and watches sync, so read it again now and then while Today is open.
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) {
+                delay(LIVE_REFRESH_MS)
+                viewModel.refresh()
+            }
+        }
+    }
     TodayScreen(
         state = state,
         onConnect = { permissionLauncher.launch(viewModel.permissionsToRequest) },
+        onPullRefresh = viewModel::pullRefresh,
         onSelectDay = viewModel::selectDay,
         onAllowWeather = { locationLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION) },
         onInstall = { runCatching { context.startActivity(viewModel.installIntent()) } },
@@ -140,6 +156,7 @@ fun TodayScreen(
     onInstall: () -> Unit,
     onRetry: () -> Unit,
     onOpenMetric: (HealthMetric) -> Unit,
+    onPullRefresh: () -> Unit = {},
     onSelectDay: (LocalDate) -> Unit = {},
     onAllowWeather: () -> Unit = {},
     onOpenInsights: () -> Unit = {},
@@ -175,78 +192,85 @@ fun TodayScreen(
     LaunchedEffect(pager) {
         snapshotFlow { pager.settledPage }.collect { page -> onSelectDay(first.plusDays(page.toLong())) }
     }
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp),
+    PullToRefresh(
+        refreshing = state.refreshing,
+        onRefresh = onPullRefresh,
+        modifier = Modifier.fillMaxSize(),
+        indicatorTop = LocalHeaderInset.current + 8.dp,
     ) {
-        Spacer(Modifier.height(LocalHeaderInset.current + 4.dp))
-        DayStrip(today = today, selected = selected, onSelect = onSelectDay)
-        Spacer(Modifier.height(16.dp))
-        DayHeader(
-            date = selected,
-            today = today,
-            weather = state.weather,
-            weatherAllowed = state.weatherAllowed,
-            units = units,
-            onBackToToday = { onSelectDay(today) },
-            onAllowWeather = onAllowWeather,
-        )
-        Spacer(Modifier.height(16.dp))
-        // The day's scores slide in from the side the day is on.
-        AnimatedContent(
-            targetState = selected,
-            transitionSpec = {
-                val forward = targetState.isAfter(initialState)
-                (slideInHorizontally { w -> if (forward) w else -w } + fadeIn()) togetherWith
-                    (slideOutHorizontally { w -> if (forward) -w else w } + fadeOut())
-            },
-            label = "dayScores",
-        ) { date ->
-            ScoreRings(state.scores, date, onOpen = { onOpenScore(it, ScorePeriod.TODAY) })
-        }
-        Spacer(Modifier.height(10.dp))
-        StreakWeekCard(state.streak, goal, today, onOpenStreak = { detail = StreakDetail.STREAK }, onOpenWeek = { detail = StreakDetail.WEEK })
-        goal?.let { g ->
-            Spacer(Modifier.height(10.dp))
-            GoalCard(g, state.streak, state.weight, units, today) {
-                if (g.type.byWeight) onOpenMetric(HealthMetric.WEIGHT) else detail = StreakDetail.WEEK
-            }
-        }
-        HorizontalPager(
-            state = pager,
-            pageSpacing = 16.dp,
-            verticalAlignment = Alignment.Top,
-            modifier = Modifier.fillMaxWidth(),
-        ) { page ->
-            val date = first.plusDays(page.toLong())
-            DayPage(
-                date = date,
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+        ) {
+            Spacer(Modifier.height(LocalHeaderInset.current + 4.dp))
+            DayStrip(today = today, selected = selected, onSelect = onSelectDay)
+            Spacer(Modifier.height(16.dp))
+            DayHeader(
+                date = selected,
                 today = today,
-                state = state,
+                weather = state.weather,
+                weatherAllowed = state.weatherAllowed,
                 units = units,
-                onConnect = onConnect,
-                onInstall = onInstall,
-                onRetry = onRetry,
-                onOpenMetric = onOpenMetric,
-                onOpenInsights = onOpenInsights,
-                onOpenInsight = onOpenInsight,
-                onOpenMeal = onOpenMeal,
-                onOpenWorkout = onOpenWorkout,
-                onToggleHabit = onToggleHabit,
-                onAddHabit = onAddHabit,
-                onOpenHabits = onOpenHabits,
-                onStartSession = onStartSession,
-                onCompactListChange = onCompactListChange,
-                onOpenGoals = { detail = StreakDetail.GOALS },
-                onDismissInsight = onDismissInsight,
-                onImportWeights = onImportWeights,
-                onDismissWeightImport = onDismissWeightImport,
-                reelCard = reelCard,
+                onBackToToday = { onSelectDay(today) },
+                onAllowWeather = onAllowWeather,
             )
+            Spacer(Modifier.height(16.dp))
+            // The day's scores slide in from the side the day is on.
+            AnimatedContent(
+                targetState = selected,
+                transitionSpec = {
+                    val forward = targetState.isAfter(initialState)
+                    (slideInHorizontally { w -> if (forward) w else -w } + fadeIn()) togetherWith
+                        (slideOutHorizontally { w -> if (forward) -w else w } + fadeOut())
+                },
+                label = "dayScores",
+            ) { date ->
+                ScoreRings(state.scores, date, onOpen = { onOpenScore(it, ScorePeriod.TODAY) })
+            }
+            Spacer(Modifier.height(10.dp))
+            StreakWeekCard(state.streak, goal, today, onOpenStreak = { detail = StreakDetail.STREAK }, onOpenWeek = { detail = StreakDetail.WEEK })
+            goal?.let { g ->
+                Spacer(Modifier.height(10.dp))
+                GoalCard(g, state.streak, state.weight, units, today) {
+                    if (g.type.byWeight) onOpenMetric(HealthMetric.WEIGHT) else detail = StreakDetail.WEEK
+                }
+            }
+            HorizontalPager(
+                state = pager,
+                pageSpacing = 16.dp,
+                verticalAlignment = Alignment.Top,
+                modifier = Modifier.fillMaxWidth(),
+            ) { page ->
+                val date = first.plusDays(page.toLong())
+                DayPage(
+                    date = date,
+                    today = today,
+                    state = state,
+                    units = units,
+                    onConnect = onConnect,
+                    onInstall = onInstall,
+                    onRetry = onRetry,
+                    onOpenMetric = onOpenMetric,
+                    onOpenInsights = onOpenInsights,
+                    onOpenInsight = onOpenInsight,
+                    onOpenMeal = onOpenMeal,
+                    onOpenWorkout = onOpenWorkout,
+                    onToggleHabit = onToggleHabit,
+                    onAddHabit = onAddHabit,
+                    onOpenHabits = onOpenHabits,
+                    onStartSession = onStartSession,
+                    onCompactListChange = onCompactListChange,
+                    onOpenGoals = { detail = StreakDetail.GOALS },
+                    onDismissInsight = onDismissInsight,
+                    onImportWeights = onImportWeights,
+                    onDismissWeightImport = onDismissWeightImport,
+                    reelCard = reelCard,
+                )
+            }
+            Spacer(Modifier.height(32.dp + LocalFloatingBarInset.current))
         }
-        Spacer(Modifier.height(32.dp + LocalFloatingBarInset.current))
     }
 
     if (state.showDayComplete) DayCompleteDialog(state, onDismissDayComplete)
@@ -469,3 +493,6 @@ private fun TodayNoPermissionPreview() {
         )
     }
 }
+
+/** How often Today reads Health Connect again while it stays open. */
+private const val LIVE_REFRESH_MS = 2 * 60_000L
