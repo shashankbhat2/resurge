@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-US
+reviews:
+  profile: chill
+  high_level_summary: true
+  review_status: true
+  poem: false
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+  path_filters:
+    - '!**/build/**'
+    - '!**/node_modules/**'
+    - '!functions/lib/**'
+    - '!functions/data/food-db.json'
+    - '!**/src/test/screenshots/**'
+    - '!docs/screenshots/**'
+    - '!**/package-lock.json'
+  path_instructions:
+    - path: 'functions/**'
+      instructions: >-
+        Prioritize correctness, authentication, App Check, quota enforcement, server-side nutrition
+        provenance, cooking-state and serving-unit conversions, provider failure handling, and
+        secret redaction. Review external page fetching and web-evidence verification critically.
+        Distinguish model estimates of portions from source-backed nutrient values. Keep Mastra as
+        the agent harness, Anthropic search primary, and OpenRouter as fallback.
+    - path: 'feature/food/**'
+      instructions: >-
+        Check state restoration, coroutine and camera lifecycles, permissions, accessibility,
+        editable portions, clear source/estimate labels, and backwards compatibility with old meals.
+        Use existing design-system tokens. Screenshot tests use sample data and do not prove device
+        camera, barcode, voice, or deployed-backend behavior.
+    - path: 'firestore.rules'
+      instructions: >-
+        Check ownership and field validation, backwards compatibility, and that shared nutrition
+        caches cannot be written by clients. For this rollout, Firebase must be deployed and
+        smoke-tested before merging, as documented in docs/grounded-food-rollout.md.

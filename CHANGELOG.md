@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0 (25 October 2026)
+
+### Food logging
+A meal's numbers now come from nutrition tables. The same dish gets the same values, and micronutrients show up when the source has them.
+- Log with a photo, a description, your voice, or a barcode.
+- Each food says where its numbers came from. If nothing matched, it's marked as an estimate you can edit.
+- Change the grams and the totals follow, before you save.
+- A barcode that isn't known asks for a photo of the nutrition label.
+
 ## 0.4.0 (23 October 2026)
 
 ### Smart scales

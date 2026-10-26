@@ -32,3 +32,8 @@ keystore.properties
 
 # Firebase client config: each developer uses their own project
 app/google-services.json
+
+# Food data downloads (rebuilt by functions/scripts/build_food_db.py)
+functions/scripts/.cache/
+# Firebase emulator secrets
+functions/.secret.local

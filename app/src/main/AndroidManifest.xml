@@ -3,7 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- The in-app meal scanner. Gallery and Describe still work without it. -->
+    <!-- The in-app meal and barcode scanner. Gallery and Describe still work without it. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -40,6 +40,10 @@
 
     <queries>
         <package android:name="com.google.android.apps.healthdata" />
+        <!-- Speaking a meal in Describe uses the phone's own speech recognizer. -->
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
     </queries>
 
     <application
