@@ -1,0 +1,125 @@
+---
+/**
+ * The waitlist form, in a dialog. Any element with `data-waitlist` opens it. A sign-up is posted
+ * to /api/waitlist and remembered on this device, so coming back shows that you're already on it.
+ */
+---
+
+<dialog
+  id="waitlist"
+  aria-labelledby="waitlist-title"
+  class="m-auto w-[calc(100%-32px)] max-w-[440px] rounded-[28px] border border-line bg-surface p-0 text-white backdrop:bg-black/70 backdrop:backdrop-blur-sm"
+>
+  <div class="relative p-7 sm:p-8">
+    <button type="button" data-close aria-label="Close" class="absolute top-4 right-4 flex size-10 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/[0.06] hover:text-white">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+    </button>
+
+    <div data-state="form">
+      <h2 id="waitlist-title" class="headline pr-10 text-[32px] leading-[1.05] tracking-[-0.035em]">Join the waitlist</h2>
+      <p class="mt-3 leading-relaxed text-muted">Resurge is coming to Google Play. Leave your email and you'll get an invite to test it first, and a note the day it's out.</p>
+      <form class="mt-6 flex flex-col gap-3" novalidate>
+        <label for="waitlist-email" class="text-[13px] font-semibold text-muted">Email</label>
+        <input
+          id="waitlist-email"
+          name="email"
+          type="email"
+          inputmode="email"
+          autocomplete="email"
+          required
+          placeholder="you@gmail.com"
+          class="h-13 rounded-2xl border border-line bg-black px-4 text-[16px] text-white placeholder:text-faint focus:border-accent focus:outline-none"
+        />
+        <!-- People never see this; bots fill it in. -->
+        <input name="company" type="text" tabindex="-1" autocomplete="off" aria-hidden="true" class="absolute -left-[9999px] h-0 w-0 opacity-0" />
+        <p data-error role="alert" class="hidden text-sm text-[#FF4D8D]"></p>
+        <button type="submit" class="mt-1 inline-flex h-13 items-center justify-center rounded-full bg-white px-6 font-semibold text-black transition-[transform,opacity] hover:scale-[1.02] disabled:opacity-60">
+          Join the waitlist
+        </button>
+      </form>
+    </div>
+
+    <div data-state="done" class="hidden text-center" role="status">
+      <span class="mx-auto flex size-14 items-center justify-center rounded-full bg-[rgba(34,245,195,0.12)] text-up">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+      </span>
+      <h2 class="headline mt-5 text-[30px] tracking-[-0.035em]">You're on the list</h2>
+      <p class="mt-3 leading-relaxed text-muted">We'll write to <span data-email class="text-white"></span> with your test invite.</p>
+      <button type="button" data-close class="mt-6 inline-flex h-12 items-center rounded-full bg-white/[0.06] px-6 font-medium transition-colors hover:bg-white/[0.12]">Done</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+  const KEY = 'resurge-waitlist';
+  const dialog = document.getElementById('waitlist') as HTMLDialogElement;
+  const form = dialog.querySelector('form')!;
+  const input = form.querySelector<HTMLInputElement>('input[name=email]')!;
+  const error = form.querySelector<HTMLElement>('[data-error]')!;
+  const submit = form.querySelector<HTMLButtonElement>('button[type=submit]')!;
+  const formState = dialog.querySelector<HTMLElement>('[data-state=form]')!;
+  const doneState = dialog.querySelector<HTMLElement>('[data-state=done]')!;
+
+  const joined = (): string | null => {
+    try {
+      return JSON.parse(localStorage.getItem(KEY) ?? 'null')?.email ?? null;
+    } catch {
+      return null;
+    }
+  };
+
+  const show = (email: string | null) => {
+    formState.classList.toggle('hidden', !!email);
+    doneState.classList.toggle('hidden', !email);
+    if (email) dialog.querySelector('[data-email]')!.textContent = email;
+  };
+
+  const setError = (message: string | null) => {
+    error.textContent = message ?? '';
+    error.classList.toggle('hidden', !message);
+    input.setAttribute('aria-invalid', message ? 'true' : 'false');
+  };
+
+  document.querySelectorAll<HTMLElement>('[data-waitlist]').forEach((el) =>
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      setError(null);
+      show(joined());
+      dialog.showModal();
+      if (!joined()) input.focus();
+    }),
+  );
+  dialog.querySelectorAll('[data-close]').forEach((el) => el.addEventListener('click', () => dialog.close()));
+  // A click on the backdrop (outside the card) closes it too.
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) dialog.close();
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = input.value.trim();
+    if (!input.checkValidity() || !email) return setError("That doesn't look like an email address.");
+    setError(null);
+    submit.disabled = true;
+    submit.textContent = 'Joining…';
+    try {
+      const res = await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, company: (form.elements.namedItem('company') as HTMLInputElement).value }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "We couldn't add you just now. Try again in a minute.");
+      try {
+        localStorage.setItem(KEY, JSON.stringify({ email, at: new Date().toISOString() }));
+      } catch {}
+      (window as unknown as { dataLayer?: object[] }).dataLayer?.push({ event: 'waitlist_signup' });
+      show(email);
+    } catch (err) {
+      setError(err instanceof TypeError ? "You seem to be offline. Try again when you're connected." : (err as Error).message);
+    } finally {
+      submit.disabled = false;
+      submit.textContent = 'Join the waitlist';
+    }
+  });
+</script>

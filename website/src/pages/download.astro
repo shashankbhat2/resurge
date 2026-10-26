@@ -3,46 +3,44 @@ import Base from '../layouts/Base.astro';
 import { app, breadcrumbs } from '../lib/seo';
 import Logo from '../components/Logo.astro';
 import { REPO } from '../lib/site';
-import { latestDownload } from '../lib/releases';
-
-const apk = await latestDownload();
-const meta = [apk.version && `Version ${apk.version}`, apk.size, 'Android 8.0 or later'].filter(Boolean).join(' · ');
 
 const steps = [
-  ['Download the APK', "Open this page on your phone and tap Download. The file comes from the project's GitHub releases."],
-  ['Allow the install', 'The first time, Android asks you to allow installs from your browser. Allow it once, then open the file.'],
-  ['Connect Health Connect', "Sign in, then let Resurge read sleep, steps and workouts. Your watch's data starts showing up straight away."],
+  ['Join the waitlist', 'Use the Gmail you use on Google Play, so the invite reaches the right account.'],
+  ['Get your test invite', 'Testers go into a closed test on Google Play first. We email you the link to join it.'],
+  ['Install from Google Play', 'Sign in, let Resurge read Health Connect, and your watch’s data shows up straight away.'],
 ];
 const needs = [
   ['Android', '8.0 or later'],
   ['Health Connect', 'Built in on Android 14+'],
+  ['A Google account', 'For Google Play'],
   ['A watch or tracker', 'Optional'],
-  ['Price', 'Try for free'],
 ];
 ---
 
-<Base title="Download" description="Download Resurge for Android and try it for free, straight from GitHub." schema={[await app(Astro.site!), breadcrumbs(Astro.site!, 'Download', '/download')]}>
+<Base
+  title="Get Resurge"
+  description="Resurge is coming to Google Play. Join the waitlist to test it first."
+  schema={[await app(Astro.site!), breadcrumbs(Astro.site!, 'Get Resurge', '/download')]}
+>
   <section class="relative mx-auto max-w-[1200px] px-6 pt-44 text-center">
     <div class="glow pointer-events-none absolute top-20 left-1/2 h-[520px] w-[min(800px,100vw)] -translate-x-1/2 bg-[radial-gradient(closest-side,rgba(139,124,255,0.1),transparent)]" aria-hidden="true"></div>
     <div class="reveal relative inline-block"><Logo size={104} /></div>
-    <h1 class="reveal headline relative mt-7 text-[clamp(48px,7vw,100px)] leading-[0.98]" style="--d:1">Get Resurge.</h1>
-    <p class="reveal relative mx-auto mt-[22px] max-w-[520px] text-[19px] leading-relaxed text-muted" style="--d:2">Try it for free on Android. Download the app straight from GitHub.</p>
-    <div class="reveal relative mt-9 flex flex-wrap justify-center gap-3" style="--d:3">
-      <a href={apk.href} class="inline-flex h-[60px] items-center gap-2.5 rounded-full bg-white px-8 text-[17px] font-semibold text-black transition-transform hover:scale-[1.03] active:scale-[0.98]">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12M6 10l6 6 6-6M5 20h14" /></svg>
-        Download the APK
-      </a>
-      <a href="/releases" class="inline-flex h-[60px] items-center rounded-full bg-white/[0.06] px-[26px] font-medium transition-colors hover:bg-white/[0.12]">All releases</a>
+    <h1 class="reveal headline relative mt-7 text-[clamp(44px,6.4vw,92px)] leading-[0.98]" style="--d:1">Coming to<br /><span class="text-dim">Google Play.</span></h1>
+    <p class="reveal relative mx-auto mt-[22px] max-w-[520px] text-[19px] leading-relaxed text-muted" style="--d:2">Join the waitlist and you'll be one of the first to test Resurge on your phone.</p>
+    <div class="reveal relative mt-9 flex justify-center" style="--d:3">
+      <button type="button" data-waitlist class="inline-flex h-[60px] cursor-pointer items-center rounded-full bg-white px-9 text-[17px] font-semibold text-black transition-transform hover:scale-[1.03] active:scale-[0.98]">Join the waitlist</button>
     </div>
-    <p class="reveal relative mt-[18px] text-[13px] text-subtle" style="--d:4">{meta}</p>
+    <p class="reveal relative mt-4 text-[13px] text-subtle" style="--d:4">
+      Android 8.0 or later · Open source on <a href={REPO} class="text-muted underline decoration-white/20 underline-offset-4 transition-colors hover:text-white">GitHub</a>
+    </p>
   </section>
 
   <section class="mx-auto max-w-[1200px] px-6 pt-36">
-    <h2 class="reveal headline text-[clamp(34px,3.6vw,52px)] leading-[1.02] tracking-[-0.04em]">Three steps,<br /><span class="text-dim">about a minute.</span></h2>
+    <h2 class="reveal headline text-[clamp(34px,3.6vw,52px)] leading-[1.02] tracking-[-0.04em]">What happens<br /><span class="text-dim">next.</span></h2>
     <div class="reveal mt-10 grid gap-px overflow-hidden rounded-[28px] border border-line bg-line md:grid-cols-3">
       {
         steps.map(([title, body], i) => (
-          <div class="flex min-h-[240px] flex-col gap-3.5 bg-surface p-7 transition-colors duration-500 hover:bg-[#101010]">
+          <div class="flex min-h-[220px] flex-col gap-3.5 bg-surface p-7 transition-colors duration-500 hover:bg-[#101010]">
             <span class="flex size-10 items-center justify-center rounded-xl bg-surface-2 font-display text-lg font-semibold">{i + 1}</span>
             <h3 class="text-[21px] font-semibold tracking-[-0.01em]">{title}</h3>
             <p class="leading-relaxed text-muted">{body}</p>
@@ -53,27 +51,17 @@ const needs = [
   </section>
 
   <section class="mx-auto mt-4 max-w-[1200px] px-6">
-    <div class="reveal grid grid-cols-1 gap-px overflow-hidden rounded-[28px] border border-line bg-line md:grid-cols-2">
-    <div class="min-w-0 bg-surface p-7">
+    <div class="reveal rounded-[28px] border border-line bg-surface p-7">
       <span class="text-[13px] font-semibold text-muted">You'll need</span>
-      <div class="mt-4 flex flex-col gap-2">
-        {needs.map(([k, v]) => <div class="flex justify-between gap-4 rounded-2xl bg-surface-2 px-4 py-3"><span>{k}</span><span class="text-muted">{v}</span></div>)}
+      <div class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        {needs.map(([k, v]) => <div class="rounded-2xl bg-surface-2 px-4 py-3"><div class="font-medium">{k}</div><div class="text-sm text-muted">{v}</div></div>)}
       </div>
-    </div>
-    <div class="flex min-w-0 flex-col bg-surface p-7">
-      <span class="text-[13px] font-semibold text-muted">Or build it yourself</span>
-      <pre class="mt-4 grow overflow-x-auto rounded-2xl bg-black p-5 font-mono text-[13px] leading-[1.8] text-muted">git clone {REPO}.git
-cd resurge
-<span class="text-faint"># add your own app/google-services.json</span>
-./gradlew :app:installDebug</pre>
-      <a href={`${REPO}#readme`} class="mt-4 text-[15px] text-accent-soft hover:text-white">Read the setup guide →</a>
-    </div>
     </div>
   </section>
 
   <section class="mx-auto max-w-[1200px] px-6 pt-36 text-center">
     <h2 class="reveal headline text-[clamp(32px,3.4vw,48px)] leading-[1.04] tracking-[-0.04em]">What's new</h2>
-    <p class="reveal mx-auto mt-3.5 max-w-[520px] text-[17px] leading-relaxed text-muted" style="--d:1">Every release lists what changed. Updates arrive as a new APK on GitHub.</p>
-    <a href="/releases" class="reveal mt-6 inline-flex h-12 items-center rounded-full bg-white/[0.06] px-[22px] text-[15px] font-medium transition-colors hover:bg-white/[0.12]" style="--d:2">See every release</a>
+    <p class="reveal mx-auto mt-3.5 max-w-[520px] text-[17px] leading-relaxed text-muted" style="--d:1">Every version lists what changed, so you can see where Resurge is heading.</p>
+    <a href="/releases" class="reveal mt-6 inline-flex h-12 items-center rounded-full bg-white/[0.06] px-[22px] text-[15px] font-medium transition-colors hover:bg-white/[0.12]" style="--d:2">Read the release notes</a>
   </section>
 </Base>

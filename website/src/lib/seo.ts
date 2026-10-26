@@ -6,7 +6,7 @@ import { getReleases } from './releases';
 
 export const SITE_NAME = 'Resurge';
 export const DEFAULT_DESCRIPTION =
-  'Resurge is an AI health coach for Android. Sleep, steps, workouts, meals and habits, scored every morning, with a coach that has read them. Try it for free.';
+  'Resurge is an AI health coach for Android. Sleep, steps, workouts, meals and habits, scored every morning, with a coach that has read them. Coming to Google Play.';
 
 const id = (site: URL, fragment: string) => new URL(`/#${fragment}`, site).href;
 
@@ -35,7 +35,7 @@ export function website(site: URL) {
   };
 }
 
-/** The Android app, with its latest release from GitHub. */
+/** The Android app, with its latest version from GitHub (not on Google Play yet, so no download or price). */
 export async function app(site: URL) {
   const latest = (await getReleases())[0];
   return {
@@ -50,14 +50,10 @@ export async function app(site: URL) {
     image: new URL('/icon-512.png', site).href,
     screenshot: ['screen-scores', 'screen-food', 'screen-coach'].map((s) => new URL(`/ui/${s}.webp`, site).href),
     license: 'https://www.gnu.org/licenses/gpl-3.0.html',
-    isAccessibleForFree: true,
-    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD', category: 'Free trial' },
     publisher: { '@id': id(site, 'organization') },
     ...(latest && {
       softwareVersion: latest.version,
       datePublished: latest.date.toISOString().slice(0, 10),
-      ...(latest.apkUrl && { downloadUrl: latest.apkUrl, installUrl: latest.apkUrl }),
-      ...(latest.apkBytes && { fileSize: `${(latest.apkBytes / 1_000_000).toFixed(1)}MB` }),
     }),
   };
 }

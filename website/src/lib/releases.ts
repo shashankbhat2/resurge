@@ -67,17 +67,5 @@ async function load(): Promise<Release[]> {
   }
 }
 
-export const formatSize = (bytes: number | null) => (bytes == null ? null : `${(bytes / 1_000_000).toFixed(1)} MB`);
-
 export const formatDate = (d: Date) =>
   d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
-
-/** The latest APK, or the releases page when it can't be read. */
-export async function latestDownload() {
-  const latest = (await getReleases())[0];
-  return {
-    href: latest?.apkUrl ?? `${REPO}/releases/latest`,
-    version: latest?.version ?? null,
-    size: formatSize(latest?.apkBytes ?? null),
-  };
-}

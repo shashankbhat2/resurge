@@ -3,7 +3,7 @@ import Logo from './Logo.astro';
 import { REPO } from '../lib/site';
 
 const links = [
-  { href: '/download', label: 'Download' },
+  { href: '/download', label: 'Get Resurge' },
   { href: '/releases', label: 'Release notes' },
   { href: '/story', label: 'Story' },
   { href: REPO, label: 'Source code' },
@@ -20,10 +20,12 @@ const links = [
     <div class="relative mx-auto max-w-[1200px] px-6 pt-20 text-center">
       <Logo size={72} class="mx-auto" />
       <h2 class="headline mt-6 text-[clamp(36px,5vw,72px)]">Start tomorrow<br /><span class="text-dim">on a better note.</span></h2>
-      <div class="mt-9 flex flex-wrap justify-center gap-3">
-        <a href="/download" class="inline-flex h-14 items-center rounded-full bg-white px-7 font-semibold text-black transition-transform hover:scale-[1.03] active:scale-[0.98]">Try for free</a>
-        <a href={REPO} class="inline-flex h-14 items-center rounded-full bg-white/[0.06] px-6 font-medium transition-colors hover:bg-white/[0.12]">Star on GitHub</a>
+      <div class="mt-9 flex justify-center">
+        <button type="button" data-waitlist class="inline-flex h-14 cursor-pointer items-center rounded-full bg-white px-8 font-semibold text-black transition-transform hover:scale-[1.03] active:scale-[0.98]">Join the waitlist</button>
       </div>
+      <p class="mt-4 text-[13px] text-subtle">
+        Open source on <a href={REPO} class="text-muted underline decoration-white/20 underline-offset-4 transition-colors hover:text-white">GitHub</a>
+      </p>
     </div>
 
     <div class="relative mx-auto mt-24 flex max-w-[1200px] flex-wrap items-center justify-between gap-4 px-6 text-sm text-subtle">

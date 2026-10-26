@@ -27,11 +27,12 @@ const path = Astro.url.pathname.replace(/\/$/, '') || '/';
         ))
       }
     </div>
-    <a
-      href="/download"
-      class="inline-flex h-10 items-center rounded-full bg-white/12 px-5 text-[15px] font-medium text-white transition-colors hover:bg-white/20"
+    <button
+      type="button"
+      data-waitlist
+      class="inline-flex h-10 cursor-pointer items-center rounded-full bg-white/12 px-5 text-[15px] font-medium text-white transition-colors hover:bg-white/20"
     >
-      Download
-    </a>
+      Join waitlist
+    </button>
   </nav>
 </header>

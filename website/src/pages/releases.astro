@@ -2,16 +2,16 @@
 import Base from '../layouts/Base.astro';
 import { breadcrumbs } from '../lib/seo';
 import { REPO } from '../lib/site';
-import { formatDate, formatSize, getReleases } from '../lib/releases';
+import { formatDate, getReleases } from '../lib/releases';
 
 const releases = await getReleases();
 ---
 
-<Base title="Release notes" description="Every Resurge release: what changed, and its APK." schema={[breadcrumbs(Astro.site!, 'Release notes', '/releases')]}>
+<Base title="Release notes" description="Every Resurge release and what changed in it." schema={[breadcrumbs(Astro.site!, 'Release notes', '/releases')]}>
   <section class="mx-auto max-w-[1200px] px-6 pt-44">
     <p class="reveal text-[13px] tracking-[0.08em] text-accent uppercase">Release notes</p>
     <h1 class="reveal headline mt-[18px] text-[clamp(44px,6.4vw,92px)]" style="--d:1">What's new<br /><span class="text-dim">in Resurge.</span></h1>
-    <p class="reveal mt-6 max-w-[560px] text-[19px] leading-relaxed text-muted" style="--d:2">Every version, what changed, and its APK. Install a new one over the old and your data stays put.</p>
+    <p class="reveal mt-6 max-w-[560px] text-[19px] leading-relaxed text-muted" style="--d:2">Every version and what changed in it.</p>
   </section>
 
   <section class="mx-auto flex max-w-[1200px] flex-col gap-2 px-6 pt-24">
@@ -32,19 +32,7 @@ const releases = await getReleases();
                 <span class="inline-flex h-[26px] items-center rounded-full border border-accent bg-accent-tint px-2.5 text-xs font-semibold text-accent-soft">Latest</span>
               )}
             </div>
-            <span class="text-[15px] text-subtle">{[formatDate(r.date), formatSize(r.apkBytes)].filter(Boolean).join(' · ')}</span>
-            {r.apkUrl && (
-              <a
-                href={r.apkUrl}
-                class:list={[
-                  'mt-2 inline-flex h-12 items-center gap-2 rounded-full px-[22px] text-[15px] transition-transform hover:scale-[1.03]',
-                  r.latest ? 'bg-white font-semibold text-black' : 'bg-white/[0.06] font-medium hover:bg-white/[0.12]',
-                ]}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12M6 10l6 6 6-6M5 20h14" /></svg>
-                Download APK
-              </a>
-            )}
+            <span class="text-[15px] text-subtle">{formatDate(r.date)}</span>
           </div>
           <div class="notes text-[17px] leading-relaxed text-muted" set:html={r.notesHtml} />
         </article>
