@@ -1,5 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
+import { app, faqPage } from '../lib/seo';
 import Phone from '../components/Phone.astro';
 import Ring from '../components/Ring.astro';
 import TodayScreen from '../components/TodayScreen.astro';
@@ -12,7 +13,7 @@ import { REPO } from '../lib/site';
 const partners = ['Fitbit', 'Pixel Watch', 'Samsung Health', 'Garmin', 'Oura', 'Withings'];
 ---
 
-<Base title="Resurge">
+<Base title="Resurge" schema={[await app(Astro.site!), faqPage(Astro.site!)]}>
   <!-- Hero -->
   <section class="relative mx-auto max-w-[1200px] px-6 pt-40 text-center">
     <div class="glow pointer-events-none absolute top-16 left-1/2 h-[600px] w-[min(900px,100vw)] -translate-x-1/2 bg-[radial-gradient(closest-side,rgba(139,124,255,0.1),transparent)]" aria-hidden="true"></div>

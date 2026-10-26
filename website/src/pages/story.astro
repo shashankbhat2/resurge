@@ -1,5 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
+import { breadcrumbs } from '../lib/seo';
 import { REPO } from '../lib/site';
 
 const beliefs = [
@@ -16,7 +17,7 @@ const stack = [
 ];
 ---
 
-<Base title="Story" description="Why Resurge exists, what it believes, and how it's built: an AI health coach for Android, built in the open.">
+<Base title="Story" description="Why Resurge exists, what it believes, and how it's built: an AI health coach for Android, built in the open." schema={[breadcrumbs(Astro.site!, 'Story', '/story')]}>
   <section class="mx-auto max-w-[1200px] px-6 pt-44">
     <p class="reveal text-[13px] tracking-[0.08em] text-accent uppercase">Story</p>
     <h1 class="reveal headline mt-[18px] max-w-[1000px] text-[clamp(44px,6.4vw,92px)]" style="--d:1">Health apps count.<br /><span class="text-dim">Resurge reads.</span></h1>

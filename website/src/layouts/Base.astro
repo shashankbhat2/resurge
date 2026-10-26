@@ -2,18 +2,24 @@
 import '../styles/global.css';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
+import { DEFAULT_DESCRIPTION, SITE_NAME, organization, website } from '../lib/seo';
 
 interface Props {
   title: string;
   description?: string;
+  /** Page-specific structured data, added to the organization and website on every page. */
+  schema?: object[];
+  /** Keep search engines out (the 404 page). */
+  noindex?: boolean;
 }
 
-const {
-  title,
-  description = 'Resurge is an AI health coach for Android. Sleep, steps, workouts, meals and habits, scored every morning, with a coach that has read them. Try it for free.',
-} = Astro.props;
-const fullTitle = title === 'Resurge' ? 'Resurge: your whole day, one calm coach' : `${title} · Resurge`;
-const canonical = new URL(Astro.url.pathname, Astro.site);
+const { title, description = DEFAULT_DESCRIPTION, schema = [], noindex = false } = Astro.props;
+const site = Astro.site!;
+const fullTitle = title === SITE_NAME ? 'Resurge: your whole day, one calm coach' : `${title} · Resurge`;
+// Pages are built as story.html and served at /story, so drop any .html from the canonical URL.
+const canonical = new URL(Astro.url.pathname.replace(/\.html$/, '').replace(/\/index$/, '/'), site);
+const ogImage = new URL('/og.jpg', site);
+const jsonLd = { '@context': 'https://schema.org', '@graph': [organization(site), website(site), ...schema] };
 ---
 
 <!doctype html>
@@ -24,16 +30,39 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
-    <link rel="icon" type="image/png" href="/favicon.png" />
+    {noindex ? <meta name="robots" content="noindex" /> : <meta name="robots" content="index, follow, max-image-preview:large" />}
+
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="application-name" content={SITE_NAME} />
+    <meta name="apple-mobile-web-app-title" content={SITE_NAME} />
+
     <link rel="preload" href="/fonts/bricolage.ttf" as="font" type="font/ttf" crossorigin />
     <link rel="preload" href="/fonts/figtree.ttf" as="font" type="font/ttf" crossorigin />
-    <meta name="theme-color" content="#000000" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={SITE_NAME} />
+    <meta property="og:locale" content="en_US" />
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
-    <meta property="og:type" content="website" />
     <meta property="og:url" content={canonical} />
-    <meta property="og:image" content={new URL('/icon.png', Astro.site)} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Resurge: your whole day, one calm coach. The Recovery screen of the app, scoring 85 and ready to train." />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+    <meta name="twitter:image:alt" content="Resurge: your whole day, one calm coach." />
+
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
   </head>
   <body class="min-h-screen overflow-x-clip bg-bg text-white">
     <Nav />

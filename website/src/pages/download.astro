@@ -1,5 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
+import { app, breadcrumbs } from '../lib/seo';
 import Logo from '../components/Logo.astro';
 import { REPO } from '../lib/site';
 import { latestDownload } from '../lib/releases';
@@ -20,7 +21,7 @@ const needs = [
 ];
 ---
 
-<Base title="Download" description="Download Resurge for Android and try it for free, straight from GitHub.">
+<Base title="Download" description="Download Resurge for Android and try it for free, straight from GitHub." schema={[await app(Astro.site!), breadcrumbs(Astro.site!, 'Download', '/download')]}>
   <section class="relative mx-auto max-w-[1200px] px-6 pt-44 text-center">
     <div class="glow pointer-events-none absolute top-20 left-1/2 h-[520px] w-[min(800px,100vw)] -translate-x-1/2 bg-[radial-gradient(closest-side,rgba(139,124,255,0.1),transparent)]" aria-hidden="true"></div>
     <div class="reveal relative inline-block"><Logo size={104} /></div>

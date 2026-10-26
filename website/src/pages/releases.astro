@@ -1,12 +1,13 @@
 ---
 import Base from '../layouts/Base.astro';
+import { breadcrumbs } from '../lib/seo';
 import { REPO } from '../lib/site';
 import { formatDate, formatSize, getReleases } from '../lib/releases';
 
 const releases = await getReleases();
 ---
 
-<Base title="Release notes" description="Every Resurge release: what changed, and its APK.">
+<Base title="Release notes" description="Every Resurge release: what changed, and its APK." schema={[breadcrumbs(Astro.site!, 'Release notes', '/releases')]}>
   <section class="mx-auto max-w-[1200px] px-6 pt-44">
     <p class="reveal text-[13px] tracking-[0.08em] text-accent uppercase">Release notes</p>
     <h1 class="reveal headline mt-[18px] text-[clamp(44px,6.4vw,92px)]" style="--d:1">What's new<br /><span class="text-dim">in Resurge.</span></h1>
