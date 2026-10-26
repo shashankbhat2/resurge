@@ -21,17 +21,18 @@
   --color-energy: #ff9a57;
   --color-water: #5cc8f2;
 
-  --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Figtree", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
+  --font-secondary: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 
   --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 @font-face {
-  font-family: "Bricolage Grotesque";
-  src: url("/fonts/bricolage.ttf") format("truetype");
-  font-weight: 200 800;
+  font-family: "Inter";
+  src: url("/fonts/inter.woff2") format("woff2");
+  font-weight: 100 900;
   font-display: swap;
 }
 
@@ -52,10 +53,21 @@
     -webkit-font-smoothing: antialiased;
     scroll-behavior: smooth;
   }
+  /* Pitch black, with a little chalk dust here and there. */
+  body {
+    background-image: url("/dust.webp");
+    background-size: 1600px;
+  }
   ::selection {
     background: var(--color-accent);
     color: #000;
   }
+}
+
+/* The column between the page's two rails. Grids sit exactly in it, so their outer edges are the rails. */
+@utility rail {
+  width: min(var(--container-5xl), calc(100% - 24px));
+  margin-inline: auto;
 }
 
 /* Big two-line headlines: the second line steps back. */
@@ -63,7 +75,7 @@
   font-family: var(--font-display);
   font-weight: 600;
   line-height: 1;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.035em;
 }
 
 /* Intro on scroll: rise, sharpen and fade in. Children can stagger with --d (0, 1, 2…). */
@@ -160,29 +172,6 @@
   animation-delay: calc(var(--d, 0) * -1.6s);
 }
 
-/* The score story: steps step back unless they're the one in view. */
-.story-step {
-  opacity: 0.22;
-  transition: opacity 0.5s var(--ease-out-soft);
-}
-.story-step.is-active {
-  opacity: 1;
-}
-.story-panel {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  transform: translateY(16px) scale(0.98);
-  transition:
-    opacity 0.55s var(--ease-out-soft),
-    transform 0.55s var(--ease-out-soft);
-  pointer-events: none;
-}
-.story-panel.is-active {
-  opacity: 1;
-  transform: none;
-}
-
 /* Release notes come from GitHub as Markdown. */
 .notes h3 {
   margin: 2rem 0 0;
@@ -206,7 +195,10 @@
   margin-top: 0.35rem;
 }
 .notes a {
-  color: var(--color-accent-soft);
+  color: #fff;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.3);
+  text-underline-offset: 4px;
 }
 
 details > summary {
@@ -231,9 +223,6 @@ details[open] .faq-plus {
     transform: none;
     filter: none;
     transition: opacity 0.8s ease var(--delay);
-  }
-  .story-panel {
-    transform: none;
   }
   .glow,
   .float {

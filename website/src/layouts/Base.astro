@@ -3,6 +3,7 @@ import '../styles/global.css';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
 import Waitlist from '../components/Waitlist.astro';
+import Divider from '../components/Divider.astro';
 import { DEFAULT_DESCRIPTION, SITE_NAME, organization, website } from '../lib/seo';
 
 interface Props {
@@ -49,7 +50,7 @@ const jsonLd = { '@context': 'https://schema.org', '@graph': [organization(site)
     <meta name="application-name" content={SITE_NAME} />
     <meta name="apple-mobile-web-app-title" content={SITE_NAME} />
 
-    <link rel="preload" href="/fonts/bricolage.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="preload" href="/fonts/inter.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/figtree.ttf" as="font" type="font/ttf" crossorigin />
 
     <meta property="og:type" content="website" />
@@ -77,8 +78,11 @@ const jsonLd = { '@context': 'https://schema.org', '@graph': [organization(site)
     <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-TQ4B3SDB" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <!-- End Google Tag Manager (noscript) -->
     <Nav />
-    <main>
+    <main class="relative">
+      <!-- Two hairline rails down the page, at the edges of the content. -->
+      <div class="rail pointer-events-none absolute inset-y-0 inset-x-0 z-[4] border-x border-white/[0.08]" aria-hidden="true"></div>
       <slot />
+      <Divider class="mt-24" />
     </main>
     <Footer />
     <Waitlist />

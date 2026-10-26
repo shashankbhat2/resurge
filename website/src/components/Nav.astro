@@ -1,38 +1,40 @@
 ---
 import Logo from './Logo.astro';
+import Divider from './Divider.astro';
 import { NAV } from '../lib/site';
 
 const path = Astro.url.pathname.replace(/\/$/, '') || '/';
 ---
 
-<!-- A compact glass pill floating over the top of the page. -->
-<header class="pointer-events-none fixed inset-x-0 top-5 z-50 flex justify-center px-4">
-  <nav
-    aria-label="Main"
-    class="pointer-events-auto flex h-14 items-center gap-6 rounded-full border border-white/[0.06] bg-[#141414]/60 py-2 pr-2 pl-5 shadow-[0_8px_32px_rgba(0,0,0,0.35)] backdrop-blur-xl"
-  >
-    <a href="/" class="flex items-center gap-2 font-display text-lg leading-none font-semibold tracking-[-0.02em]">
-      <Logo mark size={18} />
+<!--
+  A black bar stuck to the top of the page. The page's rails run up through it, and its bottom
+  hairline meets them at the coach's mark, like every other divider.
+-->
+<header class="sticky top-0 z-50 bg-black/95 backdrop-blur-xl">
+  <nav aria-label="Main" class="rail flex h-14 items-center justify-between gap-6 border-x border-white/[0.08] px-5">
+    <!-- The mark is as tall as the capitals and stands on the text's baseline. -->
+    <a href="/" class="flex items-baseline gap-2 font-display text-lg leading-none font-semibold tracking-[-0.02em]">
+      <Logo mark size={13} class="grayscale" />
       Resurge
     </a>
-    <div class="hidden items-center gap-5 text-sm md:flex">
-      {
-        NAV.map((item) => (
-          <a
-            href={item.href}
-            class:list={['transition-colors hover:text-white', path === item.href ? 'text-white' : 'text-white/70']}
-          >
-            {item.label}
-          </a>
-        ))
-      }
+    <div class="flex items-center gap-6">
+      <div class="hidden items-center gap-6 font-secondary text-[13px] md:flex">
+        {
+          NAV.map((item) => (
+            <a href={item.href} class:list={['transition-colors hover:text-white', path === item.href ? 'text-white' : 'text-subtle']}>
+              {item.label}
+            </a>
+          ))
+        }
+      </div>
+      <button
+        type="button"
+        data-waitlist
+        class="inline-flex h-9 cursor-pointer items-center rounded-full border border-white/[0.14] px-4 text-[14px] font-medium text-white transition-colors hover:border-white/30 hover:bg-white/[0.06]"
+      >
+        Join waitlist
+      </button>
     </div>
-    <button
-      type="button"
-      data-waitlist
-      class="inline-flex h-10 cursor-pointer items-center rounded-full bg-white/12 px-5 text-[15px] font-medium text-white transition-colors hover:bg-white/20"
-    >
-      Join waitlist
-    </button>
   </nav>
+  <Divider />
 </header>

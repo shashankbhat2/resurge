@@ -1,18 +1,22 @@
 ---
-/** A plain phone frame; the screen is the slot. */
+/** A plain phone frame; the screen is the slot. `slim` draws a thin bezel with tighter corners. */
 interface Props {
   width?: number;
   height?: number;
+  slim?: boolean;
   class?: string;
 }
-const { width = 300, height = 620, class: className = '' } = Astro.props;
+const { width = 300, height = 620, slim = false, class: className = '' } = Astro.props;
 ---
 
 <div
-  class:list={['rounded-[48px] border border-[#2A2A2A] bg-[#1A1A1A] p-2.5', className]}
+  class:list={[
+    slim ? 'rounded-[32px] border border-white/[0.1] bg-[#0d0d0d] p-1' : 'rounded-[48px] border border-[#2A2A2A] bg-[#1A1A1A] p-2.5',
+    className,
+  ]}
   style={`width:${width}px;height:${height}px`}
 >
-  <div class="relative h-full w-full overflow-hidden rounded-[39px] bg-black">
+  <div class:list={['relative h-full w-full overflow-hidden bg-black', slim ? 'rounded-[28px]' : 'rounded-[39px]']}>
     <slot />
   </div>
 </div>

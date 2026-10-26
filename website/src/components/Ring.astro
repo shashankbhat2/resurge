@@ -5,7 +5,9 @@
  */
 interface Props {
   value: number;
-  kind: 'recovery' | 'effort' | 'fuel';
+  kind: 'recovery' | 'effort' | 'fuel' | 'mono';
+  /** What the ring scores, for screen readers; defaults to the kind. */
+  label?: string;
   size?: number;
   stroke?: number;
   class?: string;
@@ -15,8 +17,9 @@ const HUES = {
   recovery: ['#BDFFEF', '#14C9A0'],
   effort: ['#FFE2A6', '#FF7A2E'],
   fuel: ['#DCD7FF', '#9C90FF'],
+  mono: ['#FFFFFF', '#8F8F8F'],
 };
-const { value, kind, size = 56, stroke = 6, class: className = '' } = Astro.props;
+const { value, kind, label = `${kind[0].toUpperCase()}${kind.slice(1)}`, size = 56, stroke = 6, class: className = '' } = Astro.props;
 const [light, dark] = HUES[kind];
 ---
 
@@ -24,7 +27,7 @@ const [light, dark] = HUES[kind];
   class:list={['score-ring', className]}
   style={`--target:${value};--light:${light};--dark:${dark};--size:${size}px;--w:${stroke}px`}
   role="img"
-  aria-label={`${kind[0].toUpperCase()}${kind.slice(1)} ${value}`}
+  aria-label={`${label} ${value}`}
 >
   <div><slot /></div>
 </div>

@@ -1,30 +1,29 @@
 ---
 /**
- * A cell of the bento: what it is, then a real piece of the app's UI. The bento is one container
- * and its cells are split by thin lines, so a cell has no border or corners of its own. One-column
+ * A cell of the bento: what it is, then a real piece of the app's UI. The bento is one black grid
+ * split by hairlines, so a cell has no border or corners of its own. One-column
  * cells put the UI under the text; `wide` cells span two columns with the UI beside the text.
  */
 interface Props {
   label: string;
-  color: string;
   title: string;
   body?: string;
   img?: string;
   alt?: string;
   wide?: boolean;
 }
-const { label, color, title, body, img, alt = '', wide = false } = Astro.props;
+const { label, title, body, img, alt = '', wide = false } = Astro.props;
 ---
 
 <div
   class:list={[
-    'group flex flex-col overflow-hidden bg-surface transition-colors duration-500 hover:bg-[#101010]',
+    'group flex flex-col overflow-hidden bg-black transition-colors duration-500 hover:bg-[#060606]',
     wide ? 'md:col-span-2 lg:flex-row' : '',
   ]}
 >
-  <div class:list={['flex flex-col p-6', img ? (wide ? 'lg:w-[44%] lg:shrink-0 lg:pr-2' : 'pb-0') : 'h-full w-full']}>
-    <span class="text-[13px] font-semibold" style={`color:${color}`}>{label}</span>
-    <h3 class="headline mt-2 text-2xl leading-[1.1] tracking-[-0.03em]">{title}</h3>
+  <div class:list={['flex flex-col p-7', img ? (wide ? 'lg:w-[44%] lg:shrink-0 lg:pr-2' : 'pb-0') : 'h-full w-full']}>
+    <span class="font-secondary text-[11px] tracking-[0.14em] text-subtle uppercase">{label}</span>
+    <h3 class="headline mt-3 text-2xl leading-[1.1] tracking-[-0.03em]">{title}</h3>
     {body && <p class="mt-2 text-sm leading-relaxed text-muted">{body}</p>}
     <slot />
   </div>

@@ -1,5 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
+import Divider from '../components/Divider.astro';
 import { breadcrumbs } from '../lib/seo';
 import { REPO } from '../lib/site';
 import { formatDate, getReleases } from '../lib/releases';
@@ -8,39 +9,45 @@ const releases = await getReleases();
 ---
 
 <Base title="Release notes" description="Every Resurge release and what changed in it." schema={[breadcrumbs(Astro.site!, 'Release notes', '/releases')]}>
-  <section class="mx-auto max-w-[1200px] px-6 pt-44">
-    <p class="reveal text-[13px] tracking-[0.08em] text-accent uppercase">Release notes</p>
-    <h1 class="reveal headline mt-[18px] text-[clamp(44px,6.4vw,92px)]" style="--d:1">What's new<br /><span class="text-dim">in Resurge.</span></h1>
-    <p class="reveal mt-6 max-w-[560px] text-[19px] leading-relaxed text-muted" style="--d:2">Every version and what changed in it.</p>
+  <section class="mx-auto max-w-5xl px-6 pt-28">
+    <p class="reveal font-secondary text-[12px] tracking-[0.14em] text-subtle uppercase">Release notes</p>
+    <h1 class="reveal headline mt-5 text-[clamp(40px,5vw,64px)]" style="--d:1">What's new<br /><span class="text-dim">in Resurge.</span></h1>
+    <p class="reveal mt-6 max-w-[560px] text-[18px] leading-relaxed text-muted" style="--d:2">Every version and what changed in it.</p>
   </section>
 
-  <section class="mx-auto flex max-w-[1200px] flex-col gap-2 px-6 pt-24">
+  <Divider class="mt-24" />
+
+  <!-- One release per cell, split by hairlines. -->
+  <section class="rail grid gap-px bg-white/[0.08]">
     {
       releases.length === 0 && (
-        <p class="reveal rounded-[28px] border border-line bg-surface p-8 text-lg text-muted">
-          The release list couldn't be loaded. <a href={`${REPO}/releases`} class="text-accent-soft hover:text-white">See them on GitHub →</a>
+        <p class="reveal bg-black p-8 font-secondary text-[15px] text-muted">
+          The release list couldn't be loaded. <a href={`${REPO}/releases`} class="text-white underline decoration-white/30 underline-offset-4">See them on GitHub →</a>
         </p>
       )
     }
     {
       releases.map((r) => (
-        <article class="reveal grid gap-5 rounded-[28px] border border-line bg-surface p-8 md:grid-cols-[240px_minmax(0,1fr)] md:gap-12 md:p-10" id={r.tag}>
+        <article class="reveal grid gap-5 bg-black p-8 md:grid-cols-[220px_minmax(0,1fr)] md:gap-12 md:p-10" id={r.tag}>
           <div class="flex flex-col items-start gap-3">
             <div class="flex items-center gap-2.5">
-              <h2 class="font-display text-[40px] font-semibold tracking-[-0.035em]">{r.version}</h2>
+              <h2 class="font-display text-[34px] font-semibold tracking-[-0.035em]">{r.version}</h2>
               {r.latest && (
-                <span class="inline-flex h-[26px] items-center rounded-full border border-accent bg-accent-tint px-2.5 text-xs font-semibold text-accent-soft">Latest</span>
+                <span class="inline-flex h-6 items-center rounded-full border border-white/25 px-2.5 font-secondary text-[11px] tracking-[0.08em] text-white uppercase">Latest</span>
               )}
             </div>
-            <span class="text-[15px] text-subtle">{formatDate(r.date)}</span>
+            <span class="font-secondary text-[13px] text-subtle">{formatDate(r.date)}</span>
           </div>
-          <div class="notes text-[17px] leading-relaxed text-muted" set:html={r.notesHtml} />
+          <div class="notes font-secondary text-[15px] leading-relaxed text-muted" set:html={r.notesHtml} />
         </article>
       ))
     }
-    <div class="reveal mt-6 flex flex-wrap items-center justify-between gap-4">
-      <span class="text-[15px] text-subtle">Every release is also on GitHub, with its source.</span>
-      <a href={`${REPO}/releases`} class="inline-flex h-12 items-center rounded-full bg-white/[0.06] px-[22px] text-[15px] font-medium transition-colors hover:bg-white/[0.12]">All releases on GitHub →</a>
-    </div>
   </section>
+
+  <Divider />
+
+  <div class="reveal mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-6 pt-10">
+    <span class="font-secondary text-[14px] text-subtle">Every release is also on GitHub, with its source.</span>
+    <a href={`${REPO}/releases`} class="inline-flex h-11 items-center rounded-full border border-white/[0.14] px-5 text-[15px] font-medium transition-colors hover:border-white/30 hover:bg-white/[0.06]">All releases on GitHub →</a>
+  </div>
 </Base>
