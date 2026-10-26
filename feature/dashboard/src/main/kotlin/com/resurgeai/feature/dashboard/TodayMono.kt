@@ -307,6 +307,7 @@ private class ListEntry(
 @Composable
 internal fun TodayChecklist(
     state: DayStreakState,
+    title: String,
     session: PlanDay?,
     sessionDone: Boolean,
     compact: Boolean,
@@ -342,7 +343,7 @@ internal fun TodayChecklist(
     val counted = entries.filter { !(it.isSession && it.done == null && it.actionLabel == null) }
     Row(Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Overline(
-            if (counted.isNotEmpty()) "Today · ${counted.count { it.done == true }} of ${counted.size}" else "Today",
+            if (counted.isNotEmpty()) "$title · ${counted.count { it.done == true }} of ${counted.size}" else title,
             color = Resurge.colors.textSubtle,
             modifier = Modifier.weight(1f),
         )

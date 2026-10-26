@@ -69,6 +69,10 @@ import com.resurgeai.core.model.SourceKind
 import com.resurgeai.core.model.Targets
 import com.resurgeai.core.model.UnitSystem
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.time.format.TextStyle
+import java.util.Locale
 
 @Composable
 fun TodayRoute(
@@ -316,10 +320,16 @@ private fun DayPage(
     Column(Modifier.fillMaxWidth()) {
         if (isToday) {
             val losingWeight = state.profile?.majorGoal?.takeIf { it.type.byWeight }?.let { g -> (g.targetKg ?: 0.0) < (g.startKg ?: 0.0) }
-            val session = state.plan?.days?.firstOrNull { it.day == today.dayOfWeek }
-            val sessionDone = session != null && state.workouts.any { it.date() == today && PlanMatch.matches(session, it) }
+            // The list is the habit day's, which runs past midnight until the reset time; it says
+            // so, or a tick after midnight would undo yesterday under a heading that reads today.
+            val listDay = state.streak.day
+            val reset = state.profile?.habitSettings?.resetTime ?: HabitSettings.DEFAULT_RESET
+            val session = state.plan?.days?.firstOrNull { it.day == listDay.dayOfWeek }
+            val sessionDone = session != null && state.workouts.any { it.date() == listDay && PlanMatch.matches(session, it) }
             TodayChecklist(
                 state = state.streak,
+                title = if (listDay == today) "Today"
+                else "${listDay.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())} until ${reset.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))}",
                 session = session,
                 sessionDone = sessionDone,
                 compact = state.compactList,

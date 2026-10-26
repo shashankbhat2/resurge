@@ -105,7 +105,9 @@ class DayStreakEngine @Inject constructor(
         val yesterdayDate = today.minusDays(1)
 
         val todayItems = DayStreakMath.items(
-            inputs(data, today, health?.takeIf { it.date == today }?.let { it.sleepMinutes to it.steps }, ready),
+            // Past midnight, before the reset time, the live numbers are already the next day's, so
+            // the day still open reads its own summary.
+            inputs(data, today, health?.takeIf { it.date == today }?.let { it.sleepMinutes to it.steps } ?: recent[today], ready),
             goals, targets, isToday = true,
         )
         val yesterdayItems = DayStreakMath.items(
