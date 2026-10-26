@@ -1,0 +1,465 @@
+---
+/**
+ * What Resurge reads, told on a small human made of particles. The particles drift as a loose cloud;
+ * each step flies the camera to one part of the body, gathers just that part out of the cloud and runs
+ * a line from it to a card. Moving on lets it scatter again. The last step pulls back and assembles the
+ * whole body, with every line running to the coach. It's all chalk on a blackboard: each particle is a
+ * grain of chalk, on the same dusty black as the rest of the site.
+ *
+ * The figure is drawn in a 400 × 1040 box. Its outline and organs live in a hidden SVG only so the
+ * script can sample points along them.
+ */
+const STEPS = [
+  { key: 'intro', side: 'center', anchors: [], focus: [200, 520, 1] },
+  { key: 'sleep', side: 'right', anchors: ['brain'], focus: [200, 84, 6], fig: '01', latin: 'Cerebrum', label: 'Sleep',
+    title: 'It starts the night before.',
+    body: 'Time asleep, quality and every stage, from whatever you sleep with. A short night is noticed, and today is planned around it.' },
+  { key: 'recovery', side: 'left', anchors: ['heart'], focus: [200, 292, 4.2], fig: '02', latin: 'Cor', label: 'Recovery',
+    title: 'How ready you are, before you get up.',
+    body: 'Resting heart rate and heart rate variability against your own normal. One number for whether today is a push or an easy day.' },
+  { key: 'effort', side: 'right', anchors: ['arm', 'thigh'], focus: [200, 600, 1.35], fig: '03', latin: 'Musculi', label: 'Effort',
+    title: 'A target that moves with you.',
+    body: 'Workouts from your watch, strength sets in a tap, steps and active minutes. Well rested, it asks more. After a short night, it asks less.' },
+  { key: 'fuel', side: 'left', anchors: ['gut'], focus: [210, 425, 4.6], fig: '04', latin: 'Ventriculus', label: 'Fuel',
+    title: 'Eating to match the day.',
+    body: 'Snap a photo, say it or scan a barcode. Values come from nutrition tables, so the same dish always gets the same numbers.' },
+  { key: 'weight', side: 'right', anchors: ['scale'], focus: [200, 535, 1], fig: '05', latin: 'Corpus', label: 'Weight',
+    title: 'Your trend, not the scale.',
+    body: 'Step on a smart scale and it’s logged. The daily noise is smoothed into the one line that matters.' },
+  { key: 'coach', side: 'right', anchors: ['brain', 'heart', 'arm', 'gut', 'scale'], focus: [200, 535, 1], fig: '06', latin: 'Totum', label: 'Your coach',
+    title: 'One coach that reads all of it.',
+    body: 'Ask anything and the answer starts from your night, your heart, your training and your plate.' },
+] as const;
+
+const HALF =
+  'M200,38 C228,38 246,60 246,96 C246,122 238,140 224,152 C220,160 220,170 221,180 C232,192 262,196 288,200 C318,206 334,226 338,256 C344,300 350,350 356,404 C362,450 370,500 374,540 C377,562 380,580 380,596 C390,616 392,642 384,664 C378,678 362,676 360,660 C357,640 356,622 354,606 C348,570 340,520 332,474 C326,436 320,390 316,350 C314,326 312,306 306,292 C302,330 296,370 292,410 C290,440 296,478 304,512 C310,540 312,572 310,604 C306,664 298,724 290,770 C286,796 286,816 290,836 C298,876 294,920 282,962 C280,976 284,990 296,1000 C306,1008 304,1018 290,1020 C272,1022 256,1020 250,1012 C246,1000 250,986 250,968 C246,926 238,884 238,846 C238,814 236,790 232,768 C226,716 216,656 206,604 C204,592 202,586 200,584';
+
+/** Lines to sample: which system they belong to, and whether to mirror them onto the other side. */
+const SHAPES: { sys: string; d: string; mirror?: boolean }[] = [
+  { sys: 'weight', d: HALF, mirror: true },
+  { sys: 'weight', d: 'M140,1030 L260,1030' },
+  { sys: 'sleep', d: 'M166,94 C160,70 176,52 200,52 C224,52 240,70 234,94 C232,106 220,112 210,110 C206,116 194,116 190,110 C180,112 168,106 166,94Z' },
+  { sys: 'sleep', d: 'M200,56 C196,66 204,74 200,86 C197,96 203,102 200,110 M178,76 C184,70 188,80 194,76 M174,94 C180,88 186,100 194,94', mirror: true },
+  { sys: 'recovery', d: 'M204,272 C192,272 186,284 189,298 C192,312 206,322 224,328 C236,318 243,302 240,288 C237,274 226,268 216,273 C212,270 208,270 204,272Z' },
+  { sys: 'recovery', d: 'M206,272 C204,258 212,248 224,250 C232,252 234,260 232,266' },
+  { sys: 'recovery', d: 'M188,236 C164,244 150,280 150,322 C150,342 164,350 180,342 C192,334 194,300 192,258Z', mirror: true },
+  { sys: 'effort', d: 'M322,300 C338,322 342,362 336,398 C326,380 318,340 322,300Z M342,450 C354,480 360,510 362,536 C352,516 342,486 342,450Z M262,592 C290,622 292,696 278,760 C266,722 254,656 262,592Z M236,612 C250,660 252,714 248,758 C236,722 228,660 236,612Z M258,846 C274,866 278,906 268,944 C260,914 252,870 258,846Z', mirror: true },
+  { sys: 'fuel', d: 'M212,360 C236,354 252,370 248,392 C244,414 222,422 204,414 C194,408 194,398 202,394 C214,390 222,382 214,370Z' },
+  { sys: 'fuel', d: 'M182,448 C182,438 218,438 218,450 C218,462 182,458 182,472 C182,484 218,482 218,494' },
+];
+
+/** Where each system's line starts. */
+const ANCHORS = { brain: [200, 82], heart: [214, 298], arm: [334, 350], thigh: [268, 676], gut: [224, 390], scale: [200, 1030] };
+const NIGHT = [0, 1, 2, 3, 3, 2, 1, 2, 3, 2, 1, 1, 2, 2, 1, 0, 1, 2, 1, 1, 2, 1, 1, 0];
+const total = STEPS.length - 1;
+---
+
+<section class="anatomy relative z-[3]" data-anatomy style={`height:calc(${STEPS.length} * 100svh)`} aria-label="What Resurge reads">
+  <div class="stage sticky top-0 h-[100svh] overflow-hidden bg-black bg-[url(/dust.webp)] bg-size-[1600px]" data-stage>
+    <canvas class="absolute inset-0 h-full w-full" data-canvas aria-hidden="true"></canvas>
+
+    <svg class="absolute size-0" aria-hidden="true">
+      {SHAPES.map((s) => <path d={s.d} data-shape={s.sys} data-mirror={s.mirror ? '' : undefined} />)}
+    </svg>
+    <script is:inline type="application/json" data-anchors set:html={JSON.stringify(ANCHORS)} />
+
+    <!-- Cards sit either side of the figure on wide screens, and under it on phones. -->
+    <div class="relative mx-auto grid h-full max-w-5xl grid-rows-[minmax(0,1fr)_auto] px-5 pb-8 lg:grid-cols-[minmax(0,1fr)_340px_minmax(0,1fr)] lg:grid-rows-1 lg:px-10 lg:pb-0">
+      {
+        STEPS.map((s, i) => (
+          <div
+            class:list={[
+              'card',
+              s.key === 'intro'
+                ? 'col-span-full row-span-full self-center justify-self-center text-center'
+                : 'col-start-1 row-start-2 self-end lg:row-start-1 lg:self-center',
+              s.side === 'left' && 'lg:col-start-1 lg:justify-self-end',
+              s.side === 'right' && 'lg:col-start-3 lg:justify-self-start',
+              i === 0 && 'is-active is-in',
+            ]}
+            data-card={i}
+            data-side={s.side}
+            data-anchors={s.anchors.join(' ')}
+            data-focus={s.focus.join(',')}
+          >
+            {s.key === 'intro' ? (
+              <h2 class="headline max-w-[900px] text-[clamp(40px,5.6vw,80px)] leading-[1.02] text-balance">
+                Everything your body says.<br /><span class="text-dim">Read in one place.</span>
+              </h2>
+            ) : (
+              <article class="plate w-full max-w-[380px] rounded-[22px] border border-white/[0.09] bg-black/85 p-6 backdrop-blur-md">
+                <div class="flex items-baseline justify-between font-secondary text-[11px] tracking-[0.14em] uppercase">
+                  <span class="text-faint">Fig. {s.fig} · <span class="text-subtle">{s.latin}</span></span>
+                  <span class="text-white">{s.label}</span>
+                </div>
+                <h3 class="headline mt-4 text-[clamp(24px,2.2vw,30px)] leading-[1.08]">{s.title}</h3>
+                <p class="mt-3 font-secondary text-[14px] leading-relaxed text-muted">{s.body}</p>
+
+                <div class="mt-5 border-t border-line pt-4 font-secondary">
+                  {s.key === 'sleep' && (
+                    <div>
+                      <div class="flex items-baseline justify-between"><span class="text-[22px] font-semibold tracking-[-0.02em]">7h 12m</span><span class="text-[12px] text-subtle">1h 42m deep</span></div>
+                      <div class="mt-3 flex h-8 items-end gap-[3px]">
+                        {NIGHT.map((d, k) => <span class="grow flex-1 rounded-[2px]" style={`--h:${25 + d * 25}%;--k:${k};background:rgba(255,255,255,${0.18 + d * 0.27})`} />)}
+                      </div>
+                    </div>
+                  )}
+                  {s.key === 'recovery' && (
+                    <div class="flex items-end justify-between">
+                      <div><span class="text-[40px] leading-none font-semibold tracking-[-0.03em]">85</span><div class="mt-1.5 text-[12px] text-subtle">Ready to train</div></div>
+                      <div class="text-right text-[12px] leading-relaxed text-subtle">HRV <span class="text-white">62 ms</span><br />Resting <span class="text-white">52 bpm</span></div>
+                    </div>
+                  )}
+                  {s.key === 'effort' && (
+                    <ul class="space-y-1.5 text-[13px]">
+                      <li class="flex justify-between"><span>Front squat</span><span class="text-subtle">4 × 6 · 80 kg</span></li>
+                      <li class="flex justify-between"><span>Easy run</span><span class="text-subtle">5.2 km</span></li>
+                      <li class="flex justify-between"><span>Steps</span><span class="text-subtle">8,412</span></li>
+                    </ul>
+                  )}
+                  {s.key === 'fuel' && (
+                    <div>
+                      <div class="flex items-baseline justify-between text-[13px]"><span>Paneer butter masala, rice</span><span class="text-subtle">612 kcal</span></div>
+                      <div class="mt-3 grid grid-cols-3 gap-3 text-[11px] text-subtle">
+                        {[['Protein', '28 g', '62%'], ['Carbs', '71 g', '78%'], ['Fat', '24 g', '48%']].map(([n, v, w]) => (
+                          <div>
+                            <div class="flex justify-between"><span>{n}</span><span class="text-white">{v}</span></div>
+                            <div class="bar mt-1.5 h-1 rounded-full bg-[#262626]"><span style={`--target:${w};background:#fff`} /></div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {s.key === 'weight' && (
+                    <div class="flex items-center justify-between gap-4">
+                      <div><span class="text-[28px] leading-none font-semibold tracking-[-0.03em]">78.6</span><span class="ml-1 text-[13px] text-subtle">kg</span><div class="mt-1.5 text-[12px] text-subtle">↓ 1.1 kg this month</div></div>
+                      <svg viewBox="0 0 160 56" class="h-12 w-32" fill="none" aria-hidden="true">
+                        <path d="M2,14 L14,20 L24,12 L36,22 L48,18 L60,28 L72,22 L84,30 L96,26 L108,36 L120,32 L132,40 L144,36 L158,44" stroke="#fff" stroke-opacity=".2" stroke-width="1.5" />
+                        <path class="draw" pathLength="1" d="M2,15 C40,18 70,24 100,31 C120,36 140,40 158,42" stroke="#fff" stroke-width="2" />
+                      </svg>
+                    </div>
+                  )}
+                  {s.key === 'coach' && (
+                    <div>
+                      <p class="text-[13px] leading-normal text-[#D4D4D4]">“Short night and your HRV is down. I’ve moved Friday’s squats to Saturday. Today’s a 30-minute walk, and aim for 120 g of protein.”</p>
+                      <button type="button" data-waitlist class="mt-5 inline-flex h-11 w-full cursor-pointer items-center justify-center rounded-full bg-white font-sans font-semibold text-black transition-transform hover:scale-[1.02] active:scale-[0.98]">
+                        Join the waitlist
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </article>
+            )}
+          </div>
+        ))
+      }
+    </div>
+
+    <p class="absolute bottom-6 left-1/2 hidden -translate-x-1/2 font-secondary text-[11px] tracking-[0.16em] text-faint tabular-nums lg:block" aria-hidden="true">
+      <span class="text-white" data-count>00</span> / {String(total).padStart(2, '0')}
+    </p>
+  </div>
+</section>
+
+<style>
+  .card {
+    opacity: 0;
+    transform: translateY(14px);
+    filter: blur(6px);
+    pointer-events: none;
+    transition:
+      opacity 0.5s var(--ease-out-soft),
+      transform 0.6s var(--ease-out-soft),
+      filter 0.5s var(--ease-out-soft);
+  }
+  .card.is-active {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    pointer-events: auto;
+    transition-delay: 0.12s;
+  }
+  .grow {
+    height: 0;
+    transition: height 0.7s var(--ease-out-soft) calc(0.3s + var(--k) * 22ms);
+  }
+  .is-in .grow {
+    height: var(--h);
+  }
+  .draw {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    transition: stroke-dashoffset 1.4s var(--ease-out-soft) 0.4s;
+  }
+  .is-in .draw {
+    stroke-dashoffset: 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card {
+      transform: none;
+      filter: none;
+      transition: opacity 0.4s ease;
+    }
+  }
+</style>
+
+<script>
+  /** A particle: its place in the figure (hx, hy), its place in the loose cloud as a share of the screen (u, v), and how far it has gathered (f). */
+  type P = { hx: number; hy: number; u: number; v: number; sys: string; ph: number; rate: number; f: number; a: number; sp: number; sz: number };
+
+  const root = document.querySelector<HTMLElement>('[data-anatomy]');
+  if (root) {
+    const stage = root.querySelector<HTMLElement>('[data-stage]')!;
+    const canvas = root.querySelector<HTMLCanvasElement>('[data-canvas]')!;
+    const ctx = canvas.getContext('2d')!;
+    const cards = [...root.querySelectorAll<HTMLElement>('[data-card]')];
+    const count = root.querySelector<HTMLElement>('[data-count]');
+    const ANCHORS: Record<string, [number, number]> = JSON.parse(root.querySelector('[data-anchors]')!.textContent!);
+    const KEYS = ['intro', 'sleep', 'recovery', 'effort', 'fuel', 'weight', 'coach'];
+    const still = matchMedia('(prefers-reduced-motion: reduce)');
+    const wide = matchMedia('(min-width: 1024px)');
+
+    // A steady random number for a given seed, so chalk marks don't flicker from frame to frame.
+    const hash = (n: number) => {
+      const x = Math.sin(n * 12.9898) * 43758.5453;
+      return x - Math.floor(x);
+    };
+
+    // Grains of chalk: a few small, ragged clusters of specks, stamped for every particle.
+    const GRAINS = Array.from({ length: 8 }, (_, g) => {
+      const c = document.createElement('canvas');
+      c.width = c.height = 16;
+      const x = c.getContext('2d')!;
+      x.fillStyle = '#f4f4ef';
+      for (let n = 0; n < 22; n++) {
+        const a = hash(g * 97 + n) * Math.PI * 2;
+        const r = Math.pow(hash(g * 31 + n * 7), 0.7) * 6;
+        x.globalAlpha = 0.25 + hash(g * 13 + n * 3) * 0.75;
+        const d = 1 + hash(g * 7 + n * 11) * 2.2;
+        x.fillRect(8 + Math.cos(a) * r - d / 2, 8 + Math.sin(a) * r - d / 2, d, d);
+      }
+      return c;
+    });
+    const stamp = (x: number, y: number, size: number, seed: number) =>
+      ctx.drawImage(GRAINS[Math.floor(hash(seed) * GRAINS.length)], x - size / 2, y - size / 2, size, size);
+
+    // Organs seen close up get dense chalk; the outline and muscles, only ever seen whole, get less.
+    const GAP: Record<string, number> = { sleep: 0.9, recovery: 1.1, fuel: 1, effort: 2, weight: 2 };
+    const parts: P[] = [];
+    const add = (hx: number, hy: number, sys: string) =>
+      parts.push({
+        hx, hy, sys,
+        u: Math.random(), v: Math.random(),
+        ph: Math.random() * Math.PI * 2,
+        rate: 0.025 + Math.random() * 0.05,
+        f: 0, a: 0,
+        sp: Math.floor(Math.random() * GRAINS.length),
+        sz: 0.7 + Math.random() * 0.6,
+      });
+    for (const el of root.querySelectorAll<SVGPathElement>('[data-shape]')) {
+      const sys = el.dataset.shape!;
+      const len = el.getTotalLength();
+      for (let l = 0; l < len; l += GAP[sys]) {
+        const p = el.getPointAtLength(l);
+        add(p.x, p.y, sys);
+        if (el.hasAttribute('data-mirror')) add(400 - p.x, p.y, sys);
+      }
+    }
+    // A light dust inside the body, which only gathers when the whole figure does.
+    const half = new Path2D(root.querySelector<SVGPathElement>('[data-shape="weight"]')!.getAttribute('d')!);
+    const body = new Path2D();
+    body.addPath(half);
+    body.addPath(half, new DOMMatrix([-1, 0, 0, 1, 400, 0]));
+    for (let n = 0; n < 600; ) {
+      const x = Math.random() * 400;
+      const y = 40 + Math.random() * 980;
+      if (ctx.isPointInPath(body, x, y)) {
+        add(x, y, 'dust');
+        n++;
+      }
+    }
+
+    let active = 0;
+    let changed = 0;
+    let w = 0;
+    let h = 0;
+    // The camera eases towards the step's focus: x, y in the drawing, and zoom.
+    const cam = { x: 200, y: 520, z: 1 };
+
+    const size = () => {
+      const dpr = Math.min(devicePixelRatio || 1, 2);
+      w = stage.clientWidth;
+      h = stage.clientHeight;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+
+    const show = (i: number) => {
+      if (i === active) return;
+      active = i;
+      changed = performance.now();
+      cards.forEach((c, k) => {
+        c.classList.toggle('is-active', k === i);
+        c.classList.toggle('is-in', k === i);
+      });
+      if (count) count.textContent = String(i).padStart(2, '0');
+    };
+
+    const onScroll = () => {
+      const r = root.getBoundingClientRect();
+      const p = Math.min(Math.max(-r.top / (r.height - innerHeight), 0), 0.9999);
+      show(Math.floor(p * cards.length));
+    };
+
+    const ease = (t: number) => {
+      const c = Math.min(Math.max(t, 0), 1);
+      return c < 0.5 ? 4 * c * c * c : 1 - Math.pow(-2 * c + 2, 3) / 2;
+    };
+
+    // A chalk stroke from one point to another: grains every pixel or so, wobbling a little across the
+    // line and skipping now and then where the chalk didn't catch.
+    const chalk = (x1: number, y1: number, x2: number, y2: number, seed: number) => {
+      const len = Math.hypot(x2 - x1, y2 - y1);
+      const nx = -(y2 - y1) / (len || 1);
+      const ny = (x2 - x1) / (len || 1);
+      for (let d = 0; d <= len; d += 1.1) {
+        const i = seed + Math.round(d);
+        if (hash(i * 1.7) < 0.12) continue;
+        const off = (hash(i * 2.3) - 0.5) * 1.4;
+        const q = d / (len || 1);
+        stamp(x1 + (x2 - x1) * q + nx * off, y1 + (y2 - y1) * q + ny * off, 2.6 + hash(i) * 1.4, i);
+      }
+    };
+
+    // Draw part of an elbowed chalk line, from a to b by way of m.
+    const lead = (ax: number, ay: number, mx: number, my: number, bx: number, by: number, t: number, seed: number) => {
+      const l1 = Math.hypot(mx - ax, my - ay);
+      const l2 = Math.hypot(bx - mx, by - my);
+      let d = t * (l1 + l2);
+      if (d <= l1) {
+        chalk(ax, ay, ax + ((mx - ax) * d) / l1, ay + ((my - ay) * d) / l1, seed);
+      } else {
+        d -= l1;
+        chalk(ax, ay, mx, my, seed);
+        chalk(mx, my, mx + ((bx - mx) * d) / l2, my + ((by - my) * d) / l2, seed + 5000);
+      }
+      return t >= 1;
+    };
+
+    // A chalk ring, drawn round in grains.
+    const ring = (x: number, y: number, r: number, seed: number) => {
+      const n = Math.max(12, Math.round(r * 2.2));
+      for (let i = 0; i < n; i++) {
+        if (hash(seed + i * 3.1) < 0.15) continue;
+        const a = (i / n) * Math.PI * 2;
+        stamp(x + Math.cos(a) * r, y + Math.sin(a) * r, 2.4, seed + i);
+      }
+    };
+
+    const frame = (now: number) => {
+      ctx.clearRect(0, 0, w, h);
+      const key = KEYS[active];
+      const card = cards[active];
+      const [fx, fy, fz] = card.dataset.focus!.split(',').map(Number);
+      const glide = still.matches ? 1 : 0.07;
+      cam.x += (fx - cam.x) * glide;
+      cam.y += (fy - cam.y) * glide;
+      // Zoom eases in log space, so a fly from 6× to 1× feels as even as one from 1× to 1.5×.
+      cam.z = Math.exp(Math.log(cam.z) + (Math.log(fz) - Math.log(cam.z)) * glide);
+
+      // The whole figure is small: about 60% of the screen's height, centred (on phones, in the top third).
+      const base = (wide.matches ? Math.min(h * 0.62, 560) : Math.min(h * 0.4, 330)) / 1040;
+      const k = base * cam.z;
+      const cx = w / 2;
+      const cy = wide.matches ? h / 2 : h * 0.3;
+      const t = still.matches ? 0 : now / 1000;
+      const whole = key === 'coach';
+      // Grains grow a little as the camera closes in, so close-ups read as thick chalk lines.
+      const grain = Math.min(4.6, 2.4 + cam.z * 0.36);
+
+      for (const p of parts) {
+        const on = whole || p.sys === key;
+        p.f += ((on ? 1 : 0) - p.f) * (still.matches ? 1 : p.rate);
+        const g = ease(p.f);
+        // Loose: drifting slowly through the whole stage. Gathered: in place, with a breath of motion.
+        const lx = (p.u + Math.sin(t * 0.07 + p.ph) * 0.03) * w;
+        const ly = (p.v + Math.cos(t * 0.05 + p.ph) * 0.03) * h;
+        const gx = cx + (p.hx - cam.x + Math.sin(t * 1.3 + p.ph) * 0.5) * k;
+        const gy = cy + (p.hy - cam.y + Math.cos(t * 1.1 + p.ph) * 0.5) * k;
+        const x = lx + (gx - lx) * g;
+        const y = ly + (gy - ly) * g;
+        // Loose chalk dust is faint; gathered chalk is bright, the body's dust less so, and dense organs
+        // thin out when seen whole.
+        const lit = p.sys === 'dust' ? 0.2 : p.sys === 'weight' || p.sys === 'effort' ? 0.8 : Math.min(0.85, 0.2 * cam.z + 0.1);
+        const goal = 0.06 + (lit - 0.06) * g;
+        p.a += (goal - p.a) * 0.15;
+        ctx.globalAlpha = p.a;
+        const size = grain * p.sz * (0.6 + 0.4 * g);
+        ctx.drawImage(GRAINS[p.sp], x - size / 2, y - size / 2, size, size);
+      }
+
+      // Leader lines from each anchor to the card, once the part has mostly gathered.
+      const ids = (card.dataset.anchors || '').split(' ').filter(Boolean);
+      if (ids.length) {
+        const box = stage.getBoundingClientRect();
+        const c = card.firstElementChild!.getBoundingClientRect();
+        const left = card.dataset.side === 'left';
+        const prog = still.matches ? 1 : ease((now - changed - 900) / 900);
+        ids.forEach((id, n) => {
+          const [hx, hy] = ANCHORS[id];
+          const ax = cx + (hx - cam.x) * k;
+          const ay = cy + (hy - cam.y) * k;
+          let bx: number;
+          let by: number;
+          let mx: number;
+          let my: number;
+          if (wide.matches) {
+            bx = (left ? c.right : c.left) - box.left;
+            by = c.top - box.top + c.height / 2 + (n - (ids.length - 1) / 2) * 14;
+            mx = bx + (left ? 32 : -32);
+            my = by;
+          } else {
+            bx = Math.min(Math.max(ax, c.left - box.left + 24), c.right - box.left - 24);
+            by = c.top - box.top;
+            mx = bx;
+            my = by - 16;
+          }
+          if (prog <= 0) return;
+          const seed = n * 10000;
+          ctx.globalAlpha = 0.6;
+          const done = lead(ax, ay, mx, my, bx, by, prog, seed);
+          // A chalk dot at the anchor with a ring that breathes out from it, and a dab where the line lands.
+          ctx.globalAlpha = prog;
+          for (let j = 0; j < 5; j++) stamp(ax + (hash(seed + j) - 0.5) * 3, ay + (hash(seed + j + 9) - 0.5) * 3, 4, seed + j);
+          const ping = still.matches ? 0.5 : (t * 0.6) % 1;
+          ctx.globalAlpha = 0.55 * (1 - ping) * prog;
+          ring(ax, ay, 5 + ping * 12, seed + 700);
+          if (done) {
+            ctx.globalAlpha = 0.9;
+            for (let j = 0; j < 3; j++) stamp(bx + (hash(seed + j + 40) - 0.5) * 2, by + (hash(seed + j + 50) - 0.5) * 2, 3.5, seed + j + 40);
+          }
+        });
+      }
+      ctx.globalAlpha = 1;
+    };
+
+    let raf = 0;
+    const loop = (now: number) => {
+      frame(now);
+      raf = requestAnimationFrame(loop);
+    };
+    new IntersectionObserver(([e]) => {
+      cancelAnimationFrame(raf);
+      if (e.isIntersecting) raf = requestAnimationFrame(loop);
+    }).observe(root);
+
+    addEventListener('scroll', onScroll, { passive: true });
+    addEventListener('resize', () => {
+      size();
+      onScroll();
+    });
+    size();
+    onScroll();
+  }
+</script>
