@@ -1,0 +1,40 @@
+---
+import Logo from './Logo.astro';
+import Divider from './Divider.astro';
+import { NAV } from '../lib/site';
+
+const path = Astro.url.pathname.replace(/\/$/, '') || '/';
+---
+
+<!--
+  A black bar stuck to the top of the page. The page's rails run up through it, and its bottom
+  hairline meets them at the coach's mark, like every other divider.
+-->
+<header class="sticky top-0 z-50 bg-black/95 backdrop-blur-xl">
+  <nav aria-label="Main" class="rail flex h-14 items-center justify-between gap-6 border-x border-white/[0.08] px-5">
+    <!-- The mark is as tall as the capitals and stands on the text's baseline. -->
+    <a href="/" class="flex items-baseline gap-2 font-display text-lg leading-none font-semibold tracking-[-0.02em]">
+      <Logo mark size={13} class="grayscale" />
+      Resurge
+    </a>
+    <div class="flex items-center gap-6">
+      <div class="hidden items-center gap-6 font-secondary text-[13px] md:flex">
+        {
+          NAV.map((item) => (
+            <a href={item.href} class:list={['transition-colors hover:text-white', path === item.href ? 'text-white' : 'text-subtle']}>
+              {item.label}
+            </a>
+          ))
+        }
+      </div>
+      <button
+        type="button"
+        data-waitlist
+        class="inline-flex h-9 cursor-pointer items-center rounded-full border border-white/[0.14] px-4 text-[14px] font-medium text-white transition-colors hover:border-white/30 hover:bg-white/[0.06]"
+      >
+        Join waitlist
+      </button>
+    </div>
+  </nav>
+  <Divider />
+</header>
