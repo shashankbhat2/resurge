@@ -3,8 +3,7 @@
  * What Resurge reads, told on a small human made of particles. The particles drift as a loose cloud;
  * each step flies the camera to one part of the body, gathers just that part out of the cloud and runs
  * a line from it to a card. Moving on lets it scatter again. The last step pulls back and assembles the
- * whole body, with every line running to the coach. It's all chalk on a blackboard: each particle is a
- * grain of chalk, on the same dusty black as the rest of the site.
+ * whole body, with every line running to the coach. Plain white particles on the site's dusty black.
  *
  * The figure is drawn in a 400 × 1040 box. Its outline and organs live in a hidden SVG only so the
  * script can sample points along them.
@@ -205,7 +204,7 @@ const total = STEPS.length - 1;
 
 <script>
   /** A particle: its place in the figure (hx, hy), its place in the loose cloud as a share of the screen (u, v), and how far it has gathered (f). */
-  type P = { hx: number; hy: number; u: number; v: number; sys: string; ph: number; rate: number; f: number; a: number; sp: number; sz: number };
+  type P = { hx: number; hy: number; u: number; v: number; sys: string; ph: number; rate: number; f: number; a: number; sz: number };
 
   const root = document.querySelector<HTMLElement>('[data-anatomy]');
   if (root) {
@@ -219,32 +218,8 @@ const total = STEPS.length - 1;
     const still = matchMedia('(prefers-reduced-motion: reduce)');
     const wide = matchMedia('(min-width: 1024px)');
 
-    // A steady random number for a given seed, so chalk marks don't flicker from frame to frame.
-    const hash = (n: number) => {
-      const x = Math.sin(n * 12.9898) * 43758.5453;
-      return x - Math.floor(x);
-    };
-
-    // Grains of chalk: a few small, ragged clusters of specks, stamped for every particle.
-    const GRAINS = Array.from({ length: 8 }, (_, g) => {
-      const c = document.createElement('canvas');
-      c.width = c.height = 16;
-      const x = c.getContext('2d')!;
-      x.fillStyle = '#f4f4ef';
-      for (let n = 0; n < 22; n++) {
-        const a = hash(g * 97 + n) * Math.PI * 2;
-        const r = Math.pow(hash(g * 31 + n * 7), 0.7) * 6;
-        x.globalAlpha = 0.25 + hash(g * 13 + n * 3) * 0.75;
-        const d = 1 + hash(g * 7 + n * 11) * 2.2;
-        x.fillRect(8 + Math.cos(a) * r - d / 2, 8 + Math.sin(a) * r - d / 2, d, d);
-      }
-      return c;
-    });
-    const stamp = (x: number, y: number, size: number, seed: number) =>
-      ctx.drawImage(GRAINS[Math.floor(hash(seed) * GRAINS.length)], x - size / 2, y - size / 2, size, size);
-
-    // Organs seen close up get dense chalk; the outline and muscles, only ever seen whole, get less.
-    const GAP: Record<string, number> = { sleep: 0.9, recovery: 1.1, fuel: 1, effort: 2, weight: 2 };
+    // Organs seen close up get dense dots; the outline and muscles, only ever seen whole, get fewer.
+    const GAP: Record<string, number> = { sleep: 1.3, recovery: 1.6, fuel: 1.5, effort: 3, weight: 3.2 };
     const parts: P[] = [];
     const add = (hx: number, hy: number, sys: string) =>
       parts.push({
@@ -253,8 +228,7 @@ const total = STEPS.length - 1;
         ph: Math.random() * Math.PI * 2,
         rate: 0.025 + Math.random() * 0.05,
         f: 0, a: 0,
-        sp: Math.floor(Math.random() * GRAINS.length),
-        sz: 0.7 + Math.random() * 0.6,
+        sz: 0.8 + Math.random() * 0.4,
       });
     for (const el of root.querySelectorAll<SVGPathElement>('[data-shape]')) {
       const sys = el.dataset.shape!;
@@ -317,44 +291,22 @@ const total = STEPS.length - 1;
       return c < 0.5 ? 4 * c * c * c : 1 - Math.pow(-2 * c + 2, 3) / 2;
     };
 
-    // A chalk stroke from one point to another: grains every pixel or so, wobbling a little across the
-    // line and skipping now and then where the chalk didn't catch.
-    const chalk = (x1: number, y1: number, x2: number, y2: number, seed: number) => {
-      const len = Math.hypot(x2 - x1, y2 - y1);
-      const nx = -(y2 - y1) / (len || 1);
-      const ny = (x2 - x1) / (len || 1);
-      for (let d = 0; d <= len; d += 1.1) {
-        const i = seed + Math.round(d);
-        if (hash(i * 1.7) < 0.12) continue;
-        const off = (hash(i * 2.3) - 0.5) * 1.4;
-        const q = d / (len || 1);
-        stamp(x1 + (x2 - x1) * q + nx * off, y1 + (y2 - y1) * q + ny * off, 2.6 + hash(i) * 1.4, i);
-      }
-    };
-
-    // Draw part of an elbowed chalk line, from a to b by way of m.
-    const lead = (ax: number, ay: number, mx: number, my: number, bx: number, by: number, t: number, seed: number) => {
+    // Draw part of an elbowed line, from a to b by way of m.
+    const lead = (ax: number, ay: number, mx: number, my: number, bx: number, by: number, t: number) => {
       const l1 = Math.hypot(mx - ax, my - ay);
       const l2 = Math.hypot(bx - mx, by - my);
       let d = t * (l1 + l2);
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
       if (d <= l1) {
-        chalk(ax, ay, ax + ((mx - ax) * d) / l1, ay + ((my - ay) * d) / l1, seed);
+        ctx.lineTo(ax + ((mx - ax) * d) / l1, ay + ((my - ay) * d) / l1);
       } else {
         d -= l1;
-        chalk(ax, ay, mx, my, seed);
-        chalk(mx, my, mx + ((bx - mx) * d) / l2, my + ((by - my) * d) / l2, seed + 5000);
+        ctx.lineTo(mx, my);
+        ctx.lineTo(mx + ((bx - mx) * d) / l2, my + ((by - my) * d) / l2);
       }
+      ctx.stroke();
       return t >= 1;
-    };
-
-    // A chalk ring, drawn round in grains.
-    const ring = (x: number, y: number, r: number, seed: number) => {
-      const n = Math.max(12, Math.round(r * 2.2));
-      for (let i = 0; i < n; i++) {
-        if (hash(seed + i * 3.1) < 0.15) continue;
-        const a = (i / n) * Math.PI * 2;
-        stamp(x + Math.cos(a) * r, y + Math.sin(a) * r, 2.4, seed + i);
-      }
     };
 
     const frame = (now: number) => {
@@ -375,9 +327,10 @@ const total = STEPS.length - 1;
       const cy = wide.matches ? h / 2 : h * 0.3;
       const t = still.matches ? 0 : now / 1000;
       const whole = key === 'coach';
-      // Grains grow a little as the camera closes in, so close-ups read as thick chalk lines.
-      const grain = Math.min(4.6, 2.4 + cam.z * 0.36);
+      // Dots stay a steady size on screen however close the camera is.
+      const dot = Math.min(2.2, 1.1 + cam.z * 0.18);
 
+      ctx.fillStyle = '#fff';
       for (const p of parts) {
         const on = whole || p.sys === key;
         p.f += ((on ? 1 : 0) - p.f) * (still.matches ? 1 : p.rate);
@@ -389,14 +342,13 @@ const total = STEPS.length - 1;
         const gy = cy + (p.hy - cam.y + Math.cos(t * 1.1 + p.ph) * 0.5) * k;
         const x = lx + (gx - lx) * g;
         const y = ly + (gy - ly) * g;
-        // Loose chalk dust is faint; gathered chalk is bright, the body's dust less so, and dense organs
-        // thin out when seen whole.
-        const lit = p.sys === 'dust' ? 0.2 : p.sys === 'weight' || p.sys === 'effort' ? 0.8 : Math.min(0.85, 0.2 * cam.z + 0.1);
-        const goal = 0.06 + (lit - 0.06) * g;
+        // Loose dots are faint; gathered ones are bright, the dust less so, and dense organs thin out when seen whole.
+        const lit = p.sys === 'dust' ? 0.22 : p.sys === 'weight' || p.sys === 'effort' ? 0.85 : Math.min(0.9, 0.22 * cam.z + 0.12);
+        const goal = 0.1 + (lit - 0.1) * g;
         p.a += (goal - p.a) * 0.15;
         ctx.globalAlpha = p.a;
-        const size = grain * p.sz * (0.6 + 0.4 * g);
-        ctx.drawImage(GRAINS[p.sp], x - size / 2, y - size / 2, size, size);
+        const r = dot * p.sz * (0.75 + 0.25 * g);
+        ctx.fillRect(x - r / 2, y - r / 2, r, r);
       }
 
       // Leader lines from each anchor to the card, once the part has mostly gathered.
@@ -406,6 +358,8 @@ const total = STEPS.length - 1;
         const c = card.firstElementChild!.getBoundingClientRect();
         const left = card.dataset.side === 'left';
         const prog = still.matches ? 1 : ease((now - changed - 900) / 900);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
         ids.forEach((id, n) => {
           const [hx, hy] = ANCHORS[id];
           const ax = cx + (hx - cam.x) * k;
@@ -426,18 +380,23 @@ const total = STEPS.length - 1;
             my = by - 16;
           }
           if (prog <= 0) return;
-          const seed = n * 10000;
-          ctx.globalAlpha = 0.6;
-          const done = lead(ax, ay, mx, my, bx, by, prog, seed);
-          // A chalk dot at the anchor with a ring that breathes out from it, and a dab where the line lands.
+          ctx.globalAlpha = 0.5;
+          const done = lead(ax, ay, mx, my, bx, by, prog);
+          // A dot at the anchor with a ring that breathes out from it, and a dot where the line lands.
           ctx.globalAlpha = prog;
-          for (let j = 0; j < 5; j++) stamp(ax + (hash(seed + j) - 0.5) * 3, ay + (hash(seed + j + 9) - 0.5) * 3, 4, seed + j);
+          ctx.beginPath();
+          ctx.arc(ax, ay, 2.5, 0, Math.PI * 2);
+          ctx.fill();
           const ping = still.matches ? 0.5 : (t * 0.6) % 1;
-          ctx.globalAlpha = 0.55 * (1 - ping) * prog;
-          ring(ax, ay, 5 + ping * 12, seed + 700);
+          ctx.globalAlpha = 0.6 * (1 - ping) * prog;
+          ctx.beginPath();
+          ctx.arc(ax, ay, 4 + ping * 12, 0, Math.PI * 2);
+          ctx.stroke();
           if (done) {
-            ctx.globalAlpha = 0.9;
-            for (let j = 0; j < 3; j++) stamp(bx + (hash(seed + j + 40) - 0.5) * 2, by + (hash(seed + j + 50) - 0.5) * 2, 3.5, seed + j + 40);
+            ctx.globalAlpha = 1;
+            ctx.beginPath();
+            ctx.arc(bx, by, 2, 0, Math.PI * 2);
+            ctx.fill();
           }
         });
       }
