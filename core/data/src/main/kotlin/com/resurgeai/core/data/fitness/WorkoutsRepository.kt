@@ -6,6 +6,8 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.resurgeai.core.data.listen
+import com.resurgeai.core.healthconnect.CardioHealthDataSource
+import kotlinx.coroutines.CancellationException
 import com.resurgeai.core.healthconnect.HealthDataSource
 import com.resurgeai.core.data.weight.WeightRepository
 import com.resurgeai.core.model.ActivityCatalog
@@ -54,6 +56,7 @@ class WorkoutsRepository @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val auth: FirebaseAuth,
     private val healthData: HealthDataSource,
+    private val cardioHealthData: CardioHealthDataSource,
     private val weights: WeightRepository,
 ) {
     private fun user() = auth.currentUser?.uid?.let { firestore.collection("users").document(it) }
@@ -70,7 +73,7 @@ class WorkoutsRepository @Inject constructor(
 
     /** Health Connect sessions in the range, each with its window totals. */
     suspend fun deviceWorkouts(from: Instant, to: Instant): List<Workout> = coroutineScope {
-        healthData.exerciseSessionsBetween(from, to).map { s -> async { s.toWorkout() } }.awaitAll()
+        cardioHealthData.workouts(from, to).map { s -> async { s.toWorkout() } }.awaitAll()
     }
 
     /** One workout for the editor: a saved record, a device session, or the session with edits applied. */
@@ -89,7 +92,7 @@ class WorkoutsRepository @Inject constructor(
     suspend fun latestWeightKg(): Double? = weights.latestKg()
 
     private suspend fun ExerciseSession.toWorkout(): Workout {
-        val metrics = metricsCache[id] ?: runCatching { healthData.metricsBetween(start, end) }.getOrNull()?.let { m ->
+        val metrics = metricsCache[id] ?: (try { healthData.metricsBetween(start, end) } catch (e: CancellationException) { throw e } catch (_: Exception) { null })?.let { m ->
             WorkoutMetricsInput(
                 distanceM = m.distanceMeters?.takeIf { it >= 50 },
                 avgHr = m.avgBpm?.toInt(),
