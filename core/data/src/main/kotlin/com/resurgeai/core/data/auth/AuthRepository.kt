@@ -1,6 +1,7 @@
 package com.resurgeai.core.data.auth
 
 import android.content.Context
+import android.util.Log
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
@@ -11,12 +12,16 @@ import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
+import com.resurgeai.core.data.cardio.CardioPointsCache
 import com.resurgeai.core.data.di.WebClientId
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -37,6 +42,7 @@ sealed interface SignInResult {
 class AuthRepository @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
     private val credentialManager: CredentialManager,
+    private val cardioCache: CardioPointsCache,
     @param:WebClientId private val webClientId: String,
 ) {
     val currentUser: Flow<AuthUser?> = callbackFlow {
@@ -84,7 +90,23 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun signOut() {
+        val previousUid = firebaseAuth.currentUser?.uid
         firebaseAuth.signOut()
-        runCatching { credentialManager.clearCredentialState(ClearCredentialStateRequest()) }
+        // Auth changes can remove the caller's screen and cancel its scope during cleanup.
+        withContext(NonCancellable) {
+            try {
+                previousUid?.let { cardioCache.clearForUser(it) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Cardio cache cleanup failed during sign-out", e)
+            } finally {
+                runCatching { credentialManager.clearCredentialState(ClearCredentialStateRequest()) }
+            }
+        }
+    }
+
+    private companion object {
+        const val TAG = "AuthRepository"
     }
 }

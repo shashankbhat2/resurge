@@ -9,6 +9,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SourceResolverTest {
+    @Test fun `synthetic on-device step source is classified and labelled as phone`() {
+        val pkg = "com.android.healthconnect.phone.example"
+        assertEquals(SourceKind.PHONE, SourceResolver.classify(null, 0, pkg))
+        assertEquals("This phone", SourceResolver.knownAppName(pkg))
+    }
+
 
     private val auto = Metadata.RECORDING_METHOD_AUTOMATICALLY_RECORDED
 

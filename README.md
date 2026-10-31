@@ -31,7 +31,7 @@ Habits, sleep, movement, food and weight in one daily picture, with a coach that
 
 - **Today.** A day streak of days you did everything you set out to, a weekly goal, and your habits and health at a glance.
 - **Habits.** One-tap check-ins, streaks with a weekly freeze, and private habits.
-- **Fitness.** Workouts from Health Connect and ones you log yourself, merged into one feed.
+- **Fitness.** Workouts from Health Connect and ones you log yourself, merged into one feed. Cardio Points show daily intensity-weighted activity and 30 days of history, with separate cadence-based and estimated contributions.
 - **Food.** Photograph or describe a meal; the coach estimates calories and macros and asks one question when it matters.
 - **Weight.** A smoothed trend, a goal split into milestones, and history imported from Health Connect.
 - **Smart scales.** Step on a Bluetooth scale and the weigh-in is logged, even with the app closed. [Supported scales](docs/smart-scales.md).
@@ -43,6 +43,19 @@ Habits, sleep, movement, food and weight in one daily picture, with a coach that
 </p>
 
 Health data comes through [Health Connect](https://developer.android.com/health-and-fitness/guides/health-connect), so it works with Fitbit, Samsung Health, Garmin and most other apps.
+
+### Cardio Points
+
+Find Cardio Points below Move Week in Fitness. The compact card shows this week’s points and today’s total. Tap its footer to browse Sunday–Saturday weeks, select a day, and see sources and contributions. Expand **How points work** in the detail sheet for scoring rules; refresh is available there too. Points have no goal or streak effect.
+
+- Cadence of 100–129 steps/min earns 1 point/min; 130+ earns 2. Short step records (at most 60 seconds) can supply a step-rate estimate. Daily totals and longer step records cannot establish intensity.
+- Recognized workouts without usable cadence use the existing activity MET estimate: 3–<6 METs earns 1 point/min; 6+ earns 2. These contributions are labelled **Estimated**. Walking/running use available cadence, including zero for low cadence; other workouts use their activity estimate. Unknown activities have no automatic estimate.
+- Workouts own their time and overlapping sources are counted once. Everyday movement contributes outside workouts. Daily totals round down after accumulating weighted duration; weeks add those daily totals.
+- Scores are calculated and cached on this device for the last 30 days, excluded from backup, and cleared on sign-out. Raw samples are not retained. Cardio Points are not uploaded or sent to the coach; manual workouts still use their existing account storage.
+- Missing permissions or recordings limit coverage. Manual workouts work without Health Connect. Refresh from Cardio Points details after changing Health Connect access in Settings; failed reads show stale results and can be retried.
+- Workout imports use sessions started within the requested period. Cadence-series reads are bounded to retained history, with up to a one-minute boundary allowance, so recent recalculations can include overnight series. Older-starting series are outside the import range.
+
+The moderate/vigorous principle follows [Google Fit’s published scoring rules](https://support.google.com/fit/answer/7619539?hl=en), but Cardio Points are Resurge’s calculation. Catalog estimates and source handling can differ: for example, Resurge’s cycling estimate is 7.5 METs, or 2 points/min. No heart rate is used in this version.
 
 ## How it's built
 

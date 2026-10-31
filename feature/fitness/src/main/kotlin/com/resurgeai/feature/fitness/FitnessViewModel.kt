@@ -4,6 +4,10 @@ import com.resurgeai.core.model.ActivityCategory
 import com.resurgeai.core.model.FitnessMath
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.resurgeai.core.data.cardio.CardioPointsRepository
+import com.resurgeai.core.data.cardio.CardioPointsState
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import com.resurgeai.core.data.fitness.WorkoutRecord
 import com.resurgeai.core.data.fitness.WorkoutsRepository
 import com.resurgeai.core.data.session.SessionRepository
@@ -15,14 +19,12 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -91,6 +93,7 @@ object PersonalBests {
 
 data class FitnessUiState(
     val loading: Boolean = true,
+    val cardio: CardioPointsState = CardioPointsState(),
     val days: List<Pair<LocalDate, List<Workout>>> = emptyList(),
     val week: WeekSummary = WeekSummary(0, 0, 0),
     val bests: Map<String, PersonalBest> = emptyMap(),
@@ -104,9 +107,10 @@ data class FitnessUiState(
 @HiltViewModel
 class FitnessViewModel @Inject constructor(
     private val repository: WorkoutsRepository,
+    private val cardioRepository: CardioPointsRepository,
     sessionRepository: SessionRepository,
 ) : ViewModel() {
-    private val zone = ZoneId.systemDefault()
+    private val zone get() = ZoneId.systemDefault()
     private val since = LocalDate.now(zone).minusDays(DAYS).atStartOfDay(zone).toInstant()
     private val device = MutableStateFlow<List<Workout>?>(null)
     private val deleted = MutableStateFlow<Workout?>(null)
@@ -115,17 +119,23 @@ class FitnessViewModel @Inject constructor(
         .filterIsInstance<SessionState.Ready>()
         .map { it.profile.units }
 
-    private val records = repository.records(since).catch { emit(emptyList<WorkoutRecord>()) }
+    private val records = MutableStateFlow<List<WorkoutRecord>?>(null)
+    private var deviceReadComplete = true
+    private var recordsReadComplete = true
+    private var cardioRefresh: Job? = null
+    private var deviceRefresh: Job? = null
+    private var recordsRefresh: Job? = null
 
-    val state: StateFlow<FitnessUiState> = combine(device, records, units, deleted) { dev, recs, u, del ->
+    val state: StateFlow<FitnessUiState> = combine(device, records, units, deleted, cardioRepository.state) { dev, recs, u, del, cardio ->
         val today = LocalDate.now(zone)
-        if (dev == null) return@combine FitnessUiState(loading = true, units = u, today = today)
+        if (dev == null || recs == null) return@combine FitnessUiState(loading = true, units = u, today = today, cardio = cardio)
         val all = WorkoutsRepository.merge(dev, recs)
         val weekStart = HabitStreaks.weekStart(today)
         val thisWeek = all.filter { !it.date(zone).isBefore(weekStart) }
         val byDay = thisWeek.groupBy { it.date(zone) }
         FitnessUiState(
             loading = false,
+            cardio = cardio,
             days = all.groupBy { it.date(zone) }.toList().sortedByDescending { it.first },
             week = WeekSummary(
                 workouts = thisWeek.size,
@@ -142,14 +152,59 @@ class FitnessViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FitnessUiState())
 
     init {
+        watchRecords()
         refresh()
     }
 
+    private fun watchRecords() {
+        recordsRefresh?.cancel()
+        recordsRefresh = viewModelScope.launch {
+            try {
+                repository.records(since).collect {
+                    recordsReadComplete = true
+                    records.value = it
+                    device.value?.let { dev -> updateCardio(WorkoutsRepository.merge(dev, it)) }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                recordsReadComplete = false
+                records.value = records.value ?: emptyList()
+                device.value?.let { dev -> updateCardio(WorkoutsRepository.merge(dev, records.value.orEmpty())) }
+            }
+        }
+    }
+
+    private fun updateCardio(workouts: List<Workout>, force: Boolean = false) {
+        cardioRefresh?.cancel()
+        cardioRefresh = viewModelScope.launch {
+            cardioRepository.refresh(workouts, deviceReadComplete && recordsReadComplete, force)
+        }
+    }
+
+    fun retryCardio() {
+        // Reattach a failed Firestore listener as well as retrying Health Connect.
+        if (!recordsReadComplete) watchRecords()
+        refresh(forceCardio = true)
+    }
+
     /** Re-reads Health Connect (called when the tab resumes). */
-    fun refresh() {
-        viewModelScope.launch {
-            device.value = runCatching { repository.deviceWorkouts(since, Instant.now().plus(Duration.ofMinutes(1))) }
-                .getOrDefault(device.value ?: emptyList())
+    fun refresh(forceCardio: Boolean = false) {
+        cardioRefresh?.cancel()
+        cardioRefresh = viewModelScope.launch { cardioRepository.refresh(emptyList(), cacheOnly = true) }
+        deviceRefresh?.cancel()
+        deviceRefresh = viewModelScope.launch {
+            try {
+                val workouts = repository.deviceWorkouts(since, Instant.now())
+                deviceReadComplete = true
+                device.value = workouts
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                deviceReadComplete = false
+                device.value = device.value ?: emptyList()
+            }
+            records.value?.let { updateCardio(WorkoutsRepository.merge(device.value.orEmpty(), it), forceCardio) }
         }
     }
 
