@@ -13,7 +13,8 @@ export function bearerToken(header: string | undefined): string | null {
 
 /**
  * MCP over Streamable HTTP (stateless, JSON responses). It uses the same Firebase Auth as the
- * callables: send the user's Firebase ID token as a bearer token. Tools only read that user's data.
+ * callables: send the user's Firebase ID token as a bearer token. Every tool reads or writes only
+ * that user's data.
  */
 export const mcp = onRequest({ timeoutSeconds: 60, memory: "256MiB" }, async (req, res) => {
   if (req.method !== "POST") {

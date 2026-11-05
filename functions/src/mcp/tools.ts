@@ -5,6 +5,7 @@ import { runTool } from "../coach/tools";
 import { loadHabits, loadProfile } from "../lib/data";
 import { formatHabits, formatProfile } from "../lib/format";
 import { addDays, isValidTimeZone, localParts } from "../lib/time";
+import { ACTIVITY_IDS, MAX_MEAL_ITEMS, MEAL_TYPES, WriteError, createWriter, firestoreStore, type WriteStore } from "./writes";
 
 /** Data access the MCP tools need, injectable for tests. */
 export interface McpDeps {
@@ -20,10 +21,10 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe("yyyy-MM-dd");
 const text = (t: string, isError = false) => ({ content: [{ type: "text" as const, text: t }], isError });
 
 /**
- * Read-only MCP tools over one signed-in user's Resurge data. They reuse the coach's loaders and
- * tools (coach/tools.ts), so agents see exactly what the in-app coach sees.
+ * MCP tools over one signed-in user's Resurge data: reads reuse the coach's loaders and tools
+ * (coach/tools.ts); writes (./writes.ts) log meals, workouts, weight, water and habit check-ins.
  */
-export function createMcpServer(uid: string, deps: McpDeps = defaultDeps): McpServer {
+export function createMcpServer(uid: string, deps: McpDeps = defaultDeps, store: WriteStore = firestoreStore): McpServer {
   const server = new McpServer({ name: "resurge", version: "0.1.0" });
   const today = async () => {
     const tz = (await deps.loadProfile(uid)).timezone;
@@ -79,6 +80,71 @@ export function createMcpServer(uid: string, deps: McpDeps = defaultDeps): McpSe
     const dates = Array.from({ length: n }, (_, i) => addDays(from, i));
     return text(formatHabits(await deps.loadHabits(uid, from), dates));
   });
+
+  // ---- Logging writes ----
+  const writer = createWriter(uid, store);
+  const write = async (fn: () => Promise<unknown>) => {
+    try {
+      return text(JSON.stringify(await fn()));
+    } catch (e) {
+      if (e instanceof WriteError) return text(e.message, true);
+      throw e;
+    }
+  };
+  const iso = z.string().max(40).describe("ISO 8601 time with offset, e.g. 2026-11-05T13:30:00+05:30; default now");
+  const n = (max: number) => z.number().min(0).max(max);
+
+  server.registerTool("log_meal", {
+    description: "Log a meal by hand (no AI analysis), like typing it into the app. Give items (nutrition per 100 g plus grams) or just totals (kcal and optional macros in grams).",
+    inputSchema: {
+      type: z.enum(MEAL_TYPES),
+      title: z.string().trim().max(80).optional(),
+      at: iso.optional(),
+      items: z.array(z.object({
+        name: z.string().trim().min(1).max(60),
+        grams: z.number().positive().max(5000),
+        kcal: n(900).describe("per 100 g"), protein: n(100).describe("per 100 g"), carbs: n(100).describe("per 100 g"),
+        fat: n(100).describe("per 100 g"), fiber: n(100).optional().describe("per 100 g"),
+      })).max(MAX_MEAL_ITEMS).optional(),
+      kcal: n(10000).optional(), protein: n(1000).optional(), carbs: n(1000).optional(), fat: n(1000).optional(), fiber: n(500).optional(),
+    },
+  }, (a) => write(() => writer.logMeal(a)));
+
+  server.registerTool("log_workout", {
+    description: "Log a manual workout. activityId comes from the app's activity catalog.",
+    inputSchema: {
+      activityId: z.enum(ACTIVITY_IDS),
+      durationMin: z.number().int().min(1).max(1440),
+      start: iso.optional(),
+      title: z.string().trim().max(80).optional(),
+      notes: z.string().trim().max(500).optional(),
+      metrics: z.object({
+        distanceM: n(1_000_000).optional(), elevationM: n(20_000).optional(), avgHr: z.number().int().min(30).max(250).optional(),
+        kcal: z.number().int().min(0).max(10_000).optional(), laps: z.number().int().min(0).max(1000).optional(),
+        poolLengthM: z.number().int().min(10).max(100).optional(), reps: z.number().int().min(0).max(10_000).optional(),
+        rpe: z.number().int().min(1).max(10).optional(),
+        exercises: z.array(z.object({
+          name: z.string().trim().min(1).max(60),
+          sets: z.array(z.object({ reps: z.number().int().min(0).max(1000), weightKg: n(1000).optional() })).max(50),
+        })).max(30).optional(),
+      }).optional(),
+    },
+  }, (a) => write(() => writer.logWorkout(a)));
+
+  server.registerTool("log_weight", {
+    description: "Log a weigh-in in kg (20-400).",
+    inputSchema: { kg: z.number().min(20).max(400), at: iso.optional(), note: z.string().trim().max(120).optional() },
+  }, (a) => write(() => writer.logWeight(a)));
+
+  server.registerTool("log_water", {
+    description: "Add water drunk (ml, negative to correct) to a day; default today, up to 7 days back.",
+    inputSchema: { ml: z.number().int().min(-5000).max(5000).refine((v) => v !== 0, "ml can't be 0"), date: isoDate.optional() },
+  }, (a) => write(() => writer.logWater(a)));
+
+  server.registerTool("set_habit_status", {
+    description: "Check in a habit as done or missed (or clear it) for the current habit day or the day before. habit is the habit's name (as in get_habits) or id.",
+    inputSchema: { habit: z.string().trim().min(1).max(60), status: z.enum(["done", "missed", "clear"]), date: isoDate.optional() },
+  }, (a) => write(() => writer.setHabitStatus(a)));
 
   return server;
 }

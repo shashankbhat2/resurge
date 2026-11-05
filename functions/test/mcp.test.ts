@@ -31,7 +31,8 @@ describe("mcp", () => {
     expect(names).toEqual([
       "get_activities", "get_daily_summaries", "get_habits", "get_health_snapshot",
       "get_insights", "get_meals", "get_profile", "get_workout_logs",
-    ]);
+      "log_meal", "log_water", "log_weight", "log_workout", "set_habit_status",
+    ].sort());
   });
 
   it("routes coach tools for the authenticated user", async () => {
