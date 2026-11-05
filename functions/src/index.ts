@@ -4,6 +4,8 @@
  * - weeklyInsights: Saturday 19:00 local weekly review (scheduled)
  * - coachChat: streaming coach chat with Fast (Sonnet) / Smart (Opus) models (callable)
  * - analyzeMeal: foods, portions and nutrition from a meal photo or description (callable)
+ * - mcp: MCP server (Streamable HTTP) for AI agents: reads the signed-in user's data and logs meals, water and habit check-ins
+ * - createMcpApiKey / listMcpApiKeys / revokeMcpApiKey: personal API keys for the MCP server (callables)
  */
 import { setGlobalOptions } from "firebase-functions/v2";
 
@@ -13,3 +15,5 @@ export { analyzeEvent } from "./insights/activity";
 export { weeklyInsights } from "./insights/weekly";
 export { coachChat } from "./coach/chat";
 export { analyzeMeal } from "./food/analyze";
+export { mcp } from "./mcp/http";
+export { createMcpApiKey, listMcpApiKeys, revokeMcpApiKey } from "./mcp/apiKeys";

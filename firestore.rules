@@ -344,6 +344,13 @@ service cloud.firestore {
       }
     }
 
+    // Personal MCP API keys (doc id = SHA-256 of the key). Only Cloud Functions (Admin SDK) read or
+    // write these; the app manages keys through the createMcpApiKey / listMcpApiKeys / revokeMcpApiKey
+    // callables, so no client can list hashes or forge a key for another user.
+    match /mcpApiKeys/{keyHash} {
+      allow read, write: if false;
+    }
+
     // Deny anything not matched above.
     match /{document=**} {
       allow read, write: if false;

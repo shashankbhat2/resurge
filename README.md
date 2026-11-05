@@ -110,3 +110,35 @@ Issues and pull requests are welcome. Run the tests, re-record screenshots for U
 ## License
 
 [GPL v3](LICENSE). You can use, study, change and share Resurge; if you distribute a modified version, release its source under the same license.
+
+## MCP server (for AI agents)
+
+`functions` exports `mcp`, a [Model Context Protocol](https://modelcontextprotocol.io) server that uses the Streamable HTTP transport.
+
+- **Read tools:** `get_health_snapshot`, `get_profile`, `get_daily_summaries`, `get_activities`, `get_insights`, `get_meals`, `get_workout_logs`, `get_habits`. These are the same reads the coach uses. `get_nutrition_targets` returns the calorie and water targets plus the macro grams the app derives from them.
+- **Write tools:**
+  - `log_meal` writes to `meals`. Give either items (nutrition per 100 g plus grams) or totals. It doesn't run AI analysis.
+  - `log_water` writes to `waterDays`.
+  - `set_habit_status` writes to `habitDays`.
+  - `set_nutrition_targets` updates the `targets` map on `users/{uid}`. It changes only the fields you give: calories (800–6000) and water in ml (500–8000). Protein, carbs and fat targets follow calories, because the app derives them (30/40/30). The app has no micronutrient targets, so there's no tool for them.
+
+  Writes use the same document shape and limits as the app and `firestore.rules`. Meals are stored with `source: "manual"`, because the rules only allow known sources. There are no workout or weight write tools on purpose: workouts come from trackers through Health Connect, and weigh-ins come from the app and smart scales.
+
+Every request needs `Authorization: Bearer <token>`, and every tool reads or writes only that user's data under `users/{uid}`. The token is one of:
+
+- **A personal API key (recommended for agents).** In the app, open Settings → Data → **MCP API keys**, tap **New key**, name it (for example "Claude Desktop") and copy the key. It looks like `rsg_…` and is shown only once. Send it as `Authorization: Bearer rsg_...`. Keys don't expire. The list shows each key's name, last 4 characters, creation date and last use; revoke a key there and it stops working immediately. You can have up to 10 active keys.
+- **A Firebase ID token** from the app's Firebase Auth. ID tokens expire after an hour, so refresh the header when that happens.
+
+```bash
+cd functions && npm run deploy    # or: npm run serve (emulators)
+# endpoint: https://us-central1-<project>.cloudfunctions.net/mcp
+```
+
+```json
+{ "mcpServers": { "resurge": { "url": "https://us-central1-<project>.cloudfunctions.net/mcp",
+  "headers": { "Authorization": "Bearer rsg_..." } } } }
+```
+
+How keys are stored: the server makes each key (`rsg_` + 32 random bytes, base64url) and keeps only its SHA-256 hash, as the doc id in the top-level `mcpApiKeys/{hash}` collection (`uid`, `name`, `last4`, `createdAtMs`, `lastUsedAtMs`, `revoked`). `firestore.rules` denies all client access to that collection. The app manages keys through the `createMcpApiKey`, `listMcpApiKeys` and `revokeMcpApiKey` callables, and the plain-text key is returned only by `createMcpApiKey`.
+
+Only POST is served; the server is stateless and returns JSON responses.
