@@ -69,6 +69,7 @@ private enum class Page(val title: String) {
     MEALS("Meal reminders"),
     UNITS("Units"),
     TARGETS("Daily targets"),
+    MCP_KEYS("MCP API keys"),
 }
 
 /**
@@ -146,6 +147,7 @@ fun SettingsScreen(
                     onSelect = viewModel::setUnits,
                 )
                 Page.TARGETS -> state.profile?.targets?.let { TargetsPage(it, viewModel::setTargets) }
+                Page.MCP_KEYS -> McpApiKeysPage()
             }
             }
         }
@@ -207,6 +209,8 @@ private fun MainMenu(
         MenuLabel("Data")
         MenuGroup {
             MenuRow("Health Connect", "Permissions", onClick = onHealthConnect)
+            MenuDivider()
+            MenuRow("MCP API keys", "For AI agents") { onOpen(Page.MCP_KEYS) }
             onOpenSmartScale?.let {
                 MenuDivider()
                 MenuRow("Smart scale", state.smartScale ?: "Not set up", onClick = it)
