@@ -5,7 +5,7 @@ import { runTool } from "../coach/tools";
 import { loadHabits, loadProfile } from "../lib/data";
 import { formatHabits, formatProfile } from "../lib/format";
 import { addDays, isValidTimeZone, localParts } from "../lib/time";
-import { ACTIVITY_IDS, MAX_MEAL_ITEMS, MEAL_TYPES, WriteError, createWriter, firestoreStore, type WriteStore } from "./writes";
+import { MAX_MEAL_ITEMS, MEAL_TYPES, WriteError, createWriter, firestoreStore, type WriteStore } from "./writes";
 
 /** Data access the MCP tools need, injectable for tests. */
 export interface McpDeps {
@@ -22,7 +22,7 @@ const text = (t: string, isError = false) => ({ content: [{ type: "text" as cons
 
 /**
  * MCP tools over one signed-in user's Resurge data: reads reuse the coach's loaders and tools
- * (coach/tools.ts); writes (./writes.ts) log meals, workouts, weight, water and habit check-ins.
+ * (coach/tools.ts); writes (./writes.ts) log meals, water and habit check-ins.
  */
 export function createMcpServer(uid: string, deps: McpDeps = defaultDeps, store: WriteStore = firestoreStore): McpServer {
   const server = new McpServer({ name: "resurge", version: "0.1.0" });
@@ -109,32 +109,6 @@ export function createMcpServer(uid: string, deps: McpDeps = defaultDeps, store:
       kcal: n(10000).optional(), protein: n(1000).optional(), carbs: n(1000).optional(), fat: n(1000).optional(), fiber: n(500).optional(),
     },
   }, (a) => write(() => writer.logMeal(a)));
-
-  server.registerTool("log_workout", {
-    description: "Log a manual workout. activityId comes from the app's activity catalog.",
-    inputSchema: {
-      activityId: z.enum(ACTIVITY_IDS),
-      durationMin: z.number().int().min(1).max(1440),
-      start: iso.optional(),
-      title: z.string().trim().max(80).optional(),
-      notes: z.string().trim().max(500).optional(),
-      metrics: z.object({
-        distanceM: n(1_000_000).optional(), elevationM: n(20_000).optional(), avgHr: z.number().int().min(30).max(250).optional(),
-        kcal: z.number().int().min(0).max(10_000).optional(), laps: z.number().int().min(0).max(1000).optional(),
-        poolLengthM: z.number().int().min(10).max(100).optional(), reps: z.number().int().min(0).max(10_000).optional(),
-        rpe: z.number().int().min(1).max(10).optional(),
-        exercises: z.array(z.object({
-          name: z.string().trim().min(1).max(60),
-          sets: z.array(z.object({ reps: z.number().int().min(0).max(1000), weightKg: n(1000).optional() })).max(50),
-        })).max(30).optional(),
-      }).optional(),
-    },
-  }, (a) => write(() => writer.logWorkout(a)));
-
-  server.registerTool("log_weight", {
-    description: "Log a weigh-in in kg (20-400).",
-    inputSchema: { kg: z.number().min(20).max(400), at: iso.optional(), note: z.string().trim().max(120).optional() },
-  }, (a) => write(() => writer.logWeight(a)));
 
   server.registerTool("log_water", {
     description: "Add water drunk (ml, negative to correct) to a day; default today, up to 7 days back.",

@@ -118,12 +118,10 @@ Issues and pull requests are welcome. Run the tests, re-record screenshots for U
 - **Read tools:** `get_health_snapshot`, `get_profile`, `get_daily_summaries`, `get_activities`, `get_insights`, `get_meals`, `get_workout_logs`, `get_habits`. These are the same reads the coach uses.
 - **Write tools:**
   - `log_meal` writes to `meals`. Give either items (nutrition per 100 g plus grams) or totals. It doesn't run AI analysis.
-  - `log_workout` writes to `workouts`.
-  - `log_weight` writes to `weights`.
   - `log_water` writes to `waterDays`.
   - `set_habit_status` writes to `habitDays`.
 
-  Writes use the same document shape and limits as the app and `firestore.rules`. They are stored with `source: "manual"`, because the rules only allow known sources. They aren't mirrored to Health Connect.
+  Writes use the same document shape and limits as the app and `firestore.rules`. Meals are stored with `source: "manual"`, because the rules only allow known sources. There are no workout or weight write tools on purpose: workouts come from trackers through Health Connect, and weigh-ins come from the app and smart scales.
 
 It uses the app's Firebase Auth. Send a user's Firebase ID token as `Authorization: Bearer <id-token>`. Every tool reads or writes only under `users/{uid}`.
 

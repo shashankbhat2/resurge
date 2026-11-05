@@ -4,20 +4,11 @@ import { addDays, isValidTimeZone, localParts } from "../lib/time";
 
 /*
  * Logging writes for MCP. Each one stores exactly the document shape the Android app writes
- * (core/data/.../{Meals,Workouts,Weight,Habits}Repository.kt) and passes the same checks as
+ * (core/data/.../{Meals,Habits}Repository.kt) and passes the same checks as
  * firestore.rules. The rules use hasOnly() and closed `source` enums, and the app later edits
  * these documents, so we can't add a source like "mcp" or any extra field. MCP entries are stored
  * as "manual", like a hand-entered log.
  */
-
-/** Activity ids from ActivityCatalog (core/model/.../Fitness.kt). */
-export const ACTIVITY_IDS = [
-  "run", "treadmill", "walk", "hike", "cycle", "indoor_cycle", "row", "elliptical", "stairs", "wheelchair",
-  "skate", "ski", "paddle", "swim_pool", "swim_open", "weights", "bodyweight", "crossfit", "powerlifting",
-  "hiit", "yoga", "pilates", "stretch", "dance", "martial_arts", "boxing", "football", "cricket", "basketball",
-  "tennis", "badminton", "table_tennis", "volleyball", "golf", "climbing", "other", "jump_rope", "burpees",
-  "pushups", "squats", "situps",
-] as const;
 
 export const MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack"] as const;
 export const MAX_MEAL_ITEMS = 20; // MealsRepository.MAX_ITEMS / rules
@@ -110,46 +101,6 @@ export function createWriter(uid: string, store: WriteStore = firestoreStore, no
       });
       const total = (k: keyof MealItemIn) => Math.round(items.reduce((s, i) => s + (Number(i[k] ?? 0) * i.grams) / 100, 0));
       return { id, path: `users/${uid}/meals/${id}`, localDate, title, kcal: total("kcal"), protein: total("protein"), carbs: total("carbs"), fat: total("fat") };
-    },
-
-    /** users/{uid}/workouts/{auto}: same shape as WorkoutsRepository.save with source "manual". */
-    async logWorkout(a: { activityId: (typeof ACTIVITY_IDS)[number]; start?: string; durationMin: number; title?: string; notes?: string;
-      metrics?: { distanceM?: number; elevationM?: number; avgHr?: number; kcal?: number; laps?: number; poolLengthM?: number;
-        reps?: number; rpe?: number; exercises?: { name: string; sets: { reps: number; weightKg?: number }[] }[] } }) {
-      const { ms, localDate } = await when(store, uid, a.start, now());
-      const metrics: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(a.metrics ?? {})) {
-        if (v === undefined) continue;
-        if (k === "exercises") {
-          const ex = v as { name: string; sets: { reps: number; weightKg?: number }[] }[];
-          if (ex.length) metrics.exercises = ex.map((e) => ({ name: e.name, sets: e.sets.map((s) => ({ reps: s.reps, weightKg: s.weightKg ?? null })) }));
-        } else metrics[k] = v;
-      }
-      const id = await store.create(uid, "workouts", {
-        source: "manual",
-        activityId: a.activityId,
-        title: a.title?.trim() || null,
-        startMs: ms,
-        endMs: ms + a.durationMin * 60_000,
-        localDate,
-        metrics,
-        notes: a.notes?.trim() || null,
-        deleted: false,
-      });
-      return { id, path: `users/${uid}/workouts/${id}`, localDate };
-    },
-
-    /** users/{uid}/weights/{auto}: same shape as a manual WeightRepository.save (no Health Connect mirror). */
-    async logWeight(a: { kg: number; at?: string; note?: string }) {
-      const { ms, localDate } = await when(store, uid, a.at, now());
-      const id = await store.create(uid, "weights", {
-        kg: Math.round(a.kg * 100) / 100,
-        atMs: ms,
-        localDate,
-        note: a.note?.trim().slice(0, 120) || null,
-        source: "manual",
-      });
-      return { id, path: `users/${uid}/weights/${id}`, localDate };
     },
 
     /** users/{uid}/waterDays/{date}: like MealsRepository.addWater, bounded to the rules' 0..20000 ml. */

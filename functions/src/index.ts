@@ -4,7 +4,7 @@
  * - weeklyInsights: Saturday 19:00 local weekly review (scheduled)
  * - coachChat: streaming coach chat with Fast (Sonnet) / Smart (Opus) models (callable)
  * - analyzeMeal: foods, portions and nutrition from a meal photo or description (callable)
- * - mcp: MCP server (Streamable HTTP) for AI agents: reads the signed-in user's data and logs meals, workouts, weight, water and habits
+ * - mcp: MCP server (Streamable HTTP) for AI agents: reads the signed-in user's data and logs meals, water and habit check-ins
  */
 import { setGlobalOptions } from "firebase-functions/v2";
 

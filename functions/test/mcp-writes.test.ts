@@ -50,23 +50,6 @@ describe("mcp writes", () => {
     await expect(w.logMeal({ type: "dinner", kcal: 1, at: "2026-11-06T08:00:00Z" })).rejects.toThrow(/future/);
   });
 
-  it("log_workout stores a manual workout", async () => {
-    const { store, docs } = memStore();
-    await createWriter("u1", store, () => NOW).logWorkout({ activityId: "weights", durationMin: 45, notes: " legs ",
-      metrics: { rpe: 8, exercises: [{ name: "Squat", sets: [{ reps: 5, weightKg: 100 }, { reps: 5 }] }] } });
-    expect(docs["users/u1/workouts/id1"]).toEqual({
-      source: "manual", activityId: "weights", title: null, startMs: NOW, endMs: NOW + 45 * 60000, localDate: "2026-11-05",
-      metrics: { rpe: 8, exercises: [{ name: "Squat", sets: [{ reps: 5, weightKg: 100 }, { reps: 5, weightKg: null }] }] },
-      notes: "legs", deleted: false,
-    });
-  });
-
-  it("log_weight stores a manual weigh-in", async () => {
-    const { store, docs } = memStore();
-    await createWriter("u1", store, () => NOW).logWeight({ kg: 72.456 });
-    expect(docs["users/u1/weights/id1"]).toEqual({ kg: 72.46, atMs: NOW, localDate: "2026-11-05", note: null, source: "manual" });
-  });
-
   it("log_water adds within bounds", async () => {
     const { store } = memStore();
     const w = createWriter("u1", store, () => NOW);
@@ -91,11 +74,12 @@ describe("mcp writes", () => {
     const server = createMcpServer("u1", {} as McpDeps, store);
     const client = new Client({ name: "t", version: "0" });
     await Promise.all([server.connect(a), client.connect(b)]);
-    expect((await client.callTool({ name: "log_weight", arguments: { kg: 5 } })).isError).toBe(true);
-    expect((await client.callTool({ name: "log_workout", arguments: { activityId: "teleport", durationMin: 5 } })).isError).toBe(true);
+    expect((await client.callTool({ name: "log_water", arguments: { ml: 0 } })).isError).toBe(true);
+    expect((await client.callTool({ name: "log_meal", arguments: { type: "brunch", kcal: 100 } })).isError).toBe(true);
+    expect((await client.callTool({ name: "log_weight", arguments: { kg: 70 } })).isError).toBe(true);
     expect((await client.callTool({ name: "set_habit_status", arguments: { habit: "Gym", status: "done" } })).isError).toBe(true);
     expect(Object.keys(docs)).toHaveLength(0);
-    const ok = await client.callTool({ name: "log_weight", arguments: { kg: 70 } });
-    expect(parse(ok).path).toMatch(/^users\/u1\/weights\//);
+    const ok = await client.callTool({ name: "log_water", arguments: { ml: 250 } });
+    expect(parse(ok).path).toMatch(/^users\/u1\/waterDays\//);
   });
 });
