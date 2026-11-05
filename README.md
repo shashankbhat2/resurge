@@ -110,3 +110,21 @@ Issues and pull requests are welcome. Run the tests, re-record screenshots for U
 ## License
 
 [GPL v3](LICENSE). You can use, study, change and share Resurge; if you distribute a modified version, release its source under the same license.
+
+## MCP server (for AI agents)
+
+`functions` exports `mcp`, a read-only [Model Context Protocol](https://modelcontextprotocol.io) server that uses the Streamable HTTP transport. Its tools are `get_health_snapshot`, `get_profile`, `get_daily_summaries`, `get_activities`, `get_insights`, `get_meals`, `get_workout_logs` and `get_habits`. They are the same reads the coach uses, scoped to the signed-in user.
+
+It uses the app's Firebase Auth. Send a user's Firebase ID token as `Authorization: Bearer <id-token>`.
+
+```bash
+cd functions && npm run deploy    # or: npm run serve (emulators)
+# endpoint: https://us-central1-<project>.cloudfunctions.net/mcp
+```
+
+```json
+{ "mcpServers": { "resurge": { "url": "https://us-central1-<project>.cloudfunctions.net/mcp",
+  "headers": { "Authorization": "Bearer <firebase-id-token>" } } } }
+```
+
+ID tokens expire after an hour, so refresh the header when that happens. Only POST is served; the server is stateless and returns JSON responses.
