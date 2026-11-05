@@ -30,8 +30,8 @@ describe("mcp", () => {
     const names = (await client.listTools()).tools.map((t) => t.name).sort();
     expect(names).toEqual([
       "get_activities", "get_daily_summaries", "get_habits", "get_health_snapshot",
-      "get_insights", "get_meals", "get_profile", "get_workout_logs",
-      "log_meal", "log_water", "set_habit_status",
+      "get_insights", "get_meals", "get_nutrition_targets", "get_profile", "get_workout_logs",
+      "log_meal", "log_water", "set_habit_status", "set_nutrition_targets",
     ].sort());
   });
 

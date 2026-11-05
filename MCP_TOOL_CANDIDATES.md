@@ -11,6 +11,7 @@ The backend is Firebase Cloud Functions (TypeScript). The callable functions use
 | get_insights | Insights the app already showed | days: int 1-60 | text list | `runTool("get_insights")` → `loadRecentInsights`/`formatInsightList` |
 | get_meals | Logged meals with macros and daily totals | days: int 1-60 | text | `runTool("get_meals")` → `loadMeals`/`formatMeals` |
 | get_workout_logs | Manually logged or edited workouts (sets, reps, RPE, notes) | days: int 1-90 | text | `runTool("get_workout_logs")` → `loadWorkoutLogs`/`formatWorkoutLogs` |
+| get_nutrition_targets | Calorie and water targets, plus macro grams derived from calories | none | JSON {calories, waterMl, derivedMacrosG, note} | `users/{uid}.targets` (UserRepository.toProfile defaults) + `MacroTargets.from` (Food.kt) |
 | get_habits | Active habits with streaks and a done/missed log (private habits show their cover name only) | days: int 1-60 | text | `lib/data.ts` `loadHabits` + `formatHabits` |
 
 ## Write tools (implemented)
@@ -22,6 +23,9 @@ Every write goes under `users/{uid}` for the authenticated user. Documents use t
 | log_meal | type: breakfast\|lunch\|dinner\|snack; title?: string ≤80; at?: ISO time; items?: [{name, grams, kcal, protein, carbs, fat, fiber?} per 100 g] ≤20; or kcal, protein?, carbs?, fat?, fiber? totals | `meals/{auto}` {type, loggedAtMs, localDate, source, title, items, updatedAt} | `MealsRepository.save` |
 | log_water | ml: int ±5000, not 0; date?: yyyy-MM-dd (last 7 days) | `waterDays/{date}` {date, ml, updatedAt}, transactional, total kept in 0-20000 | `MealsRepository.addWater` |
 | set_habit_status | habit: name or id; status: done\|missed\|clear; date?: current habit day or the one before | `habitDays/{date}` {date, entries.{habitId}, updatedAt} (merge) | `HabitsRepository.setStatus` |
+| set_nutrition_targets | calories?: int 800-6000; waterMl?: int 500-8000 (at least one) | `users/{uid}` field `targets`: the full map {calories, waterMl, sleepMinutes, steps}, merged in a transaction and filled from current values and app defaults; plus updatedAt | `UserRepository.updateTargets`; firestore.rules `validProfile` bounds |
+
+Nutrition targets: the app stores only `targets.calories` (and `waterMl`, `sleepMinutes`, `steps`). Macro targets aren't stored; `MacroTargets.from(calories)` derives them (30% protein, 40% carbs, 30% fat). The data model and rules have no micronutrient targets. Adding them would need app, model and rules changes, so they aren't in the MCP tools.
 
 Not exposed: `log_workout` and `log_weight` (left out on purpose; workouts come from trackers through Health Connect, and weigh-ins come from the app and smart scales), creating or archiving habits (private habits need the phone's encryption key), weight goals, progress photos, and editing or deleting existing entries.
 

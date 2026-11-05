@@ -5,13 +5,14 @@ vi.mock("../src/lib/firebase", () => ({ db: {}, userDoc: () => ({}), DATABASE: "
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createMcpServer, type McpDeps } from "../src/mcp/tools";
-import { createWriter, type WriteStore } from "../src/mcp/writes";
+import { createWriter, fillTargets, type StoredTargets, type WriteStore } from "../src/mcp/writes";
 
 const NOW = Date.parse("2026-11-05T08:00:00Z"); // 13:30 in Asia/Kolkata
 
 function memStore(tz = "Asia/Kolkata") {
   const docs: Record<string, Record<string, unknown>> = {};
   const water: Record<string, number> = {};
+  const profile: { targets?: Record<string, unknown> } = { targets: { calories: 2200, steps: 8000 } };
   let n = 0;
   const store: WriteStore = {
     timezone: async () => tz,
@@ -19,9 +20,11 @@ function memStore(tz = "Asia/Kolkata") {
     create: async (uid, col, data) => { const id = `id${++n}`; docs[`users/${uid}/${col}/${id}`] = data; return id; },
     merge: async (uid, col, id, data) => { docs[`users/${uid}/${col}/${id}`] = data; },
     activeHabits: async () => [{ id: "h1", name: "Walk" }, { id: "h2", name: "Read" }],
+    targets: async () => fillTargets(profile.targets),
+    updateTargets: async (_u, patch) => { const next: StoredTargets = { ...fillTargets(profile.targets), ...patch }; profile.targets = next; return next; },
     addWater: async (_u, date, ml, max) => { const next = (water[date] ?? 0) + ml; if (next < 0 || next > max) return null; water[date] = next; return next; },
   };
-  return { store, docs, water };
+  return { store, docs, water, profile };
 }
 
 const parse = (r: { content: unknown }) => JSON.parse((r.content as { text: string }[])[0].text);
@@ -66,6 +69,37 @@ describe("mcp writes", () => {
     await w.setHabitStatus({ habit: "h2", status: "missed", date: "2026-11-04" });
     await expect(w.setHabitStatus({ habit: "Walk", status: "done", date: "2026-11-01" })).rejects.toThrow(/Only/);
     await expect(w.setHabitStatus({ habit: "Gym", status: "done" })).rejects.toThrow(/No active habit/);
+  });
+
+  it("set_nutrition_targets merges a partial update into the full targets map", async () => {
+    const { store, profile } = memStore();
+    const w = createWriter("u1", store, () => NOW);
+    expect(await w.setNutritionTargets({ calories: 1800 })).toEqual({
+      path: "users/u1", calories: 1800, waterMl: 2500, derivedMacrosG: { protein: 135, carbs: 180, fat: 60 },
+    });
+    expect(profile.targets).toEqual({ calories: 1800, waterMl: 2500, sleepMinutes: 420, steps: 8000 });
+    await w.setNutritionTargets({ waterMl: 3000 });
+    expect(profile.targets).toMatchObject({ calories: 1800, waterMl: 3000, steps: 8000 });
+    await expect(w.setNutritionTargets({})).rejects.toThrow(/calories/);
+  });
+
+  it("get_nutrition_targets reads targets with derived macros", async () => {
+    const r = await createWriter("u1", memStore().store, () => NOW).nutritionTargets();
+    expect(r).toMatchObject({ calories: 2200, waterMl: 2500, derivedMacrosG: { protein: 165, carbs: 220, fat: 73 } });
+  });
+
+  it("set_nutrition_targets enforces the app's bounds over MCP", async () => {
+    const { store, profile } = memStore();
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    const server = createMcpServer("u1", {} as McpDeps, store);
+    const client = new Client({ name: "t", version: "0" });
+    await Promise.all([server.connect(a), client.connect(b)]);
+    expect((await client.callTool({ name: "set_nutrition_targets", arguments: { calories: 500 } })).isError).toBe(true);
+    expect((await client.callTool({ name: "set_nutrition_targets", arguments: { waterMl: 9000 } })).isError).toBe(true);
+    expect((await client.callTool({ name: "set_nutrition_targets", arguments: { calories: 2100.5 } })).isError).toBe(true);
+    expect(profile.targets).toEqual({ calories: 2200, steps: 8000 });
+    const ok = await client.callTool({ name: "set_nutrition_targets", arguments: { calories: 2100 } });
+    expect(parse(ok).calories).toBe(2100);
   });
 
   it("validates inputs over MCP and reports write errors as tool errors", async () => {

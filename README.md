@@ -115,11 +115,12 @@ Issues and pull requests are welcome. Run the tests, re-record screenshots for U
 
 `functions` exports `mcp`, a [Model Context Protocol](https://modelcontextprotocol.io) server that uses the Streamable HTTP transport.
 
-- **Read tools:** `get_health_snapshot`, `get_profile`, `get_daily_summaries`, `get_activities`, `get_insights`, `get_meals`, `get_workout_logs`, `get_habits`. These are the same reads the coach uses.
+- **Read tools:** `get_health_snapshot`, `get_profile`, `get_daily_summaries`, `get_activities`, `get_insights`, `get_meals`, `get_workout_logs`, `get_habits`. These are the same reads the coach uses. `get_nutrition_targets` returns the calorie and water targets plus the macro grams the app derives from them.
 - **Write tools:**
   - `log_meal` writes to `meals`. Give either items (nutrition per 100 g plus grams) or totals. It doesn't run AI analysis.
   - `log_water` writes to `waterDays`.
   - `set_habit_status` writes to `habitDays`.
+  - `set_nutrition_targets` updates the `targets` map on `users/{uid}`. It changes only the fields you give: calories (800–6000) and water in ml (500–8000). Protein, carbs and fat targets follow calories, because the app derives them (30/40/30). The app has no micronutrient targets, so there's no tool for them.
 
   Writes use the same document shape and limits as the app and `firestore.rules`. Meals are stored with `source: "manual"`, because the rules only allow known sources. There are no workout or weight write tools on purpose: workouts come from trackers through Health Connect, and weigh-ins come from the app and smart scales.
 

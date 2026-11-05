@@ -14,6 +14,15 @@ export const MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack"] as const;
 export const MAX_MEAL_ITEMS = 20; // MealsRepository.MAX_ITEMS / rules
 export const WATER_MAX_ML = 20000; // rules: validWaterDay
 
+/** Nutrition targets on users/{uid}.targets (UserRepository / Targets.kt; rules: validProfile). */
+export const TARGET_DEFAULTS = { calories: 2000, waterMl: 2500, sleepMinutes: 7 * 60, steps: 10_000 };
+export type StoredTargets = typeof TARGET_DEFAULTS;
+
+/** Macro targets the app derives from calories (MacroTargets.from: 30% protein, 40% carbs, 30% fat). Not stored. */
+export function macrosFor(calories: number) {
+  return { protein: Math.round((calories * 0.3) / 4), carbs: Math.round((calories * 0.4) / 4), fat: Math.round((calories * 0.3) / 9) };
+}
+
 export interface MealItemIn { name: string; grams: number; kcal: number; protein: number; carbs: number; fat: number; fiber?: number }
 
 /** Firestore operations, injectable for tests. Paths are relative to users/{uid}. */
@@ -23,6 +32,10 @@ export interface WriteStore {
   create(uid: string, collection: string, data: Record<string, unknown>): Promise<string>;
   merge(uid: string, collection: string, id: string, data: Record<string, unknown>): Promise<void>;
   activeHabits(uid: string): Promise<{ id: string; name: string }[]>;
+  /** Current targets with app defaults filled in. */
+  targets(uid: string): Promise<StoredTargets>;
+  /** Merges a patch into targets in a transaction, writing the full map as the app does; returns it. */
+  updateTargets(uid: string, patch: Partial<StoredTargets>): Promise<StoredTargets>;
   /** Adds ml to a water day inside a transaction; returns the new total, or null if it would exceed max. */
   addWater(uid: string, date: string, ml: number, max: number): Promise<number | null>;
 }
@@ -48,6 +61,17 @@ export const firestoreStore: WriteStore = {
     const snap = await userDoc(uid).collection("habits").where("archived", "==", false).get();
     return snap.docs.map((d) => ({ id: d.id, name: String(d.get("name") ?? "") }));
   },
+  async targets(uid) {
+    return fillTargets((await userDoc(uid).get()).get("targets"));
+  },
+  async updateTargets(uid, patch) {
+    const ref = userDoc(uid);
+    return ref.firestore.runTransaction(async (tx) => {
+      const next = { ...fillTargets((await tx.get(ref)).get("targets")), ...patch };
+      tx.set(ref, { targets: next, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      return next;
+    });
+  },
   async addWater(uid, date, ml, max) {
     const ref = userDoc(uid).collection("waterDays").doc(date);
     return ref.firestore.runTransaction(async (tx) => {
@@ -67,6 +91,13 @@ async function when(store: WriteStore, uid: string, at: string | undefined, nowM
   if (ms > nowMs + 5 * 60_000) throw new WriteError("Time can't be in the future.");
   if (ms < nowMs - 366 * 86_400_000) throw new WriteError("Time is more than a year ago.");
   return { ms, localDate: localParts(await store.timezone(uid), new Date(ms)).date };
+}
+
+/** Like UserRepository.toProfile: missing or non-numeric fields fall back to the app's defaults. */
+export function fillTargets(raw: unknown): StoredTargets {
+  const t = (raw ?? {}) as Record<string, unknown>;
+  const pick = (k: keyof StoredTargets) => (typeof t[k] === "number" ? Math.trunc(t[k] as number) : TARGET_DEFAULTS[k]);
+  return { calories: pick("calories"), waterMl: pick("waterMl"), sleepMinutes: pick("sleepMinutes"), steps: pick("steps") };
 }
 
 export class WriteError extends Error {}
@@ -111,6 +142,26 @@ export function createWriter(uid: string, store: WriteStore = firestoreStore, no
       const total = await store.addWater(uid, date, a.ml, WATER_MAX_ML);
       if (total === null) throw new WriteError(`That day's water would go outside 0–${WATER_MAX_ML} ml.`);
       return { path: `users/${uid}/waterDays/${date}`, date, totalMl: total };
+    },
+
+    /**
+     * users/{uid} field `targets`: partial update of the calorie and water targets. The app saves the
+     * whole map {calories, waterMl, sleepMinutes, steps} and the rules require calories 800-6000 and
+     * waterMl 500-8000, so the merged map is written in full. Macros are derived from calories.
+     */
+    async setNutritionTargets(a: { calories?: number; waterMl?: number }) {
+      const patch: Partial<StoredTargets> = {};
+      if (a.calories !== undefined) patch.calories = a.calories;
+      if (a.waterMl !== undefined) patch.waterMl = a.waterMl;
+      if (Object.keys(patch).length === 0) throw new WriteError("Give calories and/or waterMl.");
+      const t = await store.updateTargets(uid, patch);
+      return { path: `users/${uid}`, calories: t.calories, waterMl: t.waterMl, derivedMacrosG: macrosFor(t.calories) };
+    },
+
+    async nutritionTargets() {
+      const t = await store.targets(uid);
+      return { calories: t.calories, waterMl: t.waterMl, derivedMacrosG: macrosFor(t.calories),
+        note: "Macros are derived by the app from calories (30% protein, 40% carbs, 30% fat); micronutrient targets are not stored." };
     },
 
     /**

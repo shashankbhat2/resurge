@@ -22,7 +22,7 @@ const text = (t: string, isError = false) => ({ content: [{ type: "text" as cons
 
 /**
  * MCP tools over one signed-in user's Resurge data: reads reuse the coach's loaders and tools
- * (coach/tools.ts); writes (./writes.ts) log meals, water and habit check-ins.
+ * (coach/tools.ts); writes (./writes.ts) log meals, water and habit check-ins, and set nutrition targets.
  */
 export function createMcpServer(uid: string, deps: McpDeps = defaultDeps, store: WriteStore = firestoreStore): McpServer {
   const server = new McpServer({ name: "resurge", version: "0.1.0" });
@@ -114,6 +114,19 @@ export function createMcpServer(uid: string, deps: McpDeps = defaultDeps, store:
     description: "Add water drunk (ml, negative to correct) to a day; default today, up to 7 days back.",
     inputSchema: { ml: z.number().int().min(-5000).max(5000).refine((v) => v !== 0, "ml can't be 0"), date: isoDate.optional() },
   }, (a) => write(() => writer.logWater(a)));
+
+  server.registerTool("get_nutrition_targets", {
+    description: "Current daily calorie and water targets, plus the protein/carbs/fat grams the app derives from calories.",
+    inputSchema: {},
+  }, () => write(() => writer.nutritionTargets()));
+
+  server.registerTool("set_nutrition_targets", {
+    description: "Change the daily calorie target (800-6000 kcal) and/or water target (500-8000 ml). Only the fields given change. Macro targets follow calories automatically (30/40/30); micronutrient targets aren't supported by the app.",
+    inputSchema: {
+      calories: z.number().int().min(800).max(6000).optional(),
+      waterMl: z.number().int().min(500).max(8000).optional(),
+    },
+  }, (a) => write(() => writer.setNutritionTargets(a)));
 
   server.registerTool("set_habit_status", {
     description: "Check in a habit as done or missed (or clear it) for the current habit day or the day before. habit is the habit's name (as in get_habits) or id.",
