@@ -283,6 +283,7 @@ private fun Result(state: MealReviewState, vm: MealReviewViewModel, ready: Boole
                         }
                         NutritionTiles(state.totals, onFix)
                         BalanceTags(state.totals)
+                        MicrosCard(state.totals)
                         state.question?.let { question -> QuestionCard(question, state.options, onAnswer = vm::answer, onSkip = vm::dismissQuestion) }
                         state.error?.let { SoftNote(it) }
                         DayCard(state)
@@ -339,7 +340,7 @@ private fun FoodChips(state: MealReviewState, modifier: Modifier, onFix: () -> U
                 indication = LocalIndication.current,
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (e.item.lowConfidence) {
+                    if (e.item.lowConfidence || e.item.unverified) {
                         Icon(ResurgeIcons.AlertCircle, contentDescription = null, tint = Color(0xFFB4690E), size = 14.dp)
                         Spacer(Modifier.width(4.dp))
                     }
@@ -403,6 +404,18 @@ private fun Tile(label: String, value: String, unit: String, icon: Int, tint: Co
                 Text(unit, style = Resurge.type.caption, color = Resurge.colors.textSubtle, modifier = Modifier.padding(bottom = 4.dp))
             }
         }
+    }
+}
+
+/** The meal's micronutrients, when its sources report any. */
+@Composable
+private fun MicrosCard(n: Nutrition) {
+    if (n.micros.isEmpty()) return
+    Column(Modifier.fillMaxWidth().clip(Resurge.shape.md).background(Resurge.colors.surface).padding(14.dp)) {
+        Text("Micronutrients", style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight))
+        Text("Share of an adult's daily guide", style = Resurge.type.caption, color = Resurge.colors.textSubtle)
+        Spacer(Modifier.height(12.dp))
+        MicronutrientList(n)
     }
 }
 
@@ -608,6 +621,7 @@ private fun ItemRow(e: EditableItem, vm: MealReviewViewModel) {
         Row(verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f)) {
                 Text(item.name, style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight, fontSize = Resurge.type.body.fontSize), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                SourceLine(item, Modifier.padding(top = 2.dp))
                 if (item.lowConfidence) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
                         Icon(ResurgeIcons.AlertCircle, contentDescription = null, tint = Resurge.colors.glowInk, size = 13.dp)

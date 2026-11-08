@@ -3,7 +3,9 @@ package com.resurgeai.feature.food
 import androidx.lifecycle.SavedStateHandle
 import com.resurgeai.core.data.food.MealAnalysisException
 import com.resurgeai.core.data.food.MealsRepository
+import com.resurgeai.core.model.BarcodeProduct
 import com.resurgeai.core.model.FoodItem
+import com.resurgeai.core.model.FoodSource
 import com.resurgeai.core.model.MealEstimate
 import com.resurgeai.core.model.MealSource
 import com.resurgeai.core.model.Nutrition
@@ -83,6 +85,27 @@ class MealReviewViewModelTest {
         vm.retry()
         assertNull(vm.state.value.error)
         assertEquals(1, vm.state.value.items.size)
+    }
+
+    @Test
+    fun `a product found by barcode goes straight to review at its serving size, with no analysis`() {
+        val maggi = BarcodeProduct("Maggi 2-Minute Noodles", Nutrition(kcal = 384.0, protein = 8.2, carbs = 59.6, fat = 12.5), 70.0, FoodSource("off:8901058000290", "Open Food Facts"))
+        val vm = vm(MealDraft(null, null, barcode = "8901058000290", product = maggi))
+        val s = vm.state.value
+        assertEquals(MealSource.BARCODE, s.source)
+        assertEquals("Maggi 2-Minute Noodles", s.title)
+        assertEquals(268.8, s.totals.kcal, 0.01)
+        assertTrue(s.canLog)
+        coVerify(exactly = 0) { repo.analyze(any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `a label photo for an unknown barcode is read with the barcode attached`() {
+        coEvery { repo.analyze(any(), any(), any(), any(), any()) } returns MealEstimate("Aloo bhujia", listOf(rice.copy(name = "Aloo bhujia", grams = 30.0)))
+        val vm = vm(MealDraft(photo, null, barcode = "8904063200011"))
+        coVerify { repo.analyze(photo.jpeg, null, any(), null, "8904063200011") }
+        assertEquals(MealSource.BARCODE, vm.state.value.source)
+        assertEquals(MealReviewViewModel.LABEL_STEPS, MealReviewViewModel.stepsFor(vm.state.value.copy(fixes = emptyList())))
     }
 
     @Test

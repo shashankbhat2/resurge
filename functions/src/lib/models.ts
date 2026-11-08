@@ -17,9 +17,6 @@ export const MODELS: Record<ModelChoice, ModelSpec> = {
 /** Per-activity insights: quick and cheap, but a bit more thought than chat "Fast". */
 export const ACTIVITY_INSIGHT_MODEL: ModelSpec = { ...MODELS.fast, effort: "medium" };
 
-/** Meal photo / description analysis: Sonnet with medium thinking for portion estimates. */
-export const MEAL_ANALYSIS_MODEL: ModelSpec = { id: "claude-sonnet-5-5", effort: "medium", label: "Meal" };
-
 /** Saturday weekly report: same model as activity insights, with more thought. */
 export const WEEKLY_INSIGHT_MODEL: ModelSpec = { ...MODELS.fast, effort: "high" };
 
@@ -29,4 +26,6 @@ export const LIMITS = {
   smartTurns: 10,
   activityInsights: 4,
   foodScans: 20,
+  /** Grounded web lookups (Gemini + Google Search) for foods no table has; 5,000 a month are free. */
+  webLookups: 5,
 } as const;

@@ -17,8 +17,12 @@
       "ignore": [
         "node_modules",
         "test",
+        "scripts",
+        "eval",
         ".git",
-        "*.log"
+        "*.log",
+        ".secret*",
+        ".env.*.local"
       ]
     }
   ],
