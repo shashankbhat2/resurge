@@ -98,7 +98,7 @@ service cloud.firestore {
         && m.type in ['breakfast', 'lunch', 'dinner', 'snack']
         && m.loggedAtMs is int
         && isDay(m.localDate)
-        && m.source in ['scan', 'text', 'manual']
+        && m.source in ['scan', 'text', 'manual', 'barcode']
         && m.title is string && m.title.size() > 0 && m.title.size() <= 80
         && m.items is list && m.items.size() <= 20
         && (!('thumb' in m) || (m.thumb is bytes && m.thumb.size() <= 120000))
@@ -343,6 +343,9 @@ service cloud.firestore {
                               'progressPhotos', 'progressKey', 'progressReels', 'progressSettings', 'dayResults']);
       }
     }
+
+    // foodProducts/{barcode} and foodWebCache/{id} are shared nutrition caches written only by Cloud
+    // Functions (admin SDK); the app reads products through the lookupBarcode function. Covered here.
 
     // Deny anything not matched above.
     match /{document=**} {

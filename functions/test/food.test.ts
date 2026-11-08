@@ -1,25 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { MEAL_ESTIMATE_JSON_SCHEMA, MealEstimate } from "../src/food/schema";
+import { toResponse } from "../src/food/schema";
+import { emptyNutrients } from "../src/food/nutrients";
 import { formatMeals, formatWorkoutLogs } from "../src/lib/format";
 
-describe("meal estimate schema", () => {
-  const valid = {
-    title: "Dal rice",
-    items: [{ name: "Rice", grams: 180, kcal: 130, protein: 2.7, carbs: 28, fat: 0.3, fiber: 0.4, confidence: 0.9 }],
-    question: "",
-    options: [],
-    notes: "",
-  };
-
-  it("accepts a well-formed estimate and rejects impossible nutrition", () => {
-    expect(MealEstimate.safeParse(valid).success).toBe(true);
-    const badFat = { ...valid, items: [{ ...valid.items[0], fat: 140 }] };
-    expect(MealEstimate.safeParse(badFat).success).toBe(false);
-  });
-
-  it("JSON schema requires every property structured outputs needs", () => {
-    expect([...MEAL_ESTIMATE_JSON_SCHEMA.required].sort()).toEqual(Object.keys(valid).sort());
-    expect([...MEAL_ESTIMATE_JSON_SCHEMA.properties.items.items.required].sort()).toEqual(Object.keys(valid.items[0]).sort());
+describe("analyzeMeal response", () => {
+  it("keeps the flat per-100 g macros older app versions read, and adds nutrients and source", () => {
+    const per100g = { ...emptyNutrients(), kcal: 130, protein: 2.7, carbs: 28, fat: 0.3, fiber: 0.4, iron: 0.2 };
+    const res = toResponse({
+      title: "Dal rice",
+      question: "",
+      options: [],
+      notes: "",
+      items: [{ name: "Rice", grams: 180.4, per100g, confidence: 0.912, sourceId: "cofid:11-858", sourceName: "CoFID 2021", sourceDetail: "Rice, white, basmati, boiled", verified: true }],
+    });
+    expect(res.items[0]).toMatchObject({ name: "Rice", grams: 180, kcal: 130, protein: 2.7, carbs: 28, fat: 0.3, fiber: 0.4, confidence: 0.91, verified: true });
+    expect(res.items[0].nutrients.iron).toBe(0.2);
+    expect(res.items[0].nutrients.vitC).toBeNull();
   });
 });
 

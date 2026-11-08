@@ -18,7 +18,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,6 +33,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
@@ -38,6 +44,8 @@ import com.resurgeai.core.designsystem.components.Icon
 import com.resurgeai.core.designsystem.components.MacroVisuals
 import com.resurgeai.core.designsystem.components.ResurgeIcons
 import com.resurgeai.core.designsystem.theme.Resurge
+import com.resurgeai.core.model.FoodItem
+import com.resurgeai.core.model.Micro
 import com.resurgeai.core.model.Nutrition
 import kotlin.math.roundToInt
 
@@ -161,5 +169,99 @@ internal fun MacroLegendRow(label: String, grams: Double, share: Float, color: C
         Text("${grams.roundToInt()} g", style = Resurge.type.headline.copy(fontFeatureSettings = "tnum"))
         Spacer(Modifier.width(6.dp))
         Text("${(share * 100).roundToInt()}%", style = Resurge.type.caption.copy(fontFeatureSettings = "tnum"), color = Resurge.colors.textSubtle)
+    }
+}
+
+/**
+ * Micronutrients in [n] against an adult daily guide, as rows with a slim bar. Only nutrients the
+ * sources report are shown; limits (sugar, saturated fat, sodium, cholesterol) are labelled "limit".
+ * Neutral colours throughout: this is information, not a score. Shows [collapsed] rows until
+ * expanded.
+ */
+@Composable
+internal fun MicronutrientList(n: Nutrition, collapsed: Int = 5, modifier: Modifier = Modifier) {
+    val rows = Micro.entries.mapNotNull { m -> n[m]?.let { m to it } }
+    if (rows.isEmpty()) return
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val shown = if (expanded || rows.size <= collapsed + 1) rows else rows.take(collapsed)
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        shown.forEach { (m, value) -> MicroRow(m, value) }
+        if (shown.size < rows.size || expanded) {
+            UnstyledButton(
+                onClick = { expanded = !expanded },
+                role = Role.Button,
+                indication = LocalIndication.current,
+                modifier = Modifier.clip(Resurge.shape.pill),
+                contentPadding = PaddingValues(vertical = 4.dp),
+            ) {
+                Text(
+                    if (expanded) "Show fewer" else "Show all ${rows.size}",
+                    style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight),
+                    color = Resurge.colors.brandInk,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MicroRow(m: Micro, value: Double) {
+    val share = (value / m.daily).toFloat()
+    val amount = when {
+        value >= 100 -> "%,d".format(value.roundToInt())
+        value >= 10 -> "%.0f".format(value)
+        else -> "%.1f".format(value)
+    }
+    Column(Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(m.label, style = Resurge.type.label, modifier = Modifier.weight(1f))
+            Text("$amount ${m.unit}", style = Resurge.type.label.copy(fontFeatureSettings = "tnum"))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "${(share * 100).roundToInt()}%${if (m.limit) " of limit" else ""}",
+                style = Resurge.type.caption.copy(fontFeatureSettings = "tnum"),
+                color = Resurge.colors.textSubtle,
+                modifier = Modifier.width(78.dp),
+                textAlign = TextAlign.End,
+            )
+        }
+        Spacer(Modifier.height(5.dp))
+        Box(Modifier.fillMaxWidth().height(4.dp).clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted)) {
+            Box(
+                Modifier.fillMaxHeight().fillMaxWidth(share.coerceIn(0.02f, 1f)).clip(Resurge.shape.pill)
+                    .background(if (m.limit) Resurge.colors.textMuted else Resurge.colors.accent),
+            )
+        }
+    }
+}
+
+/**
+ * Where a food's numbers came from, in one line under its name: "IFCT 2017 (ICMR-NIN) · Red gram,
+ * dal", or a nudge when it is an estimate or an unconfirmed web result.
+ */
+@Composable
+internal fun SourceLine(item: FoodItem, modifier: Modifier = Modifier) {
+    val source = item.source ?: return
+    val unverified = item.unverified
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            if (unverified) ResurgeIcons.AlertCircle else ResurgeIcons.Database,
+            contentDescription = null,
+            tint = if (unverified) Resurge.colors.glowInk else Resurge.colors.textSubtle,
+            size = 12.dp,
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(
+            when {
+                source.isEstimate -> "Estimate: no nutrition table had this food"
+                unverified -> "${source.name}: not confirmed, check it"
+                source.detail != null && source.detail != item.name -> "${source.name} · ${source.detail}"
+                else -> source.name
+            },
+            style = Resurge.type.caption,
+            color = if (unverified) Resurge.colors.glowInk else Resurge.colors.textSubtle,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }

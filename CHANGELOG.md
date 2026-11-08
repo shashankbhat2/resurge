@@ -1,15 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 (25 October 2026)
 
-### Cardio Points
-- Fitness now shows daily points and 30 days of weekly history, with no points goal or streak changes.
-- Scores combine available walking/running cadence with clearly labelled workout estimates, counting overlapping activity once.
-- A compact Fitness card matches Move Week’s number and green chart styling. Tap its footer for history, daily source breakdowns, refresh, and expandable scoring explanations. Manual workouts work without Health Connect.
-- Points stay in a device-local cache excluded from backup, are cleared on sign-out, and are never sent to the coach.
-- Google credential cleanup still runs if the local points cache cannot be cleared during sign-out.
-- Health Connect reads are bounded to the requested workout period and retained cadence history. Cached scores keep their stale/limited labels on reopening, and workout sources retain installed-app names.
-
+### Food logging
+A meal's numbers now come from nutrition tables. The same dish gets the same values, and micronutrients show up when the source has them.
+- Log with a photo, a description, your voice, or a barcode.
+- Each food says where its numbers came from. If nothing matched, it's marked as an estimate you can edit.
+- Change the grams and the totals follow, before you save.
+- A barcode that isn't known asks for a photo of the nutrition label.
 
 ## 0.4.0 (23 October 2026)
 

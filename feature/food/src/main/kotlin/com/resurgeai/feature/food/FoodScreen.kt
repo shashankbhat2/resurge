@@ -56,6 +56,7 @@ import com.resurgeai.core.designsystem.components.UndoBar
 import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.designsystem.theme.clockFormatter
 import com.resurgeai.core.model.Meal
+import com.resurgeai.core.model.Nutrition
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -110,6 +111,7 @@ fun FoodScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 item(key = "fuel") { FuelCard(state, onAddWater) }
+                if (state.todayTotals.micros.isNotEmpty()) item(key = "micros") { TodayMicros(state.todayTotals) }
                 if (state.days.isEmpty()) item(key = "empty") { EmptyFeed(onLogMeal) }
                 state.days.forEach { day ->
                     val meals = day.slots.flatMap { it.second }
@@ -192,6 +194,18 @@ private fun FuelCard(state: FoodUiState, onAddWater: (Int) -> Unit) {
             StatDivider()
             WaterCell(state.waterMl, state.targets.waterMl, onAdd = { onAddWater(250) }, modifier = Modifier.weight(1f))
         }
+    }
+}
+
+/** Today's micronutrients from the meals logged so far, against an adult's daily guide. */
+@Composable
+private fun TodayMicros(n: Nutrition) {
+    Column(Modifier.fillMaxWidth().clip(Resurge.shape.lg).background(Resurge.colors.surface).padding(20.dp)) {
+        Overline("Micronutrients today")
+        Spacer(Modifier.height(4.dp))
+        Text("From the foods' nutrition tables, as a share of an adult's daily guide", style = Resurge.type.caption, color = Resurge.colors.textSubtle)
+        Spacer(Modifier.height(14.dp))
+        MicronutrientList(n, collapsed = 6)
     }
 }
 

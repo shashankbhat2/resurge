@@ -130,6 +130,18 @@ class MealReviewViewModel @Inject constructor(
             }
         } else if (draft == null) {
             _state.value = MealReviewState(loading = false, error = "Nothing to review. Go back and scan or type a meal.")
+        } else if (draft.product != null) {
+            // Found by barcode: the product's own values, nothing to analyse.
+            val product = draft.product
+            _state.update {
+                it.copy(
+                    loading = false,
+                    title = product.name,
+                    items = listOf(EditableItem(nextKey++, product.toItem())),
+                    source = MealSource.BARCODE,
+                    notes = if (product.servingGrams == null) "Portion set to 100 g. Adjust it to what you ate." else null,
+                )
+            }
         } else {
             _state.update {
                 it.copy(
@@ -137,7 +149,11 @@ class MealReviewViewModel @Inject constructor(
                     thumbnail = draft.photo?.thumbnail,
                     preview = draft.photo?.jpeg,
                     description = draft.text,
-                    source = if (draft.photo != null) MealSource.SCAN else MealSource.TEXT,
+                    source = when {
+                        draft.barcode != null -> MealSource.BARCODE
+                        draft.photo != null -> MealSource.SCAN
+                        else -> MealSource.TEXT
+                    },
                     canCorrect = true,
                 )
             }
@@ -152,7 +168,7 @@ class MealReviewViewModel @Inject constructor(
         job = viewModelScope.launch {
             val steps = launch { cycleSteps(stepsFor(_state.value)) }
             try {
-                val result = repository.analyze(d.photo?.jpeg, describe(d), _state.value.type, answer)
+                val result = repository.analyze(d.photo?.jpeg, describe(d), _state.value.type, answer, d.barcode)
                 estimate = result
                 _state.update {
                     it.copy(
@@ -263,12 +279,14 @@ class MealReviewViewModel @Inject constructor(
     }
 
     companion object {
-        val PHOTO_STEPS = listOf("Identifying foods…", "Estimating portions…", "Working out nutrition…", "Almost there…")
-        val TEXT_STEPS = listOf("Reading your description…", "Working out nutrition…", "Almost there…")
+        val PHOTO_STEPS = listOf("Identifying foods…", "Estimating portions…", "Matching foods to nutrition tables…", "Almost there…")
+        val TEXT_STEPS = listOf("Reading your description…", "Matching foods to nutrition tables…", "Almost there…")
+        val LABEL_STEPS = listOf("Reading the label…", "Checking the values…", "Almost there…")
         val FIX_STEPS = listOf("Applying your fixes…", "Working out nutrition…", "Almost there…")
 
         fun stepsFor(s: MealReviewState): List<String> = when {
             s.fixes.isNotEmpty() -> FIX_STEPS
+            s.source == MealSource.BARCODE -> LABEL_STEPS
             s.preview != null -> PHOTO_STEPS
             else -> TEXT_STEPS
         }

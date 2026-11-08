@@ -1,14 +1,20 @@
 package com.resurgeai.feature.food
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.speech.RecognizerIntent
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.OptIn
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ExperimentalGetImage
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
@@ -40,7 +46,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -48,6 +56,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -75,6 +84,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.composeunstyled.Text
 import com.composeunstyled.UnstyledButton
+import com.google.mlkit.vision.barcode.BarcodeScannerOptions
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.common.InputImage
+import com.resurgeai.core.data.food.MealAnalysisException
 import com.resurgeai.core.data.food.MealsRepository
 import com.resurgeai.core.designsystem.components.Button
 import com.resurgeai.core.designsystem.components.ButtonVariant
@@ -99,6 +113,7 @@ import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.util.concurrent.Executors
 import javax.inject.Inject
 
 @HiltViewModel
@@ -118,6 +133,45 @@ class FoodLogViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
+    /** A barcode is being looked up. */
+    private val _lookingUp = MutableStateFlow(false)
+    val lookingUp: StateFlow<Boolean> = _lookingUp.asStateFlow()
+
+    /** A scanned barcode nobody knows yet: the next photo should be its nutrition label. */
+    private val _labelFor = MutableStateFlow<String?>(null)
+    val labelFor: StateFlow<String?> = _labelFor.asStateFlow()
+
+    /**
+     * Looks a scanned barcode up (no model call). A known product goes straight to review; an
+     * unknown one asks for a photo of its label, which is then read with the barcode attached.
+     */
+    fun useBarcode(code: String, onReady: () -> Unit, onNeedLabel: () -> Unit) {
+        if (_lookingUp.value) return
+        viewModelScope.launch {
+            _lookingUp.value = true
+            _error.value = null
+            try {
+                val product = repository.lookupBarcode(code)
+                if (product != null) {
+                    draftStore.put(MealDraft(null, null, barcode = code, product = product))
+                    onReady()
+                } else {
+                    _labelFor.value = code
+                    _error.value = "This product isn't in the database yet. Take a photo of its nutrition label."
+                    onNeedLabel()
+                }
+            } catch (e: MealAnalysisException) {
+                _error.value = e.message
+            } finally {
+                _lookingUp.value = false
+            }
+        }
+    }
+
+    fun clearLabel() {
+        _labelFor.value = null
+    }
+
     fun usePhoto(context: Context, uri: Uri, onReady: () -> Unit) {
         viewModelScope.launch {
             _preparing.value = true
@@ -131,7 +185,8 @@ class FoodLogViewModel @Inject constructor(
                 _error.value = "Couldn't open that photo. Try another one."
             } else {
                 _error.value = null
-                draftStore.put(MealDraft(photo, null))
+                draftStore.put(MealDraft(photo, null, barcode = _labelFor.value))
+                _labelFor.value = null
                 onReady()
             }
         }
@@ -153,13 +208,15 @@ class FoodLogViewModel @Inject constructor(
     }
 }
 
-/** The three ways in: the in-app camera, a gallery photo, or a description. */
-private enum class LogMode(val label: String) { PHOTO("Photo"), GALLERY("Gallery"), DESCRIBE("Describe") }
+/** The ways in: the in-app camera, a barcode, a gallery photo, or a description (typed or spoken). */
+private enum class LogMode(val label: String) { PHOTO("Photo"), BARCODE("Barcode"), GALLERY("Gallery"), DESCRIBE("Describe") }
 
 /**
- * The meal scanner: a full-screen in-app camera with frame corners and one hint, a Photo / Gallery /
- * Describe switch, and the shutter. The last meal's photo by the shutter opens recent meals for a
- * one-tap "log again". [mode] "type" opens Describe straight away (from the meal reminder).
+ * The meal logger: a full-screen in-app camera with frame corners and one hint, a Photo / Barcode /
+ * Gallery / Describe switch, and the shutter. Barcode mode reads EAN/UPC codes on the device and
+ * looks the product up; Describe takes typed or spoken words. The last meal's photo by the shutter
+ * opens recent meals for a one-tap "log again". [mode] "type" opens Describe straight away (from
+ * the meal reminder).
  */
 @Composable
 fun FoodLogRoute(
@@ -173,12 +230,14 @@ fun FoodLogRoute(
     val recent by viewModel.recent.collectAsStateWithLifecycle()
     val preparing by viewModel.preparing.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
+    val lookingUp by viewModel.lookingUp.collectAsStateWithLifecycle()
+    val labelFor by viewModel.labelFor.collectAsStateWithLifecycle()
     var logMode by rememberSaveable { mutableStateOf(if (mode == "type") LogMode.DESCRIBE else LogMode.PHOTO) }
     var showRecent by rememberSaveable { mutableStateOf(false) }
     var flash by rememberSaveable { mutableStateOf(false) }
     var hasCamera by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
     val askCamera = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { hasCamera = it }
-    LaunchedEffect(Unit) { if (!hasCamera && logMode == LogMode.PHOTO) askCamera.launch(Manifest.permission.CAMERA) }
+    LaunchedEffect(Unit) { if (!hasCamera && logMode.usesCamera) askCamera.launch(Manifest.permission.CAMERA) }
 
     val gallery = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) viewModel.usePhoto(context, uri, onReview)
@@ -203,7 +262,15 @@ fun FoodLogRoute(
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black).imePadding()) {
-        if (hasCamera) CameraPreview(imageCapture, Modifier.fillMaxSize()) else CameraOff(onAllow = { askCamera.launch(Manifest.permission.CAMERA) })
+        val onBarcode: ((String) -> Unit)? = if (logMode == LogMode.BARCODE && !lookingUp) {
+            { code ->
+                haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                viewModel.useBarcode(code, onReview, onNeedLabel = { logMode = LogMode.PHOTO })
+            }
+        } else {
+            null
+        }
+        if (hasCamera) CameraPreview(imageCapture, onBarcode, Modifier.fillMaxSize()) else CameraOff(onAllow = { askCamera.launch(Manifest.permission.CAMERA) })
         if (logMode == LogMode.DESCRIBE) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)))
 
         // Top: back, title, flash.
@@ -214,7 +281,12 @@ fun FoodLogRoute(
             GlassButton(ResurgeIcons.ArrowLeft, "Back", onClick = onBack)
             Spacer(Modifier.weight(1f))
             Text(
-                if (logMode == LogMode.DESCRIBE) "Describe a meal" else "Scan a meal",
+                when {
+                    logMode == LogMode.DESCRIBE -> "Describe a meal"
+                    logMode == LogMode.BARCODE -> "Scan a barcode"
+                    labelFor != null -> "Photograph the label"
+                    else -> "Scan a meal"
+                },
                 style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight),
                 color = Color.White,
                 modifier = Modifier.clip(Resurge.shape.pill).background(Color.Black.copy(alpha = 0.45f)).padding(horizontal = 14.dp, vertical = 8.dp),
@@ -227,9 +299,13 @@ fun FoodLogRoute(
             }
         }
 
-        if (logMode == LogMode.PHOTO && hasCamera) {
+        if (logMode.usesCamera && hasCamera) {
             Text(
-                "Fit the whole plate in the frame",
+                when {
+                    logMode == LogMode.BARCODE -> if (lookingUp) "Looking up the product…" else "Point at the barcode on the pack"
+                    labelFor != null -> "Fit the nutrition table in the frame"
+                    else -> "Fit the whole plate in the frame"
+                },
                 style = Resurge.type.caption,
                 color = Color.White,
                 modifier = Modifier
@@ -240,7 +316,7 @@ fun FoodLogRoute(
                     .background(Color.Black.copy(alpha = 0.5f))
                     .padding(horizontal = 12.dp, vertical = 6.dp),
             )
-            FrameCorners(Modifier.align(Alignment.Center).offset(y = (-40).dp).fillMaxWidth(0.82f).height(300.dp))
+            FrameCorners(Modifier.align(Alignment.Center).offset(y = (-40).dp).fillMaxWidth(0.82f).height(if (logMode == LogMode.BARCODE) 150.dp else 300.dp))
         }
 
         // Bottom: what's going on, the describe card, the mode switch and the shutter row.
@@ -249,14 +325,14 @@ fun FoodLogRoute(
             verticalArrangement = Arrangement.spacedBy(14.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            if (preparing) {
+            if (preparing || lookingUp) {
                 Row(
                     Modifier.clip(Resurge.shape.pill).background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 14.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Spinner(Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
                     Spacer(Modifier.width(8.dp))
-                    Text("Preparing photo…", style = Resurge.type.label, color = Color.White)
+                    Text(if (lookingUp) "Looking up the product…" else "Preparing photo…", style = Resurge.type.label, color = Color.White)
                 }
             }
             error?.let {
@@ -274,14 +350,15 @@ fun FoodLogRoute(
                         logMode = LogMode.GALLERY
                         gallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }
-                    LogMode.PHOTO -> {
-                        logMode = LogMode.PHOTO
+                    LogMode.PHOTO, LogMode.BARCODE -> {
+                        if (picked == LogMode.BARCODE) viewModel.clearLabel()
+                        logMode = picked
                         if (!hasCamera) askCamera.launch(Manifest.permission.CAMERA)
                     }
                     LogMode.DESCRIBE -> logMode = LogMode.DESCRIBE
                 }
             }
-            if (logMode != LogMode.DESCRIBE) {
+            if (logMode == LogMode.PHOTO || logMode == LogMode.GALLERY) {
                 Box(Modifier.fillMaxWidth().height(80.dp)) {
                     recent.firstOrNull()?.let { last ->
                         UnstyledButton(
@@ -303,26 +380,73 @@ fun FoodLogRoute(
     }
 }
 
-/** Live camera preview, bound to this screen's lifecycle, with [imageCapture] for the shutter. */
+/**
+ * Live camera preview, bound to this screen's lifecycle, with [imageCapture] for the shutter. With
+ * [onBarcode], frames also go to ML Kit's on-device barcode reader; a code is reported once it has
+ * been read the same way twice in a row, so a blurry frame can't pick the wrong product.
+ */
+@OptIn(ExperimentalGetImage::class)
 @Composable
-private fun CameraPreview(imageCapture: ImageCapture, modifier: Modifier) {
+private fun CameraPreview(imageCapture: ImageCapture, onBarcode: ((String) -> Unit)?, modifier: Modifier) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val previewView = remember { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER } }
-    DisposableEffect(lifecycleOwner) {
+    val scanning = onBarcode != null
+    val latest = rememberUpdatedState(onBarcode)
+    DisposableEffect(lifecycleOwner, scanning) {
         val future = ProcessCameraProvider.getInstance(context)
+        val executor = Executors.newSingleThreadExecutor()
+        val scanner = if (scanning) {
+            BarcodeScanning.getClient(
+                BarcodeScannerOptions.Builder()
+                    .setBarcodeFormats(Barcode.FORMAT_EAN_13, Barcode.FORMAT_EAN_8, Barcode.FORMAT_UPC_A, Barcode.FORMAT_UPC_E)
+                    .build(),
+            )
+        } else {
+            null
+        }
         future.addListener({
             runCatching {
                 val provider = future.get()
                 val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
                 provider.unbindAll()
-                provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
+                if (scanner == null) {
+                    provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
+                } else {
+                    var last: String? = null
+                    var reported = false
+                    val analysis = ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build()
+                    analysis.setAnalyzer(executor) { proxy ->
+                        val media = proxy.image
+                        if (media == null || reported) {
+                            proxy.close()
+                            return@setAnalyzer
+                        }
+                        scanner.process(InputImage.fromMediaImage(media, proxy.imageInfo.rotationDegrees))
+                            .addOnSuccessListener { codes ->
+                                val code = codes.firstNotNullOfOrNull { b -> b.rawValue?.takeIf { v -> v.length in 8..14 && v.all(Char::isDigit) } }
+                                if (code != null && code == last && !reported) {
+                                    reported = true
+                                    latest.value?.invoke(code)
+                                }
+                                last = code
+                            }
+                            .addOnCompleteListener { proxy.close() }
+                    }
+                    provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+                }
             }.onFailure { Log.w("MealScanner", "Camera bind failed", it) }
         }, ContextCompat.getMainExecutor(context))
-        onDispose { runCatching { if (future.isDone) future.get().unbindAll() } }
+        onDispose {
+            runCatching { if (future.isDone) future.get().unbindAll() }
+            scanner?.close()
+            executor.shutdown()
+        }
     }
     AndroidView(factory = { previewView }, modifier = modifier)
 }
+
+private val LogMode.usesCamera: Boolean get() = this == LogMode.PHOTO || this == LogMode.BARCODE
 
 @Composable
 private fun CameraOff(onAllow: () -> Unit) {
@@ -403,21 +527,35 @@ private fun Shutter(enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
     }
 }
 
-/** Describe mode: what you ate, in your own words, then Estimate. */
+/** Describe mode: what you ate, typed or spoken, then the agent matches it to nutrition tables. */
 @Composable
 private fun DescribeCard(autoFocus: Boolean, onSubmit: (String) -> Unit) {
     val text = rememberTextFieldState()
     val focus = remember { FocusRequester() }
     LaunchedEffect(autoFocus) { if (autoFocus) runCatching { focus.requestFocus() } }
     val submit = { onSubmit(text.text.toString()) }
+    val listen = rememberSpeechInput(text)
     Column(
         Modifier.fillMaxWidth().clip(Resurge.shape.lg).background(Resurge.colors.surface).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("What did you eat?", style = Resurge.type.headline)
-        InputField(text, placeholder = "e.g. 2 rotis, dal and a bowl of curd", maxLength = 300, onDone = submit, modifier = Modifier.focusRequester(focus))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.weight(1f)) {
+                InputField(text, placeholder = "e.g. 2 rotis, dal and a bowl of curd", maxLength = 300, onDone = submit, modifier = Modifier.focusRequester(focus))
+            }
+            if (listen != null) {
+                Spacer(Modifier.width(8.dp))
+                UnstyledButton(
+                    onClick = listen,
+                    role = Role.Button,
+                    modifier = Modifier.size(44.dp).clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted).semantics { contentDescription = "Speak instead" },
+                    indication = LocalIndication.current,
+                ) { Icon(ResurgeIcons.Microphone, contentDescription = null, size = 20.dp) }
+            }
+        }
         Button(
-            "Estimate nutrition",
+            "Log it",
             onClick = submit,
             enabled = text.text.isNotBlank(),
             variant = ButtonVariant.Accent,
@@ -425,6 +563,31 @@ private fun DescribeCard(autoFocus: Boolean, onSubmit: (String) -> Unit) {
             modifier = Modifier.fillMaxWidth(),
         )
     }
+}
+
+/**
+ * Speech to text with the phone's own recognizer (Indian English, so Hinglish works), added to
+ * [into]. Null when the phone has no recognizer.
+ */
+@Composable
+private fun rememberSpeechInput(into: TextFieldState): (() -> Unit)? {
+    val context = LocalContext.current
+    val intent = remember {
+        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-IN")
+            .putExtra(RecognizerIntent.EXTRA_PROMPT, "What did you eat?")
+    }
+    val available = remember { intent.resolveActivity(context.packageManager) != null }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
+        val heard = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.trim().orEmpty()
+        if (heard.isNotEmpty()) {
+            val current = into.text.toString().trim()
+            into.setTextAndPlaceCursorAtEnd(if (current.isEmpty()) heard else "$current, $heard")
+        }
+    }
+    return if (available) ({ runCatching { launcher.launch(intent) } }) else null
 }
 
 /** Recent meals over the camera: one tap logs a copy now. */
