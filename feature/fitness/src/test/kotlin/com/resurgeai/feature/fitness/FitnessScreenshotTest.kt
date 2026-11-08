@@ -7,6 +7,9 @@ import com.composeunstyled.theme.ColorScheme
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.resurgeai.core.designsystem.components.Screen
 import com.resurgeai.core.designsystem.theme.ResurgeTheme
+import com.resurgeai.core.data.cardio.CardioPointsState
+import com.resurgeai.core.model.CardioPointsEngine
+import com.resurgeai.core.model.CardioStatus
 import com.resurgeai.core.model.StrengthExercise
 import com.resurgeai.core.model.StrengthSet
 import com.resurgeai.core.model.Workout
@@ -46,6 +49,10 @@ class FitnessScreenshotTest {
 
     private val state = FitnessUiState(
         loading = false,
+        cardio = CardioPointsState(
+            days = CardioPointsEngine.calculate(today.minusDays(29), today, zone, today.atTime(23, 0).atZone(zone).toInstant(), emptyList(), workouts),
+            loading = false, status = CardioStatus.LIMITED_DATA, zone = zone.id,
+        ),
         days = workouts.groupBy { it.date(zone) }.toList().sortedByDescending { it.first },
         // Wed 14 Oct: the week runs Sun 11 to Sat 17.
         week = WeekSummary(workouts = 4, activeMinutes = 96, kcal = 1012, dailyMinutes = listOf(0, 34, 0, 62, 0, 0, 0), todayIndex = 3),
@@ -66,5 +73,6 @@ class FitnessScreenshotTest {
 
     @Test fun feed() = capture("feed", state)
     @Test fun feedDark() = capture("feed_dark", state, ColorScheme.Dark)
-    @Test fun empty() = capture("empty", state.copy(days = emptyList(), week = WeekSummary(0, 0, 0, todayIndex = 3), bests = emptyMap()))
+    @Test fun empty() = capture("empty", state.copy(days = emptyList(), week = WeekSummary(0, 0, 0, todayIndex = 3), bests = emptyMap(),
+        cardio = state.cardio.copy(days = state.cardio.days.map { it.copy(contributions = emptyList()) })))
 }

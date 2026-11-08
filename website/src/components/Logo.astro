@@ -1,0 +1,17 @@
+---
+/** The app icon, or with `mark` just the chevron without its tile (`size` is then its height). */
+interface Props {
+  size?: number;
+  mark?: boolean;
+  class?: string;
+}
+const { size = 28, mark = false, class: className = '' } = Astro.props;
+---
+
+{
+  mark ? (
+    <img src="/mark.png" width={Math.round((size * 176) / 160)} height={size} alt="" class={className} decoding="async" />
+  ) : (
+    <img src="/icon.png" width={size} height={size} alt="" class:list={['rounded-[22%]', className]} decoding="async" />
+  )
+}

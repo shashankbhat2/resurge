@@ -51,9 +51,9 @@ import kotlin.reflect.KClass
 class HealthDataSource @Inject constructor(
     private val manager: HealthConnectManager,
     @ApplicationContext private val context: Context,
+    private val appLabels: HealthAppLabels,
 ) {
     private val client get() = manager.client
-    private val appLabels = mutableMapOf<String, String?>()
 
     suspend fun readDay(
         date: LocalDate,
@@ -419,15 +419,7 @@ class HealthDataSource @Inject constructor(
         else -> null
     }
 
-    private fun appName(packageName: String): String? = synchronized(appLabels) {
-        appLabels.getOrPut(packageName) {
-            SourceResolver.knownAppName(packageName) ?: runCatching {
-                val pm = context.packageManager
-                @Suppress("DEPRECATION") // ApplicationInfoFlags needs API 33
-                pm.getApplicationLabel(pm.getApplicationInfo(packageName, 0)).toString()
-            }.getOrNull()
-        }
-    }
+    private fun appName(packageName: String): String? = appLabels.label(packageName)
 }
 
 /** A weigh-in read from Health Connect. */

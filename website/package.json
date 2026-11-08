@@ -1,0 +1,22 @@
+{
+  "name": "resurge-website",
+  "private": true,
+  "type": "module",
+  "description": "Website for Resurge, the free, open-source AI health coach for Android.",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "deploy": "astro build && wrangler deploy",
+    "og": "\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless=new --hide-scrollbars --force-device-scale-factor=1 --window-size=1200,630 --virtual-time-budget=3000 --allow-file-access-from-files --screenshot=/tmp/resurge-og.png \"file://$PWD/og/og.html\" && sips -s format jpeg -s formatOptions 88 /tmp/resurge-og.png --out public/og.jpg"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "astro": "5.18.2",
+    "marked": "18.1.1",
+    "tailwindcss": "4.3.3"
+  },
+  "devDependencies": {
+    "wrangler": "4.152.0"
+  }
+}

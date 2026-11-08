@@ -55,7 +55,8 @@ object SourceResolver {
         "com.resurgeai.app" to "Resurge",
     )
 
-    fun knownAppName(packageName: String): String? = knownAppNames[packageName]
+    fun knownAppName(packageName: String): String? =
+        if (packageName.startsWith("com.android.healthconnect.phone.")) "This phone" else knownAppNames[packageName]
 
     /** Classifies a record from its device type, recording method and origin package. */
     fun classify(deviceType: Int?, recordingMethod: Int, packageName: String): SourceKind = when {
@@ -68,7 +69,7 @@ object SourceResolver {
         deviceType == Device.TYPE_PHONE -> SourceKind.PHONE
         deviceType == Device.TYPE_SCALE || deviceType == Device.TYPE_SMART_DISPLAY -> SourceKind.OTHER_DEVICE
         packageName in wearablePackages -> SourceKind.WEARABLE
-        packageName in phonePackages -> SourceKind.PHONE
+        packageName in phonePackages || packageName.startsWith("com.android.healthconnect.phone.") -> SourceKind.PHONE
         else -> SourceKind.UNKNOWN
     }
 

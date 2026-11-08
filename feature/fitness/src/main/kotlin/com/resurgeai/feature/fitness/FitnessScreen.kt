@@ -7,6 +7,8 @@ import com.resurgeai.core.designsystem.components.Divider
 import com.resurgeai.core.designsystem.components.StatDivider
 import com.resurgeai.core.designsystem.components.StatCell
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -91,6 +93,7 @@ fun FitnessRoute(
         onDelete = viewModel::delete,
         onUndo = viewModel::undoDelete,
         onUndoTimeout = viewModel::clearDeleted,
+        onRetryCardio = viewModel::retryCardio,
     )
 }
 
@@ -106,6 +109,7 @@ fun FitnessScreen(
     onDelete: (Workout) -> Unit,
     onUndo: () -> Unit,
     onUndoTimeout: () -> Unit,
+    onRetryCardio: () -> Unit = {},
 ) {
     val format = UnitFormat(state.units)
     val top = LocalHeaderInset.current + 12.dp
@@ -113,9 +117,10 @@ fun FitnessScreen(
     Box(Modifier.fillMaxSize()) {
         when {
             state.loading -> SkeletonGroup {
-                Column(Modifier.padding(start = 16.dp, end = 16.dp, top = top), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = top), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SkeletonBox(Modifier.fillMaxWidth().height(260.dp), Resurge.shape.lg)
-                    repeat(2) { SkeletonBox(Modifier.fillMaxWidth().height(150.dp), Resurge.shape.md) }
+                    CardioPointsCard(state.cardio, state.today, onRetryCardio)
+                    SkeletonBox(Modifier.fillMaxWidth().height(150.dp), Resurge.shape.md)
                 }
             }
             else -> LazyColumn(
@@ -124,6 +129,7 @@ fun FitnessScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item(key = "week") { MoveWeek(state.week, state.today) }
+                item(key = "cardio") { CardioPointsCard(state.cardio, state.today, onRetryCardio) }
                 if (state.days.isEmpty()) {
                     item(key = "empty") { EmptyFeed(onLogWorkout) }
                 }

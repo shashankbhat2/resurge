@@ -1,0 +1,47 @@
+---
+/**
+ * A cell of the bento: what it is, then a real piece of the app's UI. The bento is one black grid
+ * split by hairlines, so a cell has no border or corners of its own. One-column
+ * cells put the UI under the text; `wide` cells span two columns with the UI beside the text.
+ */
+interface Props {
+  label: string;
+  title: string;
+  body?: string;
+  img?: string;
+  alt?: string;
+  wide?: boolean;
+}
+const { label, title, body, img, alt = '', wide = false } = Astro.props;
+---
+
+<div
+  class:list={[
+    'group flex flex-col overflow-hidden bg-black transition-colors duration-500 hover:bg-[#060606]',
+    wide ? 'md:col-span-2 lg:flex-row' : '',
+  ]}
+>
+  <div class:list={['flex flex-col p-7', img ? (wide ? 'lg:w-[44%] lg:shrink-0 lg:pr-2' : 'pb-0') : 'h-full w-full']}>
+    <span class="font-secondary text-[11px] tracking-[0.14em] text-subtle uppercase">{label}</span>
+    <h3 class="headline mt-3 text-2xl leading-[1.1] tracking-[-0.03em]">{title}</h3>
+    {body && <p class="mt-2 text-sm leading-relaxed text-muted">{body}</p>}
+    <slot />
+  </div>
+  {
+    img && (
+      // The same transparent frame for every image: the UI is cut out of its screen, scaled to fit,
+      // and fades in at the top and out at the bottom.
+      <div class:list={['flex min-h-0 p-6 pt-4 lg:flex-1', wide && 'lg:pt-6 lg:pl-0']}>
+        <div class="flex h-60 w-full items-center justify-center mask-[linear-gradient(transparent,#000_14%,#000_86%,transparent)] lg:h-full">
+          <img
+            src={img}
+            alt={alt}
+            loading="lazy"
+            decoding="async"
+            class="max-h-full w-auto max-w-full object-contain transition-transform duration-700 ease-out group-hover:scale-[1.03]"
+          />
+        </div>
+      </div>
+    )
+  }
+</div>

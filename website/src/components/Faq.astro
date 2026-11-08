@@ -1,0 +1,20 @@
+---
+import { FAQS } from '../lib/faq';
+---
+
+<section class="mx-auto grid max-w-5xl gap-12 px-6 pt-40 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] md:gap-16">
+  <h2 class="reveal headline text-[clamp(36px,4vw,56px)]">Questions,<br /><span class="text-dim">answered.</span></h2>
+  <div class="flex flex-col border-b border-white/[0.08]">
+    {
+      FAQS.map(([q, a], i) => (
+        <details class="reveal group border-t border-white/[0.08] px-1 transition-colors duration-500" style={`--d:${i}`} open={i === 0}>
+          <summary class="flex cursor-pointer items-center justify-between gap-4 py-5 text-lg font-medium">
+            {q}
+            <span class="faq-plus text-[22px] text-subtle transition-transform duration-300" aria-hidden="true">+</span>
+          </summary>
+          <p class="-mt-1 mb-6 max-w-[620px] font-secondary text-[15px] leading-relaxed text-muted">{a}</p>
+        </details>
+      ))
+    }
+  </div>
+</section>

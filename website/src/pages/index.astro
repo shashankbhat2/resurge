@@ -1,0 +1,165 @@
+---
+import Base from '../layouts/Base.astro';
+import { app, faqPage } from '../lib/seo';
+import Phone from '../components/Phone.astro';
+import Ring from '../components/Ring.astro';
+import TodayScreen from '../components/TodayScreen.astro';
+import Anatomy from '../components/Anatomy.astro';
+import Divider from '../components/Divider.astro';
+import Logo from '../components/Logo.astro';
+import Faq from '../components/Faq.astro';
+import MainFeatures from '../components/MainFeatures.astro';
+import BentoTile from '../components/BentoTile.astro';
+import { REPO } from '../lib/site';
+
+const partners = ['Fitbit', 'Pixel Watch', 'Samsung Health', 'Garmin', 'Oura', 'Withings'];
+---
+
+<Base title="Resurge" schema={[await app(Astro.site!), faqPage(Astro.site!)]}>
+  <!-- Hero -->
+  <section class="relative mx-auto -mb-[280px] max-w-5xl px-6 pt-20 text-center">
+    <div class="reveal relative flex justify-center">
+      <Logo size={64} />
+    </div>
+    <div class="reveal relative mt-6 inline-flex h-8 items-center gap-2 rounded-full border border-[#2A2A2A] px-3.5 text-[13px] text-muted">
+      <span class="size-1.5 rounded-full bg-white"></span>
+      Coming to Google Play
+    </div>
+    <h1 class="reveal headline relative mx-auto mt-6 max-w-[640px] text-[clamp(36px,4.6vw,60px)] leading-[1]" style="--d:1">
+      Your whole day.<br /><span class="text-dim">One calm coach.</span>
+    </h1>
+    <p class="reveal relative mx-auto mt-5 max-w-[500px] text-[17px] leading-relaxed text-muted" style="--d:2">
+      Sleep, steps, workouts, meals and habits in one place, scored every morning, with a coach that has actually read them.
+    </p>
+    <div class="reveal relative mt-7 flex justify-center" style="--d:3">
+      <button type="button" data-waitlist class="inline-flex h-12 cursor-pointer items-center rounded-full bg-white px-7 font-semibold text-black transition-transform hover:scale-[1.03] active:scale-[0.98]">
+        Join the waitlist
+      </button>
+    </div>
+    <p class="reveal relative mt-4 text-[13px] text-subtle" style="--d:4">
+      For Android · Open source on <a href={REPO} class="text-muted underline decoration-white/20 underline-offset-4 transition-colors hover:text-white">GitHub</a>
+    </p>
+
+    <!-- The phone, with cards floating either side -->
+    <div class="relative mt-12 grid items-start gap-8 text-left lg:grid-cols-[1fr_300px_1fr]" data-sink>
+      <div class="hidden flex-col items-end gap-4 pt-10 lg:flex">
+        <div class="reveal float flex w-[250px] items-center gap-3.5 rounded-[20px] border border-white/[0.1] bg-black p-[18px]" style="--d:3">
+          <Ring value={92} kind="mono" label="Recovery" size={56}><span class="text-lg font-semibold">92</span></Ring>
+          <div><div class="text-sm font-semibold">Recovery</div><div class="text-[13px] text-muted">Ready to train</div></div>
+        </div>
+        <div class="reveal float w-[220px] rounded-[20px] border border-white/[0.1] bg-black p-[18px]" style="--d:5">
+          <div class="text-xs text-subtle">Day streak</div>
+          <div class="mt-1.5 font-display text-5xl leading-none font-semibold tracking-[-0.04em]">12</div>
+          <div class="mt-3 grid grid-cols-7 gap-1">
+            {['up', 'up', 'mid', 'up', 'up', 'up', 'today'].map((s) => (
+              <span class:list={['aspect-square rounded', s === 'up' && 'bg-white', s === 'mid' && 'bg-white/30', s === 'today' && 'border-[1.5px] border-white']} />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div class="reveal justify-self-center" style="--d:2">
+        <Phone>
+          <TodayScreen />
+        </Phone>
+      </div>
+
+      <div class="hidden flex-col items-start gap-4 pt-20 lg:flex">
+        <div class="reveal float w-[260px] rounded-[20px] border border-white/[0.1] bg-black p-4" style="--d:4">
+          <div class="flex items-center gap-2">
+            <span class="flex size-[22px] items-center justify-center rounded-full bg-white text-black">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.2 6.3 6.3 2.2-6.3 2.2L12 19.5l-2.2-6.3L3.5 11l6.3-2.2z" /></svg>
+            </span>
+            <span class="text-xs text-subtle">After your run</span>
+          </div>
+          <p class="mt-2.5 text-sm leading-normal text-[#D4D4D4]">10.2 km at an easy 148 bpm. That's your longest run this month, on a good night's sleep.</p>
+        </div>
+        <div class="reveal float flex w-[230px] items-center gap-3 rounded-[20px] border border-white/[0.1] bg-black p-4" style="--d:6">
+          <span class="flex size-10 items-center justify-center rounded-xl border border-white/[0.1] text-muted">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 18V7M3 14h18v4M21 14v-2a3 3 0 0 0-3-3h-7v5" /><circle cx="7" cy="11" r="1.6" /></svg>
+          </span>
+          <div><div class="text-sm font-semibold">7h 12m asleep</div><div class="text-xs text-subtle">1h 42m deep</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <Divider />
+
+  <Anatomy />
+
+  <Divider />
+
+  <!-- Works with -->
+  <section class="reveal pt-24">
+    <p class="px-6 text-center font-secondary text-[12px] tracking-[0.14em] text-subtle uppercase">Works with what you already wear, through Health Connect</p>
+    <ul class="rail mt-8 grid grid-cols-2 gap-px border-y border-white/[0.08] bg-white/[0.08] md:grid-cols-3">
+      {
+        partners.map((p) => (
+          <li class="flex h-28 items-center justify-center bg-black font-display text-[22px] font-semibold tracking-[-0.02em] text-subtle transition-colors duration-500 hover:bg-[#060606] hover:text-white">
+            {p}
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+
+  <Divider class="mt-24" />
+
+  <MainFeatures />
+
+  <Divider class="mt-24" />
+
+  <!-- Bento: everything else, each with a real piece of the app -->
+  <section id="features" class="scroll-mt-24 pt-40">
+    <h2 class="reveal headline mx-auto max-w-5xl px-6 text-[clamp(40px,5.2vw,72px)]">Everything in one day.<br /><span class="text-dim">Nothing counted twice.</span></h2>
+    <div class="reveal rail mt-14 grid gap-px border-y border-white/[0.08] bg-white/[0.08] md:grid-cols-2 lg:grid-cols-3 lg:grid-rows-[340px_340px_340px_auto]">
+      <BentoTile wide label="Habits" title="Streaks that forgive." body="One tap a day. Miss one and a freeze covers it, so a single off day never wipes out a month." img="/ui/habits.webp" alt="Two habits with their week of check-ins and streaks." />
+      <BentoTile label="Strength" title="Log sets in a tap." img="/ui/strength.webp" alt="The strength logger with sets of front squats checked off." />
+      <BentoTile label="Workouts" title="Every workout counts, once." body="From your watch, merged when two apps saw the same one." img="/ui/workout.webp" alt="A 5.24 km run from Pixel Watch, with pace and heart rate." />
+      <BentoTile wide label="Sleep" title="Every stage of the night." body="Time asleep, quality and stages, from whatever you sleep with." img="/ui/sleep.webp" alt="Last night's sleep stages, 6h 15m asleep at 96% quality." />
+      <BentoTile label="Weight" title="Your trend, not the scale." img="/ui/weight.webp" alt="A weight trend of 78.6 kg, down 1.1 kg, with a month chart." />
+      <BentoTile label="Weekly review" title="A Saturday read on your week." img="/ui/weekly.webp" alt="A weekly review: a steadier week with more sleep and four active days." />
+      <BentoTile label="Smart scale" title="Just step on." img="/ui/scale.webp" alt="Smart scale settings: listening, with a Weigh in now button." />
+      <BentoTile label="Your coach" title="Pick how it talks to you.">
+        <div class="mt-4 flex flex-wrap gap-2 text-[13px]">
+          <span class="rounded-full border border-white/[0.1] px-3 py-1.5"><b class="font-semibold">Friend</b> <span class="text-subtle">· warm and patient</span></span>
+          <span class="rounded-full border border-white/[0.1] px-3 py-1.5"><b class="font-semibold">Commander</b> <span class="text-subtle">· direct</span></span>
+        </div>
+      </BentoTile>
+      <BentoTile wide label="Private by design" title="Your data stays yours.">
+        <ul class="mt-4 flex flex-wrap gap-2 text-[13px] text-muted">
+          <li class="rounded-full border border-white/[0.1] px-3 py-1.5">Per-user security rules</li>
+          <li class="rounded-full border border-white/[0.1] px-3 py-1.5">No keys in the app</li>
+          <li class="rounded-full border border-white/[0.1] px-3 py-1.5">Meal photos kept as thumbnails</li>
+          <li class="rounded-full border border-white/[0.1] px-3 py-1.5">Progress photos end-to-end encrypted</li>
+        </ul>
+      </BentoTile>
+    </div>
+  </section>
+
+  <Divider class="mt-24" />
+
+  <!-- Open source, in a line -->
+  <p class="reveal mx-auto max-w-5xl px-6 pt-24 text-center text-[15px] text-subtle">
+    Resurge is open source under the GPL-3.0. <a href={REPO} class="text-white underline decoration-white/30 underline-offset-4 transition-colors hover:decoration-white">View the source →</a>
+  </p>
+
+  <Divider class="mt-24" />
+
+  <Faq />
+
+</Base>
+
+<script>
+  // The hero's phone drifts down as the page scrolls, so it slips under the next section.
+  const sink = document.querySelector<HTMLElement>('[data-sink]');
+  if (sink && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const move = () => {
+      const y = Math.min(scrollY, innerHeight * 1.5);
+      sink.style.transform = `translateY(${y * 0.35}px)`;
+    };
+    addEventListener('scroll', move, { passive: true });
+    move();
+  }
+</script>

@@ -1,0 +1,51 @@
+---
+import Ring from './Ring.astro';
+
+/** The hero phone's screen: Today, as the app draws it. */
+const days = [
+  ['T', 22, 'text-muted'], ['F', 23, 'text-muted'], ['S', 24, 'text-muted'], ['S', 25, 'sel'],
+  ['M', 26, 'opacity-40'], ['T', 27, 'opacity-30'], ['W', 28, 'opacity-20'],
+] as const;
+---
+
+<div class="flex h-full flex-col gap-3 px-3.5 pt-11">
+  <div class="flex items-center justify-between px-1">
+    <span class="text-sm font-semibold">Good morning, Alex</span>
+    <span class="flex size-[26px] items-center justify-center rounded-full bg-accent-tint text-[11px] text-accent">A</span>
+  </div>
+  <div class="grid grid-cols-7 text-center text-[10px] text-subtle">
+    {
+      days.map(([d, n, cls]) =>
+        cls === 'sel' ? (
+          <span class="rounded-[9px] border border-accent bg-accent-tint py-[3px] text-white">{d}<br /><b class="text-[13px]">{n}</b></span>
+        ) : (
+          <span class:list={[cls, 'py-[3px]']}>{d}<br /><b class="text-[13px]">{n}</b></span>
+        ),
+      )
+    }
+  </div>
+  <div class="flex items-end justify-between px-1 pt-0.5">
+    <span class="font-display text-[26px] font-semibold tracking-[-0.03em]">Today</span>
+    <span class="text-xs text-muted">19° · Partly cloudy</span>
+  </div>
+  <div class="grid grid-cols-3 gap-1.5">
+    <div class="flex flex-col items-center gap-1.5 rounded-[14px] bg-surface px-1 py-2.5"><Ring value={92} kind="recovery" size={52} stroke={5}><span class="text-base font-semibold">92</span></Ring><span class="text-[11px] font-medium">Recovery</span></div>
+    <div class="flex flex-col items-center gap-1.5 rounded-[14px] bg-surface px-1 py-2.5"><Ring value={56} kind="effort" size={52} stroke={5}><span class="text-base font-semibold">56</span></Ring><span class="text-[11px] font-medium">Effort</span></div>
+    <div class="flex flex-col items-center gap-1.5 rounded-[14px] bg-surface px-1 py-2.5"><Ring value={84} kind="fuel" size={52} stroke={5}><span class="text-base font-semibold">84</span></Ring><span class="text-[11px] font-medium">Fuel</span></div>
+  </div>
+  <div class="rounded-[14px] bg-surface p-3">
+    <div class="flex items-center gap-2">
+      <span class="flex size-5 items-center justify-center rounded-full bg-white text-black">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.2 6.3 6.3 2.2-6.3 2.2L12 19.5l-2.2-6.3L3.5 11l6.3-2.2z" /></svg>
+      </span>
+      <span class="text-[11px] text-subtle">Morning brief · 07:30</span>
+    </div>
+    <div class="mt-2 text-[13px] font-semibold">Ready for the long run</div>
+    <div class="mt-1 text-xs leading-snug text-muted">Recovery is your best this week. Keep the first 3 km easy.</div>
+  </div>
+  <div class="flex items-center gap-2.5 rounded-[14px] bg-surface px-3 py-2.5">
+    <span class="size-[30px] rounded-lg bg-surface-2"></span>
+    <div class="grow"><div class="text-xs font-semibold">Oats, banana, whey</div><div class="text-[10px] text-subtle">Breakfast · 08:10</div></div>
+    <span class="text-xs font-semibold">520</span>
+  </div>
+</div>

@@ -1,0 +1,74 @@
+---
+import Base from '../layouts/Base.astro';
+import Divider from '../components/Divider.astro';
+import { app, breadcrumbs } from '../lib/seo';
+import Logo from '../components/Logo.astro';
+import { REPO } from '../lib/site';
+
+const steps = [
+  ['Join the waitlist', 'Use the Gmail you use on Google Play, so the invite reaches the right account.'],
+  ['Get your test invite', 'Testers go into a closed test on Google Play first. We email you the link to join it.'],
+  ['Install from Google Play', 'Sign in, let Resurge read Health Connect, and your watch’s data shows up straight away.'],
+];
+const needs = [
+  ['Android', '8.0 or later'],
+  ['Health Connect', 'Built in on Android 14+'],
+  ['A Google account', 'For Google Play'],
+  ['A watch or tracker', 'Optional'],
+];
+---
+
+<Base
+  title="Get Resurge"
+  description="Resurge is coming to Google Play. Join the waitlist to test it first."
+  schema={[await app(Astro.site!), breadcrumbs(Astro.site!, 'Get Resurge', '/download')]}
+>
+  <section class="relative mx-auto max-w-5xl px-6 pt-28 text-center">
+    <div class="reveal relative inline-block"><Logo size={80} /></div>
+    <h1 class="reveal headline relative mt-7 text-[clamp(40px,5vw,64px)] leading-[1]" style="--d:1">Coming to<br /><span class="text-dim">Google Play.</span></h1>
+    <p class="reveal relative mx-auto mt-5 max-w-[480px] text-[17px] leading-relaxed text-muted" style="--d:2">Join the waitlist and you'll be one of the first to test Resurge on your phone.</p>
+    <div class="reveal relative mt-8 flex justify-center" style="--d:3">
+      <button type="button" data-waitlist class="inline-flex h-12 cursor-pointer items-center rounded-full bg-white px-7 font-semibold text-black transition-transform hover:scale-[1.03] active:scale-[0.98]">Join the waitlist</button>
+    </div>
+    <p class="reveal relative mt-4 text-[13px] text-subtle" style="--d:4">
+      Android 8.0 or later · Open source on <a href={REPO} class="text-muted underline decoration-white/20 underline-offset-4 transition-colors hover:text-white">GitHub</a>
+    </p>
+  </section>
+
+  <Divider class="mt-24" />
+
+  <section class="pt-24">
+    <h2 class="reveal headline mx-auto max-w-5xl px-6 text-[clamp(32px,3.4vw,46px)] leading-[1.02]">What happens<br /><span class="text-dim">next.</span></h2>
+    <div class="reveal rail mt-10 grid gap-px border-y border-white/[0.08] bg-white/[0.08] md:grid-cols-3">
+      {
+        steps.map(([title, body], i) => (
+          <div class="flex min-h-[200px] flex-col gap-3 bg-black p-7 transition-colors duration-500 hover:bg-[#060606]">
+            <span class="font-secondary text-[13px] tracking-[0.08em] text-faint tabular-nums">0{i + 1}</span>
+            <h3 class="text-[20px] font-semibold tracking-[-0.01em]">{title}</h3>
+            <p class="font-secondary text-[15px] leading-relaxed text-muted">{body}</p>
+          </div>
+        ))
+      }
+    </div>
+
+    <!-- What you'll need, as a row of cells straight under the steps. -->
+    <div class="reveal rail grid gap-px border-b border-white/[0.08] bg-white/[0.08] sm:grid-cols-2 lg:grid-cols-4">
+      {
+        needs.map(([k, v]) => (
+          <div class="bg-black px-7 py-5">
+            <div class="font-secondary text-[11px] tracking-[0.14em] text-subtle uppercase">{k}</div>
+            <div class="mt-1.5 text-[15px]">{v}</div>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+  <Divider class="mt-24" />
+
+  <section class="mx-auto max-w-5xl px-6 pt-24 text-center">
+    <h2 class="reveal headline text-[clamp(30px,3.2vw,42px)] leading-[1.04]">What's new</h2>
+    <p class="reveal mx-auto mt-3.5 max-w-[480px] font-secondary text-[15px] leading-relaxed text-muted" style="--d:1">Every version lists what changed, so you can see where Resurge is heading.</p>
+    <a href="/releases" class="reveal mt-6 inline-flex h-11 items-center rounded-full border border-white/[0.14] px-5 text-[15px] font-medium transition-colors hover:border-white/30 hover:bg-white/[0.06]" style="--d:2">Read the release notes</a>
+  </section>
+</Base>

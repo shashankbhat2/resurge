@@ -1,0 +1,14 @@
+---
+import Base from '../layouts/Base.astro';
+---
+
+<Base title="Not found" description="This page doesn't exist." noindex>
+  <section class="mx-auto max-w-5xl px-6 pt-32 text-center">
+    <p class="reveal font-secondary text-[12px] tracking-[0.14em] text-subtle uppercase">404</p>
+    <h1 class="reveal headline mt-5 text-[clamp(40px,5vw,64px)]" style="--d:1">Nothing here.<br /><span class="text-dim">Let's get you back.</span></h1>
+    <div class="reveal mt-8 flex flex-wrap justify-center gap-3" style="--d:2">
+      <a href="/" class="inline-flex h-12 items-center rounded-full bg-white px-7 font-semibold text-black transition-transform hover:scale-[1.03]">Home</a>
+      <a href="/download" class="inline-flex h-12 items-center rounded-full border border-white/[0.14] px-6 font-medium transition-colors hover:border-white/30 hover:bg-white/[0.06]">Get Resurge</a>
+    </div>
+  </section>
+</Base>

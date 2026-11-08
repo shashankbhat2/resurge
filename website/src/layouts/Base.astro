@@ -1,0 +1,110 @@
+---
+import '../styles/global.css';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+import Waitlist from '../components/Waitlist.astro';
+import Divider from '../components/Divider.astro';
+import { DEFAULT_DESCRIPTION, SITE_NAME, organization, website } from '../lib/seo';
+
+interface Props {
+  title: string;
+  description?: string;
+  /** Page-specific structured data, added to the organization and website on every page. */
+  schema?: object[];
+  /** Keep search engines out (the 404 page). */
+  noindex?: boolean;
+}
+
+const { title, description = DEFAULT_DESCRIPTION, schema = [], noindex = false } = Astro.props;
+const site = Astro.site!;
+const fullTitle = title === SITE_NAME ? 'Resurge: your whole day, one calm coach' : `${title} · Resurge`;
+// Pages are built as story.html and served at /story, so drop any .html from the canonical URL.
+const canonical = new URL(Astro.url.pathname.replace(/\.html$/, '').replace(/\/index$/, '/'), site);
+const ogImage = new URL('/og.jpg', site);
+const jsonLd = { '@context': 'https://schema.org', '@graph': [organization(site), website(site), ...schema] };
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Google Tag Manager -->
+    <script is:inline>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','GTM-TQ4B3SDB');</script>
+    <!-- End Google Tag Manager -->
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    {noindex ? <meta name="robots" content="noindex" /> : <meta name="robots" content="index, follow, max-image-preview:large" />}
+
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="application-name" content={SITE_NAME} />
+    <meta name="apple-mobile-web-app-title" content={SITE_NAME} />
+
+    <link rel="preload" href="/fonts/inter.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/figtree.ttf" as="font" type="font/ttf" crossorigin />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={SITE_NAME} />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Resurge: your whole day, one calm coach. The Recovery screen of the app, scoring 85 and ready to train." />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+    <meta name="twitter:image:alt" content="Resurge: your whole day, one calm coach." />
+
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+  </head>
+  <body class="min-h-screen overflow-x-clip bg-bg text-white">
+    <!-- Google Tag Manager (noscript) -->
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-TQ4B3SDB" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    <!-- End Google Tag Manager (noscript) -->
+    <Nav />
+    <main class="relative">
+      <!-- Two hairline rails down the page, at the edges of the content. -->
+      <div class="rail pointer-events-none absolute inset-y-0 inset-x-0 z-[4] border-x border-white/[0.08]" aria-hidden="true"></div>
+      <slot />
+      <Divider class="mt-24" />
+    </main>
+    <Footer />
+    <Waitlist />
+
+    <script>
+      // Each .reveal element animates in the first time it scrolls into view.
+      const items = document.querySelectorAll<HTMLElement>('.reveal');
+      if (!('IntersectionObserver' in window)) {
+        items.forEach((el) => el.classList.add('is-in'));
+      } else {
+        const io = new IntersectionObserver(
+          (entries) => {
+            for (const e of entries) {
+              if (!e.isIntersecting) continue;
+              e.target.classList.add('is-in');
+              io.unobserve(e.target);
+            }
+          },
+          { rootMargin: '0px 0px -12% 0px', threshold: 0.12 },
+        );
+        items.forEach((el) => io.observe(el));
+      }
+    </script>
+  </body>
+</html>

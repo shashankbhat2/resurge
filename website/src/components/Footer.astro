@@ -1,0 +1,50 @@
+---
+import Divider from './Divider.astro';
+import Logo from './Logo.astro';
+import { REPO } from '../lib/site';
+
+const links = [
+  { href: '/download', label: 'Get Resurge' },
+  { href: '/releases', label: 'Release notes' },
+  { href: '/story', label: 'Story' },
+  { href: REPO, label: 'Source code' },
+  { href: `${REPO}/issues`, label: 'Report an issue' },
+];
+const year = new Date().getFullYear();
+---
+
+<!--
+  The end of the page, in the same black and hairlines: the rails carry on down through it, a
+  closing call to action, then the links as a row of cells and a last line.
+-->
+<footer>
+  <div class="rail reveal border-x border-white/[0.08] px-6 py-28 text-center">
+    <Logo size={72} class="mx-auto" />
+    <h2 class="headline mt-8 text-[clamp(36px,5vw,64px)]">Start tomorrow<br /><span class="text-dim">on a better note.</span></h2>
+    <div class="mt-8 flex justify-center">
+      <button type="button" data-waitlist class="inline-flex h-12 cursor-pointer items-center rounded-full bg-white px-7 font-semibold text-black transition-transform hover:scale-[1.03] active:scale-[0.98]">Join the waitlist</button>
+    </div>
+    <p class="mt-4 text-[13px] text-subtle">
+      Open source on <a href={REPO} class="text-muted underline decoration-white/20 underline-offset-4 transition-colors hover:text-white">GitHub</a>
+    </p>
+  </div>
+
+  <Divider />
+
+  <nav aria-label="Footer" class="rail grid grid-cols-2 gap-px border-x border-white/[0.08] bg-white/[0.08] md:grid-cols-5">
+    {
+      links.map((l) => (
+        <a href={l.href} class="flex h-16 items-center justify-center bg-black px-4 font-secondary text-[13px] text-subtle transition-colors duration-300 last:col-span-2 hover:bg-[#060606] hover:text-white md:last:col-span-1">
+          {l.label}
+        </a>
+      ))
+    }
+  </nav>
+
+  <Divider plain />
+
+  <div class="rail flex h-14 items-center justify-between border-x border-white/[0.08] px-6 font-secondary text-[12px] tracking-[0.08em] text-faint uppercase">
+    <span>© {year} 1477 Labs</span>
+    <span>Resurge · GPL-3.0</span>
+  </div>
+</footer>
