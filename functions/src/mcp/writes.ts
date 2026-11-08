@@ -1,0 +1,189 @@
+import { FieldValue } from "firebase-admin/firestore";
+import { userDoc } from "../lib/firebase";
+import { addDays, isValidTimeZone, localParts } from "../lib/time";
+
+/*
+ * Logging writes for MCP. Each one stores exactly the document shape the Android app writes
+ * (core/data/.../{Meals,Habits}Repository.kt) and passes the same checks as
+ * firestore.rules. The rules use hasOnly() and closed `source` enums, and the app later edits
+ * these documents, so we can't add a source like "mcp" or any extra field. MCP entries are stored
+ * as "manual", like a hand-entered log.
+ */
+
+export const MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack"] as const;
+export const MAX_MEAL_ITEMS = 20; // MealsRepository.MAX_ITEMS / rules
+export const WATER_MAX_ML = 20000; // rules: validWaterDay
+
+/** Nutrition targets on users/{uid}.targets (UserRepository / Targets.kt; rules: validProfile). */
+export const TARGET_DEFAULTS = { calories: 2000, waterMl: 2500, sleepMinutes: 7 * 60, steps: 10_000 };
+export type StoredTargets = typeof TARGET_DEFAULTS;
+
+/** Macro targets the app derives from calories (MacroTargets.from: 30% protein, 40% carbs, 30% fat). Not stored. */
+export function macrosFor(calories: number) {
+  return { protein: Math.round((calories * 0.3) / 4), carbs: Math.round((calories * 0.4) / 4), fat: Math.round((calories * 0.3) / 9) };
+}
+
+export interface MealItemIn { name: string; grams: number; kcal: number; protein: number; carbs: number; fat: number; fiber?: number }
+
+/** Firestore operations, injectable for tests. Paths are relative to users/{uid}. */
+export interface WriteStore {
+  timezone(uid: string): Promise<string>;
+  habitResetTime(uid: string): Promise<string>;
+  create(uid: string, collection: string, data: Record<string, unknown>): Promise<string>;
+  merge(uid: string, collection: string, id: string, data: Record<string, unknown>): Promise<void>;
+  activeHabits(uid: string): Promise<{ id: string; name: string }[]>;
+  /** Current targets with app defaults filled in. */
+  targets(uid: string): Promise<StoredTargets>;
+  /** Merges a patch into targets in a transaction, writing the full map as the app does; returns it. */
+  updateTargets(uid: string, patch: Partial<StoredTargets>): Promise<StoredTargets>;
+  /** Adds ml to a water day inside a transaction; returns the new total, or null if it would exceed max. */
+  addWater(uid: string, date: string, ml: number, max: number): Promise<number | null>;
+}
+
+export const firestoreStore: WriteStore = {
+  async timezone(uid) {
+    const tz = (await userDoc(uid).get()).get("timezone");
+    return isValidTimeZone(tz) ? (tz as string) : "UTC";
+  },
+  async habitResetTime(uid) {
+    const t = (await userDoc(uid).get()).get("habitResetTime");
+    return typeof t === "string" && /^\d{2}:\d{2}$/.test(t) ? t : "04:00";
+  },
+  async create(uid, collection, data) {
+    const ref = userDoc(uid).collection(collection).doc();
+    await ref.set({ ...data, updatedAt: FieldValue.serverTimestamp() });
+    return ref.id;
+  },
+  async merge(uid, collection, id, data) {
+    await userDoc(uid).collection(collection).doc(id).set({ ...data, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  },
+  async activeHabits(uid) {
+    const snap = await userDoc(uid).collection("habits").where("archived", "==", false).get();
+    return snap.docs.map((d) => ({ id: d.id, name: String(d.get("name") ?? "") }));
+  },
+  async targets(uid) {
+    return fillTargets((await userDoc(uid).get()).get("targets"));
+  },
+  async updateTargets(uid, patch) {
+    const ref = userDoc(uid);
+    return ref.firestore.runTransaction(async (tx) => {
+      const next = { ...fillTargets((await tx.get(ref)).get("targets")), ...patch };
+      tx.set(ref, { targets: next, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      return next;
+    });
+  },
+  async addWater(uid, date, ml, max) {
+    const ref = userDoc(uid).collection("waterDays").doc(date);
+    return ref.firestore.runTransaction(async (tx) => {
+      const current = Number((await tx.get(ref)).get("ml") ?? 0);
+      const next = current + ml;
+      if (next < 0 || next > max) return null;
+      tx.set(ref, { date, ml: next, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      return next;
+    });
+  },
+};
+
+/** Resolves an optional ISO time to epoch ms and the user's local date. */
+async function when(store: WriteStore, uid: string, at: string | undefined, nowMs: number) {
+  const ms = at ? Date.parse(at) : nowMs;
+  if (!Number.isFinite(ms)) throw new WriteError("Invalid time; use ISO 8601 such as 2026-11-05T13:30:00+05:30.");
+  if (ms > nowMs + 5 * 60_000) throw new WriteError("Time can't be in the future.");
+  if (ms < nowMs - 366 * 86_400_000) throw new WriteError("Time is more than a year ago.");
+  return { ms, localDate: localParts(await store.timezone(uid), new Date(ms)).date };
+}
+
+/** Like UserRepository.toProfile: missing or non-numeric fields fall back to the app's defaults. */
+export function fillTargets(raw: unknown): StoredTargets {
+  const t = (raw ?? {}) as Record<string, unknown>;
+  const pick = (k: keyof StoredTargets) => (typeof t[k] === "number" ? Math.trunc(t[k] as number) : TARGET_DEFAULTS[k]);
+  return { calories: pick("calories"), waterMl: pick("waterMl"), sleepMinutes: pick("sleepMinutes"), steps: pick("steps") };
+}
+
+export class WriteError extends Error {}
+
+export function createWriter(uid: string, store: WriteStore = firestoreStore, now: () => number = Date.now) {
+  return {
+    /** users/{uid}/meals/{auto}: same shape as MealsRepository.save (items carry nutrition per 100 g). */
+    async logMeal(a: { title?: string; type: (typeof MEAL_TYPES)[number]; at?: string; items?: MealItemIn[];
+      kcal?: number; protein?: number; carbs?: number; fat?: number; fiber?: number }) {
+      const { ms, localDate } = await when(store, uid, a.at, now());
+      let items: MealItemIn[];
+      if (a.items && a.items.length > 0) {
+        items = a.items;
+      } else {
+        if (a.kcal === undefined) throw new WriteError("Give items, or totals with at least kcal.");
+        // Totals only: one 100 g item whose per-100 g values are the totals, so totals read back exactly.
+        items = [{ name: (a.title ?? "Meal").trim() || "Meal", grams: 100, kcal: a.kcal, protein: a.protein ?? 0,
+          carbs: a.carbs ?? 0, fat: a.fat ?? 0, fiber: a.fiber ?? 0 }];
+      }
+      if (items.length > MAX_MEAL_ITEMS) throw new WriteError(`At most ${MAX_MEAL_ITEMS} items.`);
+      const title = ((a.title ?? "").trim() || items[0].name).slice(0, 80);
+      const id = await store.create(uid, "meals", {
+        type: a.type,
+        loggedAtMs: ms,
+        localDate,
+        source: "manual",
+        title,
+        items: items.map((i) => ({
+          name: i.name.slice(0, 60), grams: i.grams, kcal: i.kcal, protein: i.protein, carbs: i.carbs,
+          fat: i.fat, fiber: i.fiber ?? 0, confidence: null,
+        })),
+      });
+      const total = (k: keyof MealItemIn) => Math.round(items.reduce((s, i) => s + (Number(i[k] ?? 0) * i.grams) / 100, 0));
+      return { id, path: `users/${uid}/meals/${id}`, localDate, title, kcal: total("kcal"), protein: total("protein"), carbs: total("carbs"), fat: total("fat") };
+    },
+
+    /** users/{uid}/waterDays/{date}: like MealsRepository.addWater, bounded to the rules' 0..20000 ml. */
+    async logWater(a: { ml: number; date?: string }) {
+      const today = localParts(await store.timezone(uid), new Date(now())).date;
+      const date = a.date ?? today;
+      if (date > today || date < addDays(today, -7)) throw new WriteError("Water can be logged for the last 7 days only.");
+      const total = await store.addWater(uid, date, a.ml, WATER_MAX_ML);
+      if (total === null) throw new WriteError(`That day's water would go outside 0–${WATER_MAX_ML} ml.`);
+      return { path: `users/${uid}/waterDays/${date}`, date, totalMl: total };
+    },
+
+    /**
+     * users/{uid} field `targets`: partial update of the calorie and water targets. The app saves the
+     * whole map {calories, waterMl, sleepMinutes, steps} and the rules require calories 800-6000 and
+     * waterMl 500-8000, so the merged map is written in full. Macros are derived from calories.
+     */
+    async setNutritionTargets(a: { calories?: number; waterMl?: number }) {
+      const patch: Partial<StoredTargets> = {};
+      if (a.calories !== undefined) patch.calories = a.calories;
+      if (a.waterMl !== undefined) patch.waterMl = a.waterMl;
+      if (Object.keys(patch).length === 0) throw new WriteError("Give calories and/or waterMl.");
+      const t = await store.updateTargets(uid, patch);
+      return { path: `users/${uid}`, calories: t.calories, waterMl: t.waterMl, derivedMacrosG: macrosFor(t.calories) };
+    },
+
+    async nutritionTargets() {
+      const t = await store.targets(uid);
+      return { calories: t.calories, waterMl: t.waterMl, derivedMacrosG: macrosFor(t.calories),
+        note: "Macros are derived by the app from calories (30% protein, 40% carbs, 30% fat); micronutrient targets are not stored." };
+    },
+
+    /**
+     * users/{uid}/habitDays/{date}: like HabitsRepository.setStatus. The habit is matched by id or
+     * name (case-insensitive; private habits by cover name). Dates are limited to the current habit
+     * day or the one before (yesterday's grace), inside the rules' window.
+     */
+    async setHabitStatus(a: { habit: string; status: "done" | "missed" | "clear"; date?: string }) {
+      const [tz, reset, habits] = await Promise.all([store.timezone(uid), store.habitResetTime(uid), store.activeHabits(uid)]);
+      const p = localParts(tz, new Date(now()));
+      const habitDay = `${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}` < reset ? addDays(p.date, -1) : p.date;
+      const date = a.date ?? habitDay;
+      if (date !== habitDay && date !== addDays(habitDay, -1)) throw new WriteError(`Only ${habitDay} or ${addDays(habitDay, -1)} can be changed.`);
+      const key = a.habit.trim().toLowerCase();
+      const match = habits.filter((h) => h.id === a.habit || h.name.trim().toLowerCase() === key);
+      if (match.length !== 1) {
+        throw new WriteError(match.length ? "More than one habit has that name; pass its id." :
+          `No active habit "${a.habit}". Active: ${habits.map((h) => h.name).join(", ") || "none"}.`);
+      }
+      const h = match[0];
+      await store.merge(uid, "habitDays", date, { date, entries: { [h.id]: a.status === "clear" ? FieldValue.delete() : a.status } });
+      return { path: `users/${uid}/habitDays/${date}`, date, habitId: h.id, habit: h.name, status: a.status };
+    },
+  };
+}

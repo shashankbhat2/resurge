@@ -6,6 +6,8 @@
  * - analyzeMeal: foods, portions and nutrition from a photo, description, label or barcode, matched
  *   to nutrition tables by a Mastra agent (callable)
  * - lookupBarcode: a packaged product's nutrition by barcode, no model call (callable)
+ * - mcp: MCP server (Streamable HTTP) for AI agents: reads the signed-in user's data and logs meals, water and habit check-ins
+ * - createMcpApiKey / listMcpApiKeys / revokeMcpApiKey: personal API keys for the MCP server (callables)
  */
 import { setGlobalOptions } from "firebase-functions/v2";
 
@@ -16,3 +18,5 @@ export { weeklyInsights } from "./insights/weekly";
 export { coachChat } from "./coach/chat";
 export { analyzeMeal } from "./food/analyze";
 export { lookupBarcode } from "./food/barcode";
+export { mcp } from "./mcp/http";
+export { createMcpApiKey, listMcpApiKeys, revokeMcpApiKey } from "./mcp/apiKeys";
