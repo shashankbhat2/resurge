@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("../src/lib/firebase", () => ({ db: {}, userDoc: () => ({}), DATABASE: "resurge", messaging: () => ({}) }));
 import { toResponse } from "../src/food/schema";
 import { emptyNutrients } from "../src/food/nutrients";
+import { mealSummary } from "../src/lib/data";
 import { formatMeals, formatWorkoutLogs } from "../src/lib/format";
 
 describe("analyzeMeal response", () => {
@@ -20,14 +23,26 @@ describe("analyzeMeal response", () => {
 });
 
 describe("coach food and workout formatting", () => {
-  it("groups meals by day with totals", () => {
-    const text = formatMeals([
-      { date: "2026-10-14", type: "lunch", title: "Dal rice", kcal: 600, protein: 20, carbs: 90, fat: 12, items: ["Rice 180g", "Dal 150g"] },
-      { date: "2026-10-14", type: "breakfast", title: "Oats", kcal: 300, protein: 10, carbs: 50, fat: 6, items: ["Oats 60g"] },
-    ]);
-    expect(text.split("\n")[0]).toBe("2026-10-14: 900 kcal, protein 30 g, carbs 140 g, fat 18 g");
-    expect(text).toContain("lunch: Dal rice — 600 kcal");
-    expect(formatMeals([])).toBe("No meals logged in this period.");
+  it("groups meals and water by day with fibre, micros and a clearly predicted GI/GL", () => {
+    const dal = mealSummary({
+      localDate: "2026-10-14", type: "lunch", title: "Dal rice", loggedAtMs: Date.parse("2026-10-14T07:45:00Z"),
+      items: [{ name: "Dal rice", grams: 100, kcal: 600, protein: 22, carbs: 100, fat: 15, fiber: 8, micros: { sodium: 300, iron: 4 } }],
+    }, "Asia/Kolkata");
+    const apple = mealSummary({
+      localDate: "2026-10-14", type: "snack", title: "Apple", loggedAtMs: Date.parse("2026-10-14T10:00:00Z"),
+      items: [{ name: "Apple", grams: 150, kcal: 52, protein: 0.3, carbs: 14, fat: 0.2, fiber: 2.4, gi: 36 }],
+    }, "Asia/Kolkata");
+    expect(dal).toMatchObject({ time: "13:15", fiber: 8, micros: { sodium: 300, iron: 4 }, glycemic: { gi: 58, gl: 53, band: "high", basis: "predicted" } });
+    expect(apple.glycemic).toMatchObject({ gi: 36, basis: "assistant" });
+    const text = formatMeals([apple, dal], { "2026-10-14": 1500, "2026-10-13": 750 });
+    const lines = text.split("\n");
+    expect(lines[0]).toBe("2026-10-14: 678 kcal, protein 22 g, carbs 121 g, fat 15 g, fibre 12 g · water 1.50 L · predicted day GL ~59 (low)");
+    expect(lines[1]).toBe("  micronutrients: sodium 300 mg, iron 4 mg");
+    expect(text).toContain("lunch 13:15: Dal rice — 600 kcal, P22 C100 F15 fibre 8 g, predicted GI ~58 / GL ~53 (high)");
+    expect(text).toContain("(GI 36 from assistant)");
+    expect(text).toContain("2026-10-13: no meals logged · water 0.75 L");
+    expect(text).toMatch(/Note: GI\/GL are PREDICTED, not measured/);
+    expect(formatMeals([])).toBe("No meals or water logged in this period.");
   });
 
   it("lists logged workouts with strength sets and skips hidden ones", () => {

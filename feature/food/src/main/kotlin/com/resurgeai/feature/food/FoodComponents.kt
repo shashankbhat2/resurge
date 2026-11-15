@@ -181,13 +181,15 @@ internal fun MacroLegendRow(label: String, grams: Double, share: Float, color: C
  * expanded.
  */
 @Composable
-internal fun MicronutrientList(n: Nutrition, collapsed: Int = 5, modifier: Modifier = Modifier) {
-    val rows = Micro.entries.mapNotNull { m -> n[m]?.let { m to it } }
+internal fun MicronutrientList(n: Nutrition, collapsed: Int = 5, modifier: Modifier = Modifier, fiberTarget: Int = 30) {
+    // Fibre leads the list (against the target from calories), then the tracked micronutrients.
+    val fibre = NutrientLine("Fibre", "g", n.fiber, fiberTarget.toDouble(), limit = false).takeIf { n.fiber > 0 }
+    val rows = listOfNotNull(fibre) + Micro.entries.mapNotNull { m -> n[m]?.let { NutrientLine(m.label, m.unit, it, m.daily, m.limit) } }
     if (rows.isEmpty()) return
     var expanded by rememberSaveable { mutableStateOf(false) }
     val shown = if (expanded || rows.size <= collapsed + 1) rows else rows.take(collapsed)
     Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        shown.forEach { (m, value) -> MicroRow(m, value) }
+        shown.forEach { MicroRow(it) }
         if (shown.size < rows.size || expanded) {
             UnstyledButton(
                 onClick = { expanded = !expanded },
@@ -206,8 +208,12 @@ internal fun MicronutrientList(n: Nutrition, collapsed: Int = 5, modifier: Modif
     }
 }
 
+/** One row of [MicronutrientList]: amount and share of the daily guide (or of the limit to stay under). */
+private data class NutrientLine(val label: String, val unit: String, val value: Double, val daily: Double, val limit: Boolean)
+
 @Composable
-private fun MicroRow(m: Micro, value: Double) {
+private fun MicroRow(m: NutrientLine) {
+    val value = m.value
     val share = (value / m.daily).toFloat()
     val amount = when {
         value >= 100 -> "%,d".format(value.roundToInt())

@@ -1,8 +1,8 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { formatInsightList, loadEvents, loadMeals, loadRecentInsights, loadSummaries, loadWorkoutLogs } from "../lib/data";
+import { formatInsightList, loadEvents, loadMeals, loadProfile, loadRecentInsights, loadSummaries, loadWater, loadWorkoutLogs } from "../lib/data";
 import { formatEvents, formatMeals, formatSummaries, formatWorkoutLogs } from "../lib/format";
-import { addDays } from "../lib/time";
+import { addDays, isValidTimeZone, localParts } from "../lib/time";
 
 /*
  * Read-only tools over the user's own Firestore data. Definitions are a constant list in a fixed
@@ -57,7 +57,7 @@ export const COACH_TOOLS: Anthropic.Beta.BetaTool[] = [
   {
     name: "get_meals",
     description:
-      "Meals the user logged (scanned or typed) over the last N days (1-60): per-meal calories, protein, carbs, fat and items, with daily totals. Use for nutrition questions.",
+      "Meals and water the user logged over the last N days (1-60): per-meal calories, protein, carbs, fat, fibre, items and a predicted glycaemic index/load, with daily totals, micronutrients and water. Use for nutrition questions.",
     strict: true,
     input_schema: {
       type: "object",
@@ -82,7 +82,7 @@ export const COACH_TOOLS: Anthropic.Beta.BetaTool[] = [
 
 const SummariesInput = z.object({ from: isoDate, to: isoDate });
 const ActivitiesInput = z.object({ type: z.enum(["workout", "sleep", "any"]), days: z.number().int() });
-const InsightsInput = z.object({ days: z.number().int() });
+const InsightsInput = z.object({ days: z.number().int(), full: z.boolean().optional() });
 
 export interface ToolResult {
   content: string;
@@ -111,14 +111,17 @@ export async function runTool(uid: string, name: string, input: unknown): Promis
       const p = InsightsInput.safeParse(input);
       if (!p.success) return error(`Invalid input: ${p.error.message}`);
       const days = Math.min(Math.max(p.data.days, 1), 60);
-      return { content: formatInsightList(await loadRecentInsights(uid, Date.now() - days * DAY_MS, 40)), isError: false };
+      return { content: formatInsightList(await loadRecentInsights(uid, Date.now() - days * DAY_MS, 40), p.data.full === true), isError: false };
     }
     case "get_meals": {
       const p = InsightsInput.safeParse(input);
       if (!p.success) return error(`Invalid input: ${p.error.message}`);
       const days = Math.min(Math.max(p.data.days, 1), 60);
-      const from = new Date(Date.now() - days * DAY_MS).toISOString().slice(0, 10);
-      return { content: formatMeals(await loadMeals(uid, from)), isError: false };
+      const tz = (await loadProfile(uid)).timezone;
+      const zone = isValidTimeZone(tz) ? (tz as string) : "UTC";
+      const from = addDays(localParts(zone).date, -(days - 1));
+      const [meals, water] = await Promise.all([loadMeals(uid, from, 120, zone), loadWater(uid, from)]);
+      return { content: formatMeals(meals, water), isError: false };
     }
     case "get_workout_logs": {
       const p = InsightsInput.safeParse(input);

@@ -100,7 +100,7 @@ class AuthRepositoryTest {
     @Test fun cacheFailureInTheAccountListenerDoesNotFailSignOut() = runTest {
         val listener = slot<FirebaseAuth.AuthStateListener>()
         every { firebaseAuth.addAuthStateListener(capture(listener)) } just Runs
-        val points = CardioPointsRepository(mockk(), mockk(), cache, firebaseAuth, backgroundScope)
+        val points = CardioPointsRepository(mockk(), mockk(), cache, firebaseAuth, mockk(relaxed = true), backgroundScope)
         every { firebaseAuth.signOut() } answers {
             signedOut = true
             listener.captured.onAuthStateChanged(firebaseAuth)

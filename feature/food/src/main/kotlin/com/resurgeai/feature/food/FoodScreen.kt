@@ -121,7 +121,8 @@ fun FoodScreen(
             ) {
                 item(key = "fuel") { FuelCard(state, onAddWater.takeIf { state.logOnDevice }) }
                 if (!state.logOnDevice) item(key = "mcp") { McpPrompt(onOpenMcpKeys) }
-                if (state.todayTotals.micros.isNotEmpty()) item(key = "micros") { TodayMicros(state.todayTotals) }
+                if (state.todayTotals.micros.isNotEmpty() || state.todayTotals.fiber > 0) item(key = "micros") { TodayMicros(state.todayTotals, state.macroTargets.fiber) }
+                if (state.days.isNotEmpty()) item(key = "glycemic") { GlycemicCard(state) }
                 if (state.days.isEmpty() && state.logOnDevice) item(key = "empty") { EmptyFeed(onLogMeal) }
                 state.days.forEach { day ->
                     val meals = day.slots.flatMap { it.second }
@@ -213,13 +214,13 @@ private fun FuelCard(state: FoodUiState, onAddWater: ((Int) -> Unit)?) {
 
 /** Today's micronutrients from the meals logged so far, against an adult's daily guide. */
 @Composable
-private fun TodayMicros(n: Nutrition) {
+private fun TodayMicros(n: Nutrition, fiberTarget: Int) {
     Column(Modifier.fillMaxWidth().clip(Resurge.shape.lg).background(Resurge.colors.surface).padding(20.dp)) {
-        Overline("Micronutrients today")
+        Overline("Fibre and micronutrients today")
         Spacer(Modifier.height(4.dp))
         Text("From the foods' nutrition tables, as a share of an adult's daily guide", style = Resurge.type.caption, color = Resurge.colors.textSubtle)
         Spacer(Modifier.height(14.dp))
-        MicronutrientList(n, collapsed = 6)
+        MicronutrientList(n, collapsed = 6, fiberTarget = fiberTarget)
     }
 }
 

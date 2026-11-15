@@ -25,11 +25,11 @@ class ManualMealsTest {
 
     @Test
     fun `totals become one 100 g item, like MCP log_meal, so they read back exactly`() {
-        val items = ManualMeals.items("  Dal and rice ", 640.0, 22.0, 98.0, 14.0)
+        val items = ManualMeals.items("  Dal and rice ", 640.0, 22.0, 98.0, 14.0, 9.0)
         assertEquals(1, items.size)
         assertEquals("Dal and rice", items[0].name)
         assertEquals(100.0, items[0].grams, 0.0)
-        assertEquals(Nutrition(640.0, 22.0, 98.0, 14.0), items[0].nutrition)
+        assertEquals(Nutrition(640.0, 22.0, 98.0, 14.0, 9.0), items[0].nutrition)
         assertEquals("Meal", ManualMeals.items(" ", 100.0, 0.0, 0.0, 0.0)[0].name)
     }
 

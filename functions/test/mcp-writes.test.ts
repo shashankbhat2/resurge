@@ -5,6 +5,7 @@ vi.mock("../src/lib/firebase", () => ({ db: {}, userDoc: () => ({}), DATABASE: "
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createMcpServer, type McpDeps } from "../src/mcp/tools";
+import type { StoredWeightGoal, WeighInRow } from "../src/lib/weight";
 import { createWriter, fillTargets, type StoredTargets, type WriteStore } from "../src/mcp/writes";
 
 const NOW = Date.parse("2026-11-05T08:00:00Z"); // 13:30 in Asia/Kolkata
@@ -12,7 +13,8 @@ const NOW = Date.parse("2026-11-05T08:00:00Z"); // 13:30 in Asia/Kolkata
 function memStore(tz = "Asia/Kolkata") {
   const docs: Record<string, Record<string, unknown>> = {};
   const water: Record<string, number> = {};
-  const profile: { targets?: Record<string, unknown> } = { targets: { calories: 2200, steps: 8000 } };
+  const profile: { targets?: Record<string, unknown>; [k: string]: unknown } = { targets: { calories: 2200, steps: 8000 } };
+  const weight: { rows: WeighInRow[]; goal: StoredWeightGoal | null } = { rows: [], goal: null };
   let n = 0;
   const store: WriteStore = {
     timezone: async () => tz,
@@ -23,8 +25,12 @@ function memStore(tz = "Asia/Kolkata") {
     targets: async () => fillTargets(profile.targets),
     updateTargets: async (_u, patch) => { const next: StoredTargets = { ...fillTargets(profile.targets), ...patch }; profile.targets = next; return next; },
     addWater: async (_u, date, ml, max) => { const next = (water[date] ?? 0) + ml; if (next < 0 || next > max) return null; water[date] = next; return next; },
+    updateProfile: async (_u, patch) => { Object.assign(profile, patch); },
+    weighIns: async () => weight.rows,
+    weightGoal: async () => weight.goal,
+    setWeightGoal: async (_u, goal) => { weight.goal = goal; },
   };
-  return { store, docs, water, profile };
+  return { store, docs, water, profile, weight };
 }
 
 const parse = (r: { content: unknown }) => JSON.parse((r.content as { text: string }[])[0].text);
@@ -75,17 +81,55 @@ describe("mcp writes", () => {
     const { store, profile } = memStore();
     const w = createWriter("u1", store, () => NOW);
     expect(await w.setNutritionTargets({ calories: 1800 })).toEqual({
-      path: "users/u1", calories: 1800, waterMl: 2500, derivedMacrosG: { protein: 135, carbs: 180, fat: 60 },
+      path: "users/u1", calories: 1800, waterMl: 2500, sleepMinutes: 420, steps: 8000, derivedMacrosG: { protein: 135, carbs: 180, fat: 60 }, fiberG: 25,
     });
     expect(profile.targets).toEqual({ calories: 1800, waterMl: 2500, sleepMinutes: 420, steps: 8000 });
     await w.setNutritionTargets({ waterMl: 3000 });
     expect(profile.targets).toMatchObject({ calories: 1800, waterMl: 3000, steps: 8000 });
+    await w.setNutritionTargets({ sleepMinutes: 450, steps: 9000 });
+    expect(profile.targets).toEqual({ calories: 1800, waterMl: 3000, sleepMinutes: 450, steps: 9000 });
     await expect(w.setNutritionTargets({})).rejects.toThrow(/calories/);
+  });
+
+  it("log_meal keeps a GI the assistant gives for a food", async () => {
+    const { store, docs } = memStore();
+    await createWriter("u1", store, () => NOW).logMeal({ type: "snack", items: [{ name: "Apple", grams: 150, kcal: 52, protein: 0.3, carbs: 14, fat: 0.2, fiber: 2.4, gi: 36 }] });
+    expect((docs["users/u1/meals/id1"].items as Record<string, unknown>[])[0]).toMatchObject({ name: "Apple", gi: 36, fiber: 2.4 });
+  });
+
+  it("set_profile changes only the fields given", async () => {
+    const { store, profile } = memStore();
+    const w = createWriter("u1", store, () => NOW);
+    expect(await w.setProfile({ goals: ["LOSE_WEIGHT", "EAT_BETTER", "LOSE_WEIGHT"], coachStyle: "commander" })).toEqual({
+      path: "users/u1", updated: { goals: ["LOSE_WEIGHT", "EAT_BETTER"], coachStyle: "commander" },
+    });
+    expect(profile).toMatchObject({ goals: ["LOSE_WEIGHT", "EAT_BETTER"], coachStyle: "commander", targets: { calories: 2200 } });
+    await w.setProfile({ displayName: "  Shashank  ", units: "imperial" });
+    expect(profile).toMatchObject({ displayName: "Shashank", units: "imperial" });
+    await expect(w.setProfile({})).rejects.toThrow(/at least one/);
+  });
+
+  it("set_weight_goal starts from the trend, keeps the start of a goal in progress, maintains and clears", async () => {
+    const { store, weight } = memStore();
+    const w = createWriter("u1", store, () => NOW);
+    await expect(w.setWeightGoal({ mode: "change", goalKg: 70 })).rejects.toThrow(/weigh-in/);
+    weight.rows = [{ kg: 80, atMs: NOW - 10 * 86_400_000, localDate: "2026-10-26" }, { kg: 79, atMs: NOW, localDate: "2026-11-05" }];
+    const first = await w.setWeightGoal({ mode: "change", goalKg: 72, paceKgPerWeek: 0.5 });
+    expect(first.goal).toMatchObject({ startDate: "2026-11-05", goalKg: 72, mode: "change", paceKgPerWeek: 0.5 });
+    const start = (first.goal as StoredWeightGoal).startKg;
+    // Same direction, in progress: keeps the start, changes target and pace.
+    await w.setWeightGoal({ mode: "change", goalKg: 70, paceKgPerWeek: 0.75 });
+    expect(weight.goal).toMatchObject({ startKg: start, goalKg: 70, paceKgPerWeek: 0.75 });
+    await w.setWeightGoal({ mode: "maintain" });
+    expect(weight.goal).toMatchObject({ mode: "maintain", goalKg: 70, startKg: 70 });
+    expect(await w.setWeightGoal({ mode: "clear" })).toMatchObject({ cleared: true });
+    expect(weight.goal).toBeNull();
+    await expect(w.setWeightGoal({ mode: "change" })).rejects.toThrow(/goalKg/);
   });
 
   it("get_nutrition_targets reads targets with derived macros", async () => {
     const r = await createWriter("u1", memStore().store, () => NOW).nutritionTargets();
-    expect(r).toMatchObject({ calories: 2200, waterMl: 2500, derivedMacrosG: { protein: 165, carbs: 220, fat: 73 } });
+    expect(r).toMatchObject({ calories: 2200, waterMl: 2500, sleepMinutes: 420, steps: 8000, derivedMacrosG: { protein: 165, carbs: 220, fat: 73 }, fiberG: 31 });
   });
 
   it("set_nutrition_targets enforces the app's bounds over MCP", async () => {
@@ -111,6 +155,9 @@ describe("mcp writes", () => {
     expect((await client.callTool({ name: "log_water", arguments: { ml: 0 } })).isError).toBe(true);
     expect((await client.callTool({ name: "log_meal", arguments: { type: "brunch", kcal: 100 } })).isError).toBe(true);
     expect((await client.callTool({ name: "log_weight", arguments: { kg: 70 } })).isError).toBe(true);
+    expect((await client.callTool({ name: "set_profile", arguments: { goals: ["GET_RICH"] } })).isError).toBe(true);
+    expect((await client.callTool({ name: "set_nutrition_targets", arguments: { steps: 100 } })).isError).toBe(true);
+    expect((await client.callTool({ name: "set_weight_goal", arguments: { mode: "change", goalKg: 10 } })).isError).toBe(true);
     expect((await client.callTool({ name: "set_habit_status", arguments: { habit: "Gym", status: "done" } })).isError).toBe(true);
     expect(Object.keys(docs)).toHaveLength(0);
     const ok = await client.callTool({ name: "log_water", arguments: { ml: 250 } });

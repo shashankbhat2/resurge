@@ -22,6 +22,10 @@ export interface DailySummary {
   hrMax?: number | null;
   restingHr?: number | null;
   weightKg?: number | null;
+  /** Cardio points the phone calculated for the day (uploaded by app builds from late 2026). */
+  cardioPoints?: number | null;
+  /** True when some cardio points were estimated from the activity type rather than measured. */
+  cardioEstimated?: boolean | null;
 }
 
 export interface ExerciseSessionSummary {

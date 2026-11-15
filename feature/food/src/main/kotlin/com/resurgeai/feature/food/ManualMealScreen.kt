@@ -68,8 +68,8 @@ internal object ManualMeals {
     fun parse(text: CharSequence): Double? = text.toString().trim().replace(',', '.').toDoubleOrNull()?.takeIf { it >= 0 && it.isFinite() }
 
     /** Totals as one 100 g item whose per-100 g values are the totals, as the MCP log_meal tool stores them. */
-    fun items(title: String, kcal: Double, protein: Double, carbs: Double, fat: Double): List<FoodItem> =
-        listOf(FoodItem(title.trim().ifEmpty { "Meal" }.take(60), 100.0, Nutrition(kcal, protein, carbs, fat)))
+    fun items(title: String, kcal: Double, protein: Double, carbs: Double, fat: Double, fiber: Double = 0.0): List<FoodItem> =
+        listOf(FoodItem(title.trim().ifEmpty { "Meal" }.take(60), 100.0, Nutrition(kcal, protein, carbs, fat, fiber)))
 
     /** Totals can be typed over only when the meal is a single entry; itemised meals keep their items. */
     fun totalsEditable(meal: Meal?): Boolean = meal == null || meal.items.size <= 1
@@ -100,7 +100,7 @@ class ManualMealViewModel @Inject constructor(
         }
     }
 
-    fun save(type: MealType, title: String, kcal: Double, protein: Double, carbs: Double, fat: Double) {
+    fun save(type: MealType, title: String, n: Nutrition) {
         val meal = _state.value.meal
         if (meal != null && !ManualMeals.totalsEditable(meal)) {
             meals.save(meal.id, type, meal.loggedAt, meal.source, title.ifBlank { meal.title }, meal.items, meal.thumbnail, null)
@@ -111,7 +111,7 @@ class ManualMealViewModel @Inject constructor(
                 loggedAt = meal?.loggedAt ?: Instant.now(),
                 source = meal?.source ?: MealSource.MANUAL,
                 title = title,
-                items = ManualMeals.items(title, kcal, protein, carbs, fat),
+                items = ManualMeals.items(title, n.kcal, n.protein, n.carbs, n.fat, n.fiber),
                 thumbnail = meal?.thumbnail,
                 aiEstimate = null,
             )
@@ -129,7 +129,7 @@ fun ManualMealRoute(onDone: () -> Unit, viewModel: ManualMealViewModel = hiltVie
     ManualMealScreen(
         state = state,
         onBack = onDone,
-        onSave = { type, title, kcal, p, c, f -> viewModel.save(type, title, kcal, p, c, f); onDone() },
+        onSave = { type, title, n -> viewModel.save(type, title, n); onDone() },
         onDelete = { viewModel.delete(); onDone() },
     )
 }
@@ -138,7 +138,7 @@ fun ManualMealRoute(onDone: () -> Unit, viewModel: ManualMealViewModel = hiltVie
 internal fun ManualMealScreen(
     state: ManualMealState,
     onBack: () -> Unit,
-    onSave: (MealType, String, Double, Double, Double, Double) -> Unit,
+    onSave: (MealType, String, Nutrition) -> Unit,
     onDelete: () -> Unit,
 ) {
     val meal = state.meal
@@ -153,7 +153,7 @@ internal fun ManualMealScreen(
 }
 
 @Composable
-private fun Form(meal: Meal?, onSave: (MealType, String, Double, Double, Double, Double) -> Unit, onDelete: () -> Unit) {
+private fun Form(meal: Meal?, onSave: (MealType, String, Nutrition) -> Unit, onDelete: () -> Unit) {
     val totals = meal?.totals ?: Nutrition.Zero
     var type by rememberSaveable { mutableStateOf(meal?.type ?: MealType.forTime(LocalTime.now(ZoneId.systemDefault()))) }
     val title = remember { TextFieldState(meal?.title.orEmpty()) }
@@ -162,10 +162,12 @@ private fun Form(meal: Meal?, onSave: (MealType, String, Double, Double, Double,
     val protein = remember { field(totals.protein) }
     val carbs = remember { field(totals.carbs) }
     val fat = remember { field(totals.fat) }
+    val fiber = remember { field(totals.fiber) }
     val editable = ManualMeals.totalsEditable(meal)
     val k = ManualMeals.parse(kcal.text)
     val (p, c, f) = Triple(ManualMeals.parse(protein.text), ManualMeals.parse(carbs.text), ManualMeals.parse(fat.text))
-    val canSave = !editable || ManualMeals.valid(k, p, c, f)
+    val fb = ManualMeals.parse(fiber.text)
+    val canSave = !editable || ManualMeals.valid(k, p, c, f, fb)
 
     Column(
         Modifier
@@ -197,6 +199,10 @@ private fun Form(meal: Meal?, onSave: (MealType, String, Double, Double, Double,
                 NumberField("Carbs g", carbs, Modifier.weight(1f))
                 NumberField("Fat g", fat, Modifier.weight(1f))
             }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                NumberField("Fibre g", fiber, Modifier.weight(1f))
+                Spacer(Modifier.weight(1f))
+            }
             Text(
                 "Your AI assistant can log meals item by item through MCP; here it's one line per meal.",
                 style = Resurge.type.caption,
@@ -219,7 +225,7 @@ private fun Form(meal: Meal?, onSave: (MealType, String, Double, Double, Double,
         Spacer(Modifier.height(12.dp))
         Button(
             if (meal != null) "Save changes" else "Log meal",
-            onClick = { onSave(type, title.text.toString(), k ?: 0.0, p ?: 0.0, c ?: 0.0, f ?: 0.0) },
+            onClick = { onSave(type, title.text.toString(), Nutrition(k ?: 0.0, p ?: 0.0, c ?: 0.0, f ?: 0.0, fb ?: 0.0)) },
             enabled = canSave,
             modifier = Modifier.fillMaxWidth(),
         )

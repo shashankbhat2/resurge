@@ -46,6 +46,7 @@ class CardioPointsRepository @Inject constructor(
     private val manager: HealthConnectManager,
     private val cache: CardioPointsCache,
     private val auth: FirebaseAuth,
+    private val uploader: CardioSummaryUploader,
     @param:ApplicationScope private val scope: CoroutineScope,
 ) {
     private val mutableState = MutableStateFlow(CardioPointsState())
@@ -149,6 +150,8 @@ class CardioPointsRepository @Inject constructor(
             mutableState.value = CardioPointsState(days.map { it.summary }, false,
                 if (failed) CardioStatus.STALE else summaryStatus(baseStatus, days.map { it.summary }),
                 zone = zone.id)
+            // Day totals go to the daily summaries so the coach and MCP can read them.
+            if (!failed) uploader.upload(uid, days.map { it.summary })
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {

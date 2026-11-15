@@ -34,7 +34,7 @@ class FoodScreenshotTest {
     private val today = LocalDate.of(2026, 10, 14)
     private val zone = ZoneId.systemDefault()
     private fun item(name: String, g: Double, kcal: Double, p: Double, c: Double, f: Double, conf: Double = 0.9, source: FoodSource? = null, micros: Map<Micro, Double> = emptyMap()) =
-        FoodItem(name, g, Nutrition(kcal, p, c, f, micros = micros), conf, source)
+        FoodItem(name, g, Nutrition(kcal, p, c, f, fiber = c * 0.08, micros = micros), conf, source)
 
     private fun meal(id: String, type: MealType, hour: Int, title: String, source: MealSource, vararg items: FoodItem) =
         Meal(id, type, today.atTime(hour, 15).atZone(zone).toInstant(), today, source, title, items.toList())
@@ -84,7 +84,7 @@ class FoodScreenshotTest {
     @Test fun empty() = capture("empty", feed(state.copy(days = emptyList(), todayTotals = Nutrition.Zero, waterMl = 0, logOnDevice = true)))
 
     private fun manual(s: ManualMealState) = @androidx.compose.runtime.Composable {
-        ManualMealScreen(s, onBack = {}, onSave = { _, _, _, _, _, _ -> }, onDelete = {})
+        ManualMealScreen(s, onBack = {}, onSave = { _, _, _ -> }, onDelete = {})
     }
 
     @Test fun manualNew() = capture("manual_new", manual(ManualMealState()))

@@ -76,6 +76,6 @@ class FitnessFoodTest {
 
     @Test
     fun `macro targets split the calorie target 30-40-30`() {
-        assertEquals(MacroTargets(protein = 150, carbs = 200, fat = 67), MacroTargets.from(2000))
+        assertEquals(MacroTargets(protein = 150, carbs = 200, fat = 67, fiber = 28), MacroTargets.from(2000))
     }
 }
