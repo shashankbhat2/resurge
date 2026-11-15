@@ -10,7 +10,32 @@ describe("format", () => {
     const lines = text.split("\n");
     expect(lines).toHaveLength(3);
     expect(lines[1].startsWith("2026-10-09 | 6000")).toBe(true);
-    expect(lines[2]).toBe("2026-10-10 | 8412 | 5.8 | 2380/540 | 7h34 (80/66/290/18) | - | 58/72/52-141 | -");
+    expect(lines[2]).toBe("2026-10-10 | 8412 | 5.8 | 2380/540 | 7h34/- (80/66/290/18) | - | 58/72/52-141 | - | -");
+    expect(lines[1]).toBe("2026-10-09 | 6000 | - | -/- | - | - | -/-/--- | - | -");
+  });
+
+  it("shows time asleep and each exercise session", () => {
+    const [, line] = formatSummaries([
+      {
+        date: "2026-11-14", sleepMin: 470, asleepMin: 441, sleepStages: null, exerciseMin: 77,
+        exerciseTypes: ["Running", "Strength training"],
+        exerciseSessions: [
+          { type: "Running", title: null, start: "07:00", durationMin: 32 },
+          { type: "Strength training", title: "Push day", start: "18:00", durationMin: 45 },
+        ],
+      },
+    ]).split("\n");
+    expect(line).toBe('2026-11-14 | - | - | -/- | 7h50/7h21 | 77 (Running 07:00 32, Strength training "Push day" 18:00 45) | -/-/--- | - | -');
+  });
+
+  it("shows cardio points the phone uploaded", () => {
+    const [, line] = formatSummaries([{ date: "2026-11-02", cardioPoints: 42, cardioEstimated: true }]).split("\n");
+    expect(line.endsWith("| 42 (incl. estimates)")).toBe(true);
+  });
+
+  it("falls back to activity types for summaries without sessions", () => {
+    const [, line] = formatSummaries([{ date: "2026-11-01", exerciseMin: 40, exerciseTypes: ["Walking"] }]).split("\n");
+    expect(line).toContain("| 40 (Walking) |");
   });
 
   it("says when there is no data", () => {

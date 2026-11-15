@@ -43,6 +43,8 @@ import com.resurgeai.core.designsystem.components.Divider
 import com.resurgeai.core.designsystem.components.Icon
 import com.resurgeai.core.designsystem.components.MacroVisuals
 import com.resurgeai.core.designsystem.components.ResurgeIcons
+import com.resurgeai.core.designsystem.components.MagnitudeBar
+import com.resurgeai.core.designsystem.components.WindowBar
 import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.model.FoodItem
 import com.resurgeai.core.model.Micro
@@ -70,14 +72,14 @@ internal data class MacroShares(val protein: Float, val carbs: Float, val fat: F
 internal fun MacroSplit(n: Nutrition, modifier: Modifier = Modifier) {
     val shares = MacroShares.of(n)
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Row(
-            Modifier.weight(1f).height(6.dp).clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted),
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            listOf(shares.protein to MacroVisuals.protein(), shares.carbs to MacroVisuals.carbs(), shares.fat to MacroVisuals.fat())
-                .filter { it.first > 0f }
-                .forEach { (share, color) -> Box(Modifier.weight(share).fillMaxHeight().background(color)) }
-        }
+        WindowBar(
+            start = 0f,
+            end = 1f,
+            segments = listOf(shares.protein to MacroVisuals.protein(), shares.carbs to MacroVisuals.carbs(), shares.fat to MacroVisuals.fat())
+                .filter { it.first > 0f },
+            modifier = Modifier.weight(1f),
+            height = 8.dp,
+        )
         Spacer(Modifier.width(10.dp))
         Text(
             "${n.protein.roundToInt()}p · ${n.carbs.roundToInt()}c · ${n.fat.roundToInt()}f",
@@ -179,13 +181,15 @@ internal fun MacroLegendRow(label: String, grams: Double, share: Float, color: C
  * expanded.
  */
 @Composable
-internal fun MicronutrientList(n: Nutrition, collapsed: Int = 5, modifier: Modifier = Modifier) {
-    val rows = Micro.entries.mapNotNull { m -> n[m]?.let { m to it } }
+internal fun MicronutrientList(n: Nutrition, collapsed: Int = 5, modifier: Modifier = Modifier, fiberTarget: Int = 30) {
+    // Fibre leads the list (against the target from calories), then the tracked micronutrients.
+    val fibre = NutrientLine("Fibre", "g", n.fiber, fiberTarget.toDouble(), limit = false).takeIf { n.fiber > 0 }
+    val rows = listOfNotNull(fibre) + Micro.entries.mapNotNull { m -> n[m]?.let { NutrientLine(m.label, m.unit, it, m.daily, m.limit) } }
     if (rows.isEmpty()) return
     var expanded by rememberSaveable { mutableStateOf(false) }
     val shown = if (expanded || rows.size <= collapsed + 1) rows else rows.take(collapsed)
     Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        shown.forEach { (m, value) -> MicroRow(m, value) }
+        shown.forEach { MicroRow(it) }
         if (shown.size < rows.size || expanded) {
             UnstyledButton(
                 onClick = { expanded = !expanded },
@@ -204,8 +208,12 @@ internal fun MicronutrientList(n: Nutrition, collapsed: Int = 5, modifier: Modif
     }
 }
 
+/** One row of [MicronutrientList]: amount and share of the daily guide (or of the limit to stay under). */
+private data class NutrientLine(val label: String, val unit: String, val value: Double, val daily: Double, val limit: Boolean)
+
 @Composable
-private fun MicroRow(m: Micro, value: Double) {
+private fun MicroRow(m: NutrientLine) {
+    val value = m.value
     val share = (value / m.daily).toFloat()
     val amount = when {
         value >= 100 -> "%,d".format(value.roundToInt())
@@ -226,12 +234,7 @@ private fun MicroRow(m: Micro, value: Double) {
             )
         }
         Spacer(Modifier.height(5.dp))
-        Box(Modifier.fillMaxWidth().height(4.dp).clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted)) {
-            Box(
-                Modifier.fillMaxHeight().fillMaxWidth(share.coerceIn(0.02f, 1f)).clip(Resurge.shape.pill)
-                    .background(if (m.limit) Resurge.colors.textMuted else Resurge.colors.accent),
-            )
-        }
+        MagnitudeBar(share.coerceIn(0.02f, 1f), if (m.limit) Resurge.colors.textMuted else Resurge.colors.accent, height = 4.dp)
     }
 }
 

@@ -32,6 +32,8 @@ data class ProfileUiState(
     val timeFormat: TimeFormat? = null,
     /** The paired smart scale's model, "2 scales" for several, null when none is set up. */
     val smartScale: String? = null,
+    /** Meals can be logged in the app (device-local; off = meals come from the AI assistant over MCP). */
+    val logMealsOnDevice: Boolean = false,
 )
 
 @HiltViewModel
@@ -50,7 +52,8 @@ class ProfileViewModel @Inject constructor(
         preferencesRepository.themePreference,
         preferencesRepository.timeFormat,
         scaleStore.settings,
-    ) { session, theme, timeFormat, scales ->
+        preferencesRepository.logMealsOnDevice,
+    ) { session, theme, timeFormat, scales, logMeals ->
         ProfileUiState(
             profile = (session as? SessionState.Ready)?.profile,
             theme = theme,
@@ -60,11 +63,16 @@ class ProfileViewModel @Inject constructor(
                 1 -> scales.scales.single().model
                 else -> "${scales.scales.size} scales"
             },
+            logMealsOnDevice = logMeals,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProfileUiState())
 
     fun setTheme(theme: ThemePreference) {
         viewModelScope.launch { preferencesRepository.setThemePreference(theme) }
+    }
+
+    fun setLogMealsOnDevice(enabled: Boolean) {
+        viewModelScope.launch { preferencesRepository.setLogMealsOnDevice(enabled) }
     }
 
     fun setTimeFormat(format: TimeFormat) {

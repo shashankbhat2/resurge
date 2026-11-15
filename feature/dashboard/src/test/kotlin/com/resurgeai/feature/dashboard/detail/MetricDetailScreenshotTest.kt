@@ -26,7 +26,7 @@ import java.time.ZoneId
 /** Renders detail screens with synthetic data. Record with :feature:dashboard:recordRoborazziDebug. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35], qualifiers = "w400dp-h1900dp-xhdpi")
+@Config(sdk = [35], qualifiers = "w400dp-h2300dp-xhdpi")
 class MetricDetailScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
@@ -83,6 +83,7 @@ class MetricDetailScreenshotTest {
             metric = metric, range = range, loading = false, series = series, periods = periods,
             selected = periods.lastIndex,
             sleepSessions = if (metric == HealthMetric.SLEEP) sleepNights(days) else emptyList(),
+            patternNights = if (metric == HealthMetric.SLEEP) sleepNights(MetricDetailViewModel.PATTERN_NIGHTS) else emptyList(),
             exerciseSessions = if (metric == HealthMetric.EXERCISE) workouts else emptyList(),
             heartRanges = if (metric == HealthMetric.HEART_RATE) (0 until days).associate { first.plusDays(it.toLong()) to (50L + it % 5 to 120L + (it * 7) % 45) } else emptyMap(),
         )

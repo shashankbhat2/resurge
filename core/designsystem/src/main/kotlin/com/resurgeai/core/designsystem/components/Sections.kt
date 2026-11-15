@@ -50,7 +50,7 @@ fun SectionLabel(title: String, modifier: Modifier = Modifier, trailing: String?
 }
 
 /**
- * One cell of a card footer: an icon in a 36dp circle, a value in Bricolage and a caption label.
+ * One cell of a card footer: an icon in a 36dp circle, a value in the metric style and a caption label.
  * Footers put two side by side, end to end, split by a hairline. Tappable when [onClick] is set.
  */
 @Composable

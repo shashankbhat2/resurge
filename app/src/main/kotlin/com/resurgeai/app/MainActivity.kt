@@ -89,6 +89,7 @@ class MainActivity : ComponentActivity() {
                     val openInsights by viewModel.openInsights.collectAsStateWithLifecycle()
                     val openHabits by viewModel.openHabits.collectAsStateWithLifecycle()
                     val openFood by viewModel.openFood.collectAsStateWithLifecycle()
+                    val logMealsOnDevice by viewModel.logMealsOnDevice.collectAsStateWithLifecycle()
                     val openProgress by viewModel.openProgress.collectAsStateWithLifecycle()
                     val openWeight by viewModel.openWeight.collectAsStateWithLifecycle()
                     val askNotifications by viewModel.askNotifications.collectAsStateWithLifecycle()
@@ -98,6 +99,7 @@ class MainActivity : ComponentActivity() {
                             openInsightsSignal = openInsights,
                             openHabitsSignal = openHabits,
                             openFoodSignal = openFood,
+                            logMealsOnDevice = logMealsOnDevice,
                             openProgressSignal = openProgress,
                             openWeightSignal = openWeight,
                             askNotifications = askNotifications,
@@ -119,9 +121,8 @@ class MainActivity : ComponentActivity() {
         when (intent?.getStringExtra(ResurgeMessagingService.EXTRA_OPEN)) {
             ResurgeMessagingService.OPEN_INSIGHTS -> viewModel.requestOpenInsights()
             HabitReminder.OPEN_HABITS -> viewModel.requestOpenHabits()
-            MealReminder.OPEN_SCAN -> viewModel.requestOpenFood("scan")
-            MealReminder.OPEN_TYPE -> viewModel.requestOpenFood("type")
-            MealReminder.OPEN_FOOD -> viewModel.requestOpenFood(null)
+            // Scan / Type come from reminders posted by older builds; all of them open the Food tab now.
+            MealReminder.OPEN_SCAN, MealReminder.OPEN_TYPE, MealReminder.OPEN_FOOD -> viewModel.requestOpenFood(null)
             ProgressShortcut.OPEN_CAPTURE -> viewModel.requestOpenProgress(capture = true)
             ProgressShortcut.OPEN_PROGRESS -> viewModel.requestOpenProgress(capture = false)
             ReelReminder.OPEN_REEL -> viewModel.requestOpenProgress(capture = false, reelId = intent.getStringExtra(ReelReminder.EXTRA_REEL))
@@ -155,6 +156,7 @@ private fun AppRoot(
     openInsightsSignal: Int,
     openHabitsSignal: Int,
     openFoodSignal: FoodSignal,
+    logMealsOnDevice: Boolean,
     openProgressSignal: ProgressSignal,
     openWeightSignal: WeightSignal,
     askNotifications: Boolean,
@@ -178,6 +180,7 @@ private fun AppRoot(
                     openInsightsSignal = openInsightsSignal,
                     openHabitsSignal = openHabitsSignal,
                     openFoodSignal = openFoodSignal,
+                    logMealsOnDevice = logMealsOnDevice,
                     openProgressSignal = openProgressSignal,
                     openWeightSignal = openWeightSignal,
                 )

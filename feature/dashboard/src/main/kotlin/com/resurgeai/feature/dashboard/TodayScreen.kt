@@ -54,7 +54,7 @@ import java.time.LocalDate
 fun TodayRoute(
     onOpenMetric: (HealthMetric) -> Unit,
     onOpenInsights: () -> Unit,
-    onOpenMeal: (String) -> Unit = {},
+    onOpenMeal: ((String) -> Unit)? = null,
     onOpenWorkout: (String) -> Unit = {},
     onOpenHabit: (String) -> Unit = {},
     onAddHabit: () -> Unit = {},
@@ -112,7 +112,7 @@ fun TodayScreen(
     onRetry: () -> Unit,
     onOpenMetric: (HealthMetric) -> Unit,
     onOpenInsights: () -> Unit = {},
-    onOpenMeal: (String) -> Unit = {},
+    onOpenMeal: ((String) -> Unit)? = null,
     onOpenWorkout: (String) -> Unit = {},
     onToggleHabit: (String) -> Unit = {},
     onOpenHabit: (String) -> Unit = {},
@@ -206,7 +206,11 @@ fun TodayScreen(
                 )
                 PermissionState.PARTIAL, PermissionState.ALL -> {
                     if (state.permissions == PermissionState.PARTIAL) {
-                        PartialBanner(onConnect)
+                        PartialBanner("Some data types are turned off.", "Review", onConnect)
+                        Spacer(Modifier.height(12.dp))
+                    } else if (state.backgroundOff) {
+                        // The permission request includes background reads, so the same flow fixes it.
+                        PartialBanner("Background sync is off: data only updates while Resurge is open.", "Allow", onConnect)
                         Spacer(Modifier.height(12.dp))
                     }
                     state.error?.let {
@@ -280,16 +284,16 @@ private fun InfoCard(
 }
 
 @Composable
-private fun PartialBanner(onManage: () -> Unit) {
+private fun PartialBanner(message: String, action: String, onManage: () -> Unit) {
     Card(Modifier.fillMaxWidth(), contentPadding = PaddingValues(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "Some data types are turned off.",
+                message,
                 style = Resurge.type.label,
                 color = Resurge.colors.textMuted,
                 modifier = Modifier.weight(1f),
             )
-            Button("Review", onClick = onManage, variant = ButtonVariant.Ghost)
+            Button(action, onClick = onManage, variant = ButtonVariant.Ghost)
         }
     }
 }

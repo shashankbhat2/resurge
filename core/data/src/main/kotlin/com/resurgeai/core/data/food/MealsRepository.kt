@@ -204,6 +204,7 @@ class MealsRepository @Inject constructor(
             put("fat", per100g.fat)
             put("fiber", per100g.fiber)
             put("confidence", confidence)
+            glycemicIndex?.let { put("gi", it) }
             if (per100g.micros.isNotEmpty()) put("micros", per100g.micros.mapKeys { it.key.wire })
             source?.let { s ->
                 put("source", mapOf("id" to s.id.take(80), "name" to s.name.take(60), "detail" to s.detail?.take(200), "verified" to s.verified))
@@ -244,6 +245,7 @@ class MealsRepository @Inject constructor(
                 per100g = Nutrition(num("kcal"), num("protein"), num("carbs"), num("fat"), num("fiber"), micros),
                 confidence = (m["confidence"] as? Number)?.toDouble(),
                 source = sourceFrom(m["source"]) ?: sourceFrom(m),
+                glycemicIndex = (m["gi"] as? Number)?.toDouble()?.takeIf { it in 0.0..110.0 },
             )
         }
 

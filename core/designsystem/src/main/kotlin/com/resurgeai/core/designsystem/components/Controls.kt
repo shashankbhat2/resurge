@@ -34,7 +34,9 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
 import com.composeunstyled.TextInput
@@ -49,7 +51,7 @@ import java.time.LocalTime
 
 data class SegmentOption<T>(val value: T, val label: String, @DrawableRes val icon: Int? = null)
 
-/** Single-choice pill switcher (e.g. Day / Week / Month, System / Light / Dark). */
+/** Single-choice switcher in caps, squared like the buttons (e.g. Day / Week / Month, System / Light / Dark). */
 @Composable
 fun <T> SegmentedControl(
     options: List<SegmentOption<T>>,
@@ -59,10 +61,10 @@ fun <T> SegmentedControl(
 ) {
     Row(
         modifier = modifier
-            .clip(Resurge.shape.pill)
+            .clip(Resurge.shape.sm)
             .background(Resurge.colors.inverse)
-            .border(1.dp, Resurge.colors.border.copy(alpha = 0.6f), Resurge.shape.pill)
-            .padding(5.dp),
+            .border(1.dp, Resurge.colors.border.copy(alpha = 0.6f), Resurge.shape.sm)
+            .padding(3.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         options.forEach { option ->
@@ -73,9 +75,9 @@ fun <T> SegmentedControl(
                 modifier = Modifier
                     .weight(1f)
                     .semantics { this.selected = isSelected }
-                    .clip(Resurge.shape.pill)
+                    .clip(Resurge.shape.sm)
                     .background(if (isSelected) Resurge.colors.strong else Color.Transparent),
-                contentPadding = PaddingValues(vertical = 10.dp, horizontal = 12.dp),
+                contentPadding = PaddingValues(vertical = 10.dp, horizontal = 4.dp),
                 indication = LocalIndication.current,
             ) {
                 val color = if (isSelected) Resurge.colors.onStrong else Resurge.colors.onInverseMuted
@@ -84,7 +86,7 @@ fun <T> SegmentedControl(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     option.icon?.let { Icon(it, contentDescription = null, tint = color, size = 16.dp) }
-                    Text(option.label, style = Resurge.type.label, color = color)
+                    Text(option.label.uppercase(), style = Resurge.type.overline, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
@@ -414,6 +416,7 @@ fun InputField(
     modifier: Modifier = Modifier,
     maxLength: Int = 60,
     onDone: (() -> Unit)? = null,
+    keyboardType: KeyboardType = KeyboardType.Text,
 ) {
     UnstyledTextField(
         state = state,
@@ -428,7 +431,7 @@ fun InputField(
         cursorBrush = SolidColor(Resurge.colors.accent),
         lineLimits = TextFieldLineLimits.SingleLine,
         inputTransformation = InputTransformation.maxLength(maxLength),
-        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, keyboardType = keyboardType, imeAction = ImeAction.Done),
         onKeyboardAction = { onDone?.invoke() },
         accessibilityLabel = placeholder,
     ) {

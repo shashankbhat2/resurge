@@ -66,6 +66,8 @@ data class DashboardUiState(
     val profile: UserProfile? = null,
     val availability: HealthConnectAvailability? = null,
     val permissions: PermissionState = PermissionState.UNKNOWN,
+    /** Background reads are supported but not granted: nothing syncs while the app is closed. */
+    val backgroundOff: Boolean = false,
     val loading: Boolean = false,
     val today: DailyHealth? = null,
     val sparklines: Map<HealthMetric, List<Double?>> = emptyMap(),
@@ -285,7 +287,8 @@ class DashboardViewModel @Inject constructor(
             granted.any { it in HealthPermissions.READ } -> PermissionState.PARTIAL
             else -> PermissionState.NONE
         }
-        _state.update { it.copy(permissions = permissionState) }
+        val backgroundOff = HealthPermissions.BACKGROUND !in granted && healthConnect.isBackgroundReadSupported()
+        _state.update { it.copy(permissions = permissionState, backgroundOff = backgroundOff) }
         if (permissionState == PermissionState.NONE) return streakEngine.updateHealth(noHealth)
 
         _state.update { it.copy(loading = true) }

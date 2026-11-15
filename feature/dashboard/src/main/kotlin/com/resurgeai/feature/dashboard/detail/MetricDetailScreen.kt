@@ -84,6 +84,10 @@ fun MetricDetailScreen(
                 .weight(1f)
                 .verticalScroll(rememberScrollState()),
         ) {
+            if (state.metric == HealthMetric.SLEEP && state.patternNights.isNotEmpty()) {
+                SleepPatternSection(state.patternNights, zone, Modifier.padding(horizontal = 16.dp))
+                Spacer(Modifier.height(28.dp))
+            }
             SegmentedControl(
                 options = DetailRange.entries.map { SegmentOption(it, it.label) },
                 selected = state.range,

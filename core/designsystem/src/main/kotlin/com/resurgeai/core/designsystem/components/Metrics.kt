@@ -116,7 +116,10 @@ fun MetricCard(
     }
 }
 
-/** Minimal trend line; nulls are skipped. Last point is marked with a dot. */
+/**
+ * Minimal trend as a dotted trail; nulls are skipped. Dots brighten toward the latest value, which
+ * gets the largest dot.
+ */
 @Composable
 fun Sparkline(
     values: List<Double?>,
@@ -131,23 +134,34 @@ fun Sparkline(
         val max = points.maxOf { it.value!! }
         val span = (max - min).takeIf { it > 0 } ?: 1.0
         val stepX = size.width / (values.size - 1).coerceAtLeast(1)
-        val pad = strokeWidth.toPx() * 2
+        val r = strokeWidth.toPx() * 0.9f
+        val pad = r * 3
         fun y(v: Double) = (pad + (size.height - pad * 2) * (1 - (v - min) / span)).toFloat()
 
-        val path = Path()
-        points.forEachIndexed { i, p ->
-            val x = p.index * stepX
-            if (i == 0) path.moveTo(x, y(p.value!!)) else path.lineTo(x, y(p.value!!))
+        // Faint dots between samples so the trail reads as one line of stipple.
+        for (i in 0 until points.lastIndex) {
+            val a = points[i]
+            val b = points[i + 1]
+            val ax = a.index * stepX
+            val bx = b.index * stepX
+            val n = ((bx - ax) / (r * 3.2f)).toInt().coerceAtLeast(1)
+            for (k in 1 until n) {
+                val t = k / n.toFloat()
+                drawCircle(color.copy(alpha = 0.28f), radius = r * 0.55f, center = Offset(ax + (bx - ax) * t, y(a.value!!) + (y(b.value!!) - y(a.value!!)) * t))
+            }
         }
-        drawPath(path, color, style = Stroke(strokeWidth.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        points.forEachIndexed { i, p ->
+            val fade = 0.45f + 0.55f * (i / points.lastIndex.toFloat())
+            drawCircle(color.copy(alpha = fade), radius = r, center = Offset(p.index * stepX, y(p.value!!)))
+        }
         val last = points.last()
-        drawCircle(color, radius = strokeWidth.toPx() * 1.6f, center = Offset(last.index * stepX, y(last.value!!)))
+        drawCircle(color, radius = r * 1.9f, center = Offset(last.index * stepX, y(last.value!!)))
     }
 }
 
 /**
- * Vertical bar chart with day labels. Null values render as an empty track.
- * [highlightIndex] (default: last) is drawn in full colour, others at reduced alpha.
+ * Vertical chart of stacked dots with day labels, like a dot-matrix display. Null values show only
+ * the dim track. [highlightIndex] (default: last) is drawn in full colour, others at reduced alpha.
  */
 @Composable
 fun BarChart(
@@ -159,7 +173,7 @@ fun BarChart(
     target: Double? = null,
     chartHeight: Dp = 160.dp,
 ) {
-    val track = Resurge.colors.surfaceMuted
+    val track = Resurge.colors.border
     val targetColor = Resurge.colors.textSubtle
     Column(modifier) {
         Canvas(
@@ -170,19 +184,20 @@ fun BarChart(
             val max = (values.mapNotNull { it } + listOfNotNull(target)).maxOrNull()?.takeIf { it > 0 } ?: 1.0
             val count = values.size.coerceAtLeast(1)
             val slot = size.width / count
-            val barWidth = (slot * 0.56f).coerceAtMost(28.dp.toPx())
-            val radius = CornerRadius(barWidth / 2, barWidth / 2)
+            val pitch = 6.dp.toPx()
+            val r = 1.6.dp.toPx()
+            val rows = (size.height / pitch).toInt().coerceAtLeast(1)
+            val cols = ((slot * 0.6f) / pitch).toInt().coerceIn(1, 4)
             values.forEachIndexed { i, v ->
-                val left = slot * i + (slot - barWidth) / 2
-                drawRoundRect(track, topLeft = Offset(left, 0f), size = Size(barWidth, size.height), cornerRadius = radius)
-                if (v != null && v > 0) {
-                    val h = (size.height * (v / max)).toFloat().coerceAtLeast(barWidth)
-                    drawRoundRect(
-                        color = if (i == highlightIndex) color else color.copy(alpha = 0.45f),
-                        topLeft = Offset(left, size.height - h),
-                        size = Size(barWidth, h),
-                        cornerRadius = radius,
-                    )
+                val filled = if (v != null && v > 0) ((v / max) * rows).toInt().coerceAtLeast(1) else 0
+                val dotColor = if (i == highlightIndex) color else color.copy(alpha = 0.5f)
+                val left = slot * i + (slot - (cols - 1) * pitch) / 2
+                for (row in 0 until rows) {
+                    val cy = size.height - r - row * pitch
+                    for (c in 0 until cols) {
+                        val on = row < filled
+                        drawCircle(if (on) dotColor else track, radius = if (on) r else r * 0.7f, center = Offset(left + c * pitch, cy))
+                    }
                 }
             }
             target?.let {
@@ -192,7 +207,7 @@ fun BarChart(
                     start = Offset(0f, y),
                     end = Offset(size.width, y),
                     strokeWidth = 1.dp.toPx(),
-                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f)),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 4.dp.toPx())),
                 )
             }
         }
@@ -200,7 +215,7 @@ fun BarChart(
         Row(Modifier.fillMaxWidth()) {
             labels.forEachIndexed { i, label ->
                 Text(
-                    label,
+                    label.uppercase(),
                     style = Resurge.type.caption,
                     color = if (i == highlightIndex) Resurge.colors.text else Resurge.colors.textSubtle,
                     textAlign = TextAlign.Center,

@@ -60,7 +60,7 @@ import com.resurgeai.core.model.UnitSystem
 import com.resurgeai.core.model.ThemePreference
 import com.resurgeai.core.model.TimeFormat
 
-private enum class Page(val title: String) {
+internal enum class Page(val title: String) {
     MAIN("Settings"),
     APPEARANCE("Appearance"),
     TIME_FORMAT("Time format"),
@@ -84,11 +84,13 @@ fun SettingsScreen(
     onOpenSmartScale: (() -> Unit)? = null,
     /** Shown at the bottom of the menu; the app passes its own version. */
     versionName: String = "",
+    /** Open straight on the MCP API keys page (from the Food tab's MCP prompt). */
+    openMcpKeys: Boolean = false,
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    var page by rememberSaveable { mutableStateOf(Page.MAIN) }
+    var page by rememberSaveable { mutableStateOf(if (openMcpKeys) Page.MCP_KEYS else Page.MAIN) }
     BackHandler(enabled = page != Page.MAIN) { page = Page.MAIN }
 
     Column(Modifier.fillMaxSize().background(Resurge.colors.bg)) {
@@ -116,6 +118,7 @@ fun SettingsScreen(
                     onOpenSmartScale = onOpenSmartScale,
                     versionName = versionName,
                     onSignOut = viewModel::signOut,
+                    onLogMealsChange = viewModel::setLogMealsOnDevice,
                 )
                 Page.APPEARANCE -> Options(
                     options = listOf(ThemePreference.SYSTEM to "System", ThemePreference.LIGHT to "Light", ThemePreference.DARK to "Dark"),
@@ -155,7 +158,7 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun MainMenu(
+internal fun MainMenu(
     state: ProfileUiState,
     onOpen: (Page) -> Unit,
     onHealthConnect: () -> Unit,
@@ -164,6 +167,7 @@ private fun MainMenu(
     onOpenSmartScale: (() -> Unit)?,
     versionName: String,
     onSignOut: () -> Unit,
+    onLogMealsChange: (Boolean) -> Unit,
 ) {
     val profile = state.profile
     val use24 = LocalUse24HourClock.current
@@ -211,6 +215,13 @@ private fun MainMenu(
             MenuRow("Health Connect", "Permissions", onClick = onHealthConnect)
             MenuDivider()
             MenuRow("MCP API keys", "For AI agents") { onOpen(Page.MCP_KEYS) }
+            MenuDivider()
+            ToggleRow(
+                "Log meals on this device",
+                if (state.logMealsOnDevice) "Manual entry in the Food tab" else "Off: meals come from your AI assistant via MCP",
+                checked = state.logMealsOnDevice,
+                onCheckedChange = onLogMealsChange,
+            )
             onOpenSmartScale?.let {
                 MenuDivider()
                 MenuRow("Smart scale", state.smartScale ?: "Not set up", onClick = it)
@@ -261,6 +272,21 @@ private fun MenuGroup(content: @Composable ColumnScope.() -> Unit) {
 
 @Composable
 private fun MenuDivider() = Divider(Modifier.padding(start = 16.dp))
+
+/** A settings row with an on/off switch and a dim line under the label saying what it does. */
+@Composable
+private fun ToggleRow(label: String, detail: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    UnstyledButton(onClick = { onCheckedChange(!checked) }, indication = LocalIndication.current, modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(label, style = Resurge.type.body, color = Resurge.colors.text)
+                Text(detail.uppercase(), style = Resurge.type.caption, color = Resurge.colors.textSubtle)
+            }
+            Spacer(Modifier.width(12.dp))
+            Switch(checked, onCheckedChange, accessibilityLabel = label)
+        }
+    }
+}
 
 /** A settings row: label on the left; value and chevron always aligned to the right edge. */
 @Composable

@@ -99,6 +99,8 @@ data class FoodItem(
     val per100g: Nutrition,
     val confidence: Double? = null,
     val source: FoodSource? = null,
+    /** Glycaemic index the AI assistant supplied over MCP; null means it's predicted (see [Glycemic]). */
+    val glycemicIndex: Double? = null,
 ) {
     val nutrition: Nutrition get() = per100g.scaled(grams / 100.0)
     val lowConfidence: Boolean get() = (confidence ?: 1.0) < 0.6
@@ -146,12 +148,14 @@ data class MealEstimate(
 )
 
 /** Daily macro targets derived from the calorie target (30% protein, 40% carbs, 30% fat). */
-data class MacroTargets(val protein: Int, val carbs: Int, val fat: Int) {
+data class MacroTargets(val protein: Int, val carbs: Int, val fat: Int, val fiber: Int = 0) {
     companion object {
+        /** 30% protein, 40% carbs, 30% fat; fibre at 14 g per 1,000 kcal. Matches macrosFor / fiberFor in functions. */
         fun from(calories: Int) = MacroTargets(
             protein = (calories * 0.30 / 4).roundToInt(),
             carbs = (calories * 0.40 / 4).roundToInt(),
             fat = (calories * 0.30 / 9).roundToInt(),
+            fiber = (calories * 14 / 1000.0).roundToInt(),
         )
     }
 }

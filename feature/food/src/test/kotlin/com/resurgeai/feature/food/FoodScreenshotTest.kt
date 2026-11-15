@@ -2,13 +2,9 @@ package com.resurgeai.feature.food
 
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
-import androidx.lifecycle.SavedStateHandle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.composeunstyled.theme.ColorScheme
 import com.github.takahirom.roborazzi.captureRoboImage
-import com.resurgeai.core.data.food.MealsRepository
 import com.resurgeai.core.designsystem.components.Screen
 import com.resurgeai.core.designsystem.theme.ResurgeTheme
 import com.resurgeai.core.model.FoodItem
@@ -20,7 +16,6 @@ import com.resurgeai.core.model.MealSource
 import com.resurgeai.core.model.MealType
 import com.resurgeai.core.model.Nutrition
 import com.resurgeai.core.model.Targets
-import io.mockk.mockk
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -39,7 +34,7 @@ class FoodScreenshotTest {
     private val today = LocalDate.of(2026, 10, 14)
     private val zone = ZoneId.systemDefault()
     private fun item(name: String, g: Double, kcal: Double, p: Double, c: Double, f: Double, conf: Double = 0.9, source: FoodSource? = null, micros: Map<Micro, Double> = emptyMap()) =
-        FoodItem(name, g, Nutrition(kcal, p, c, f, micros = micros), conf, source)
+        FoodItem(name, g, Nutrition(kcal, p, c, f, fiber = c * 0.08, micros = micros), conf, source)
 
     private fun meal(id: String, type: MealType, hour: Int, title: String, source: MealSource, vararg items: FoodItem) =
         Meal(id, type, today.atTime(hour, 15).atZone(zone).toInstant(), today, source, title, items.toList())
@@ -77,72 +72,21 @@ class FoodScreenshotTest {
     }
 
     private fun feed(s: FoodUiState) = @androidx.compose.runtime.Composable {
-        FoodScreen(s, onOpenMeal = {}, onLogMeal = {}, onAddWater = {}, onDelete = {}, onUndo = {}, onUndoTimeout = {})
+        FoodScreen(s, onOpenMeal = {}, onLogMeal = {}, onOpenMcpKeys = {}, onAddWater = {}, onDelete = {}, onUndo = {}, onUndoTimeout = {})
     }
 
+    // Default: meals come from the AI assistant over MCP and are read-only here.
     @Test fun feed() = capture("feed", feed(state))
     @Test fun feedDark() = capture("feed_dark", feed(state), ColorScheme.Dark)
-    @Test fun empty() = capture("empty", feed(state.copy(days = emptyList(), todayTotals = Nutrition.Zero, waterMl = 0)))
 
-    private val reviewState get() = MealReviewState(
-            loading = false,
-            title = lunch.title,
-            type = MealType.LUNCH,
-            items = lunch.items.mapIndexed { i, it -> EditableItem(i, it) },
-            question = "Was the curry made with cream?",
-            options = listOf("Yes", "No", "Not sure"),
-            notes = "Assumed about a tablespoon of butter in the curry.",
-            source = MealSource.SCAN,
-            eatenBefore = 720.0,
-            mealsBefore = 1,
-            targetKcal = 2000,
-        )
+    // Settings › Data › Log meals on this device turned on.
+    @Test fun feedOnDevice() = capture("feed_on_device", feed(state.copy(logOnDevice = true)))
+    @Test fun empty() = capture("empty", feed(state.copy(days = emptyList(), todayTotals = Nutrition.Zero, waterMl = 0, logOnDevice = true)))
 
-    private fun reviewVm() = MealReviewViewModel(mockk<MealsRepository>(relaxed = true), MealDraftStore(), SavedStateHandle(), mockk(relaxed = true))
-
-    @Test fun review() = capture("review", { MealReviewScreen(reviewState, reviewVm(), onBack = {}) })
-
-    @Test fun reviewSources() {
-        compose.mainClock.autoAdvance = false
-        compose.setContent { ResurgeTheme { Screen { MealReviewScreen(reviewState, reviewVm(), onBack = {}) } } }
-        compose.mainClock.advanceTimeBy(1_200)
-        compose.onNodeWithText("Fix results").performClick()
-        compose.mainClock.advanceTimeBy(1_200)
-        compose.onRoot().captureRoboImage("src/test/screenshots/food_review_sources.png")
+    private fun manual(s: ManualMealState) = @androidx.compose.runtime.Composable {
+        ManualMealScreen(s, onBack = {}, onSave = { _, _, _ -> }, onDelete = {})
     }
 
-    @Test fun barcodeReview() = capture("barcode_review", {
-        val product = item(
-            "Maggi 2-minute masala noodles", 70.0, 384.0, 8.0, 58.0, 13.0,
-            source = FoodSource("off:8901058815387", "Open Food Facts", "Maggi 2-minute masala noodles"),
-            micros = mapOf(Micro.SODIUM to 890.0, Micro.SUGAR to 3.0, Micro.SAT_FAT to 6.0),
-        )
-        MealReviewScreen(reviewState.copy(
-            title = "Maggi masala noodles",
-            type = MealType.SNACK,
-            source = MealSource.BARCODE,
-            items = listOf(EditableItem(0, product)),
-            question = null,
-            options = emptyList(),
-            notes = "Nutrition is for the dry product. Check the portion against your pack.",
-        ), reviewVm(), onBack = {})
-    })
-
-    @Test fun reviewDark() = capture(
-        "review_dark",
-        { MealReviewScreen(reviewState.copy(question = null, options = emptyList()), reviewVm(), onBack = {}) },
-        ColorScheme.Dark,
-    )
-
-    @Test
-    fun analyzing() {
-        val vm = MealReviewViewModel(mockk<MealsRepository>(relaxed = true), MealDraftStore(), SavedStateHandle(), mockk(relaxed = true))
-        val s = MealReviewState(
-            loading = false,
-            analyzing = MealReviewViewModel.TEXT_STEPS[1],
-            description = "2 rotis, dal and a bowl of curd",
-            source = MealSource.TEXT,
-        )
-        capture("analyzing", { MealReviewScreen(s, vm, onBack = {}) })
-    }
+    @Test fun manualNew() = capture("manual_new", manual(ManualMealState()))
+    @Test fun manualEditDark() = capture("manual_edit_dark", manual(ManualMealState(meal = breakfast)), ColorScheme.Dark)
 }

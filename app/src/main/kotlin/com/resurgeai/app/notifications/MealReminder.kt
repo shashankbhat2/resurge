@@ -19,6 +19,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
@@ -34,6 +35,7 @@ object MealReminder {
     const val CHANNEL = "meals"
     private const val ACTION_FIRE = "com.resurgeai.app.MEAL_REMINDER"
     private const val EXTRA_MEAL = "meal"
+    // Scan / Type actions were removed; kept so reminders already posted by older builds still open the app.
     const val OPEN_SCAN = "food_scan"
     const val OPEN_TYPE = "food_type"
     const val OPEN_FOOD = "food"
@@ -81,19 +83,20 @@ object MealReminder {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
-    internal fun notify(context: Context, type: MealType) {
-        val (title, text) = when (type) {
-            MealType.BREAKFAST -> "Logged breakfast?" to "Snap your plate or type what you had."
-            MealType.LUNCH -> "What's for lunch?" to "A quick photo keeps today's calories and protein on track."
-            else -> "Log your dinner" to "Scan it or type it in to close out the day."
+    /** [onDevice]: "Log meals on this device" is on; otherwise meals are logged by telling the AI assistant. */
+    internal fun notify(context: Context, type: MealType, onDevice: Boolean) {
+        val how = if (onDevice) "Add it in Resurge or tell your AI assistant." else "Tell your AI assistant what you had."
+        val title = when (type) {
+            MealType.BREAKFAST -> "Logged breakfast?"
+            MealType.LUNCH -> "What's for lunch?"
+            else -> "Log your dinner"
         }
+        val text = how
         val notification = NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(text)
             .setContentIntent(open(context, type, OPEN_FOOD, 0))
-            .addAction(0, "Scan", open(context, type, OPEN_SCAN, 1))
-            .addAction(0, "Type", open(context, type, OPEN_TYPE, 2))
             .setAutoCancel(true)
             .build()
         runCatching { NotificationManagerCompat.from(context).notify(request(type), notification) }
@@ -117,7 +120,7 @@ class MealReminderReceiver : BroadcastReceiver() {
                 if (fired != null) {
                     val today = LocalDate.now(ZoneId.systemDefault())
                     val logged = runCatching { meals.hasMeal(today, fired) }.getOrDefault(false)
-                    if (!logged && reminders.time(fired) != null) MealReminder.notify(context, fired)
+                    if (!logged && reminders.time(fired) != null) MealReminder.notify(context, fired, preferences.logMealsOnDevice.first())
                     MealReminder.schedule(context, fired, reminders)
                 } else {
                     MealReminder.scheduleAll(context, reminders)

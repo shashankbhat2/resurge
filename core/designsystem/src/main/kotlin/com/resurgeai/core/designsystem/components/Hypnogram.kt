@@ -71,11 +71,20 @@ fun Hypnogram(
                     val x = size.width * b.start.coerceIn(0f, 1f)
                     drawLine(b.color.copy(alpha = 0.55f), Offset(x, cy(a.level)), Offset(x, cy(b.level)), strokeWidth = 1.5.dp.toPx())
                 }
-                val r = CornerRadius(4.dp.toPx(), 4.dp.toPx())
+                // Each block is a small field of dots on a fixed pitch, like the 30-night stipple.
+                val pitch = 4.dp.toPx()
+                val dot = 1.3.dp.toPx()
+                val dotRows = (blockH / pitch).toInt().coerceAtLeast(1)
                 blocks.forEach { block ->
                     val left = size.width * block.start.coerceIn(0f, 1f)
-                    val w = (size.width * (block.end - block.start).coerceAtLeast(0f)).coerceAtLeast(2.dp.toPx())
-                    drawRoundRect(block.color, Offset(left, cy(block.level) - blockH / 2), Size(w, blockH), r)
+                    val right = size.width * block.end.coerceIn(0f, 1f)
+                    var x = (kotlin.math.ceil(left / pitch) * pitch)
+                    if (x > right) x = left
+                    val top = cy(block.level) - (dotRows - 1) * pitch / 2
+                    while (x <= right) {
+                        repeat(dotRows) { row -> drawCircle(block.color, dot, Offset(x, top + row * pitch)) }
+                        x += pitch
+                    }
                 }
             }
         }

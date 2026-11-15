@@ -45,7 +45,7 @@ class CardioPointsRepositoryTest {
         coEvery { cache.save(any(), any(), any(), any(), any()) } just Runs
         coEvery { cache.clearForUser(any()) } just Runs
     }
-    private fun TestScope.repository() = CardioPointsRepository(health, manager, cache, auth, backgroundScope)
+    private fun TestScope.repository() = CardioPointsRepository(health, manager, cache, auth, mockk(relaxed = true), backgroundScope)
 
     @Test fun `cache-only loads preserve stale and limited quality without reading sensors`() = runTest {
         for (quality in listOf(CardioStatus.READY, CardioStatus.LIMITED_DATA, CardioStatus.STALE)) {

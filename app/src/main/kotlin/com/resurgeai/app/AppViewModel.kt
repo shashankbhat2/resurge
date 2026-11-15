@@ -44,6 +44,10 @@ class AppViewModel @Inject constructor(
     val timeFormat: StateFlow<TimeFormat?> = preferencesRepository.timeFormat
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
+    /** Settings › Data › Log meals on this device; off means meals come from the AI assistant over MCP. */
+    val logMealsOnDevice: StateFlow<Boolean> = preferencesRepository.logMealsOnDevice
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     /** Bumped when a notification asks to open Coach › Insights; MainScreen navigates on change. */
     private val _openInsights = MutableStateFlow(0)
     val openInsights: StateFlow<Int> = _openInsights.asStateFlow()
@@ -56,7 +60,7 @@ class AppViewModel @Inject constructor(
 
     fun requestOpenHabits() = _openHabits.update { it + 1 }
 
-    /** Meal reminder taps: mode "scan" / "type" opens the log screen, null opens the Food tab. */
+    /** Meal reminder taps open the Food tab (mode is kept for reminders posted by older builds and ignored). */
     private val _openFood = MutableStateFlow(FoodSignal())
     val openFood: StateFlow<FoodSignal> = _openFood.asStateFlow()
 

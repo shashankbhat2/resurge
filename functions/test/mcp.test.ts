@@ -21,6 +21,12 @@ function fakeDeps(): McpDeps {
     runTool: vi.fn(async (_uid: string, name: string) => ({ content: `ran ${name}`, isError: false })),
     loadProfile: vi.fn(async () => ({ timezone: "UTC" })),
     loadHabits: vi.fn(async () => [{ name: "Walk", private: false, currentStreak: 2, bestStreak: 5, log: {} }]),
+    loadProfileRaw: vi.fn(async () => ({ displayName: "Sam", goals: ["EAT_BETTER"], timezone: "UTC", dayGoals: { steps: true } })),
+    loadWeighIns: vi.fn(async () => [{ kg: 80, atMs: 0, localDate: "2026-01-01" }]),
+    loadWeightGoal: vi.fn(async () => null),
+    loadDayResults: vi.fn(async () => [{ date: "2026-01-01", met: true, done: 3, total: 3 }]),
+    loadCoachHistory: vi.fn(async () => [{ title: "Protein", updatedAt: null, turns: [{ role: "user", text: "How much protein?" }] }]),
+    loadProgress: vi.fn(async () => ({ photos: [{ date: "2026-01-01", uploaded: true }], reels: [], settings: {} })),
   } as unknown as McpDeps;
 }
 
@@ -29,9 +35,9 @@ describe("mcp", () => {
     const client = await connect(fakeDeps());
     const names = (await client.listTools()).tools.map((t) => t.name).sort();
     expect(names).toEqual([
-      "get_activities", "get_daily_summaries", "get_habits", "get_health_snapshot",
-      "get_insights", "get_meals", "get_nutrition_targets", "get_profile", "get_workout_logs",
-      "log_meal", "log_water", "set_habit_status", "set_nutrition_targets",
+      "get_activities", "get_coach_history", "get_daily_summaries", "get_day_streak", "get_habits", "get_health_snapshot",
+      "get_insights", "get_meals", "get_nutrition_targets", "get_profile", "get_progress", "get_weight", "get_workout_logs",
+      "log_meal", "log_water", "set_habit_status", "set_nutrition_targets", "set_profile", "set_weight_goal",
     ].sort());
   });
 
@@ -62,6 +68,17 @@ describe("mcp", () => {
     const client = await connect(fakeDeps());
     const r = await client.callTool({ name: "get_habits", arguments: { days: 3 } });
     expect((r.content as { text: string }[])[0].text).toContain("Walk");
+  });
+
+  it("reads the whole profile, weight, day streak, coach history and progress", async () => {
+    const client = await connect(fakeDeps());
+    const read = async (name: string, args: Record<string, unknown> = {}) =>
+      ((await client.callTool({ name, arguments: args })).content as { text: string }[])[0].text;
+    expect(await read("get_profile")).toContain('"displayName": "Sam"');
+    expect(await read("get_weight", { days: 30 })).toMatch(/Trend weight 80\.0 kg[\s\S]*Goal: none set/);
+    expect(await read("get_day_streak", { days: 7 })).toContain("Days met 1 of 1");
+    expect(await read("get_coach_history")).toContain("User: How much protein?");
+    expect(await read("get_progress")).toMatch(/encrypted[\s\S]*Photos: 1/);
   });
 
   it("parses bearer tokens", () => {
