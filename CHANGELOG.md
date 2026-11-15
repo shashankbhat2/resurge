@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.6.0 (15 November 2026)
+
+### Connect your AI assistant
+Resurge now has an MCP server, so an AI assistant like Claude can read your data and log for you.
+- Create a personal key in Settings > Data > MCP API keys. It's shown once; copy it into your assistant. Revoke a key and it stops working straight away.
+- Your assistant can read everything the app stores: meals, weight and trend, sleep, steps, workouts, habits, streak, insights and coach history. Progress photos stay encrypted; it only sees that they exist.
+- It can log meals and water, check off habits, and change your profile, weight goal and daily targets.
+
+### Meals through your assistant
+- Meals are now logged through your AI assistant. The Food tab and Today show them, and link to MCP API keys.
+- The camera logger (photo, barcode, description) has been removed.
+- To log by hand instead, turn on Settings > Data > Log meals on this device. You can then enter a meal's calories and macros, and edit or delete meals.
+- Fibre now leads the micronutrients, with a daily fibre target.
+- A new Glycaemic load panel shows a predicted GI and GL for each meal and the last 7 days. It's a prediction and may not be accurate.
+
+### Cardio Points
+- Fitness shows daily Cardio Points and 30 days of weekly history. There's no points goal, and points don't affect your streak.
+- Brisk walking and running earn points from your step cadence. Other workouts earn estimated points, marked as Estimated. Overlapping activity is counted once.
+- Tap the card's footer for each day's sources, a refresh, and how points work.
+- Points are worked out on your phone and stay there. They aren't backed up or sent to the coach.
+
+### New look
+- Monospace type, squared-off buttons and dot-matrix charts throughout.
+- Sleep shows your last 30 nights by stage, with your usual bed and wake times on weeknights and weekends.
+- Today shows your health numbers as one table.
+
+### Health Connect
+- Today tells you when background reads are off, so nothing syncs while the app is closed, and lets you turn them on.
+- Each workout is synced on its own, and sleep shows time asleep as well as time in bed. The last 30 days re-sync once to pick this up.
+
 ## 0.5.0 (25 October 2026)
 
 ### Food logging
