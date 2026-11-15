@@ -48,6 +48,24 @@ val Bricolage = FontFamily(
     bricolageWeight(FontWeight.Bold),
 )
 
+private fun monoWeight(weight: FontWeight) = Font(
+    resId = R.font.jetbrains_mono_variable,
+    weight = weight,
+    variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight)),
+)
+
+/**
+ * Instrument-panel face: every text style. JetBrains Mono (SIL Open Font License 1.1). Figtree and
+ * Bricolage stay bundled for the launcher widget and anything not yet moved over.
+ */
+val Mono = FontFamily(
+    monoWeight(FontWeight.Light),
+    monoWeight(FontWeight.Normal),
+    monoWeight(FontWeight.Medium),
+    monoWeight(FontWeight.SemiBold),
+    monoWeight(FontWeight.Bold),
+)
+
 private val Tabular = "tnum"
 
 /** Resurge Tide palette: see the design system's tokens.json for each colour's usage. */
@@ -153,7 +171,8 @@ val ResurgeTheme = buildThemeV2 {
         )
     }
 
-    defaultTextStyle = TextStyle(fontFamily = Figtree, fontSize = 15.sp, lineHeight = 22.sp)
+    // Mono, small and calm: numbers line up, labels read like an instrument panel.
+    defaultTextStyle = TextStyle(fontFamily = Mono, fontSize = 14.sp, lineHeight = 21.sp)
     defaultTextSelectionColors = TextSelectionColors(
         handleColor = Light.brand,
         backgroundColor = Light.brand.copy(alpha = 0.3f),
@@ -161,48 +180,49 @@ val ResurgeTheme = buildThemeV2 {
 
     properties[typography] = mapOf(
         TypeTokens.brand to TextStyle(
-            fontFamily = Bricolage, fontWeight = FontWeight.SemiBold,
-            fontSize = 24.sp, lineHeight = 30.sp, letterSpacing = (-0.3).sp,
+            fontFamily = Mono, fontWeight = FontWeight.Medium,
+            fontSize = 20.sp, lineHeight = 26.sp, letterSpacing = (-0.4).sp,
         ),
         TypeTokens.brandLarge to TextStyle(
-            fontFamily = Bricolage, fontWeight = FontWeight.SemiBold,
-            fontSize = 32.sp, lineHeight = 38.sp, letterSpacing = (-0.5).sp,
+            fontFamily = Mono, fontWeight = FontWeight.Medium,
+            fontSize = 28.sp, lineHeight = 34.sp, letterSpacing = (-0.8).sp,
         ),
         TypeTokens.tide to TextStyle(
-            fontFamily = Bricolage, fontWeight = FontWeight.SemiBold,
-            fontSize = 56.sp, lineHeight = 56.sp, letterSpacing = (-1.7).sp, fontFeatureSettings = Tabular,
+            fontFamily = Mono, fontWeight = FontWeight.Light,
+            fontSize = 48.sp, lineHeight = 52.sp, letterSpacing = (-2).sp, fontFeatureSettings = Tabular,
         ),
         TypeTokens.display to TextStyle(
-            fontFamily = Figtree, fontWeight = FontWeight.SemiBold,
-            fontSize = 32.sp, lineHeight = 38.sp, letterSpacing = (-0.5).sp,
+            fontFamily = Mono, fontWeight = FontWeight.Light,
+            fontSize = 28.sp, lineHeight = 34.sp, letterSpacing = (-0.8).sp, fontFeatureSettings = Tabular,
         ),
         TypeTokens.metric to TextStyle(
-            fontFamily = Bricolage, fontWeight = FontWeight.SemiBold,
-            fontSize = 28.sp, lineHeight = 34.sp, letterSpacing = (-0.2).sp, fontFeatureSettings = Tabular,
+            fontFamily = Mono, fontWeight = FontWeight.Normal,
+            fontSize = 22.sp, lineHeight = 28.sp, letterSpacing = (-0.6).sp, fontFeatureSettings = Tabular,
         ),
         TypeTokens.title to TextStyle(
-            fontFamily = Figtree, fontWeight = FontWeight.SemiBold,
-            fontSize = 22.sp, lineHeight = 28.sp, letterSpacing = (-0.2).sp,
+            fontFamily = Mono, fontWeight = FontWeight.Medium,
+            fontSize = 18.sp, lineHeight = 24.sp, letterSpacing = (-0.3).sp,
         ),
         TypeTokens.headline to TextStyle(
-            fontFamily = Figtree, fontWeight = FontWeight.SemiBold,
-            fontSize = 17.sp, lineHeight = 24.sp,
+            fontFamily = Mono, fontWeight = FontWeight.Medium,
+            fontSize = 15.sp, lineHeight = 22.sp, letterSpacing = (-0.2).sp,
         ),
         TypeTokens.body to TextStyle(
-            fontFamily = Figtree, fontWeight = FontWeight.Normal,
-            fontSize = 15.sp, lineHeight = 22.sp,
+            fontFamily = Mono, fontWeight = FontWeight.Normal,
+            fontSize = 14.sp, lineHeight = 21.sp, letterSpacing = (-0.2).sp,
         ),
         TypeTokens.label to TextStyle(
-            fontFamily = Figtree, fontWeight = FontWeight.Medium,
-            fontSize = 14.sp, lineHeight = 20.sp,
+            fontFamily = Mono, fontWeight = FontWeight.Normal,
+            fontSize = 13.sp, lineHeight = 19.sp, letterSpacing = (-0.1).sp,
         ),
         TypeTokens.caption to TextStyle(
-            fontFamily = Figtree, fontWeight = FontWeight.Medium,
-            fontSize = 12.sp, lineHeight = 16.sp,
+            fontFamily = Mono, fontWeight = FontWeight.Normal,
+            fontSize = 11.sp, lineHeight = 15.sp, fontFeatureSettings = Tabular,
         ),
+        // Small caps-style labels: callers upper-case the text (see Overline).
         TypeTokens.overline to TextStyle(
-            fontFamily = Figtree, fontWeight = FontWeight.SemiBold,
-            fontSize = 11.sp, lineHeight = 14.sp, letterSpacing = 0.9.sp,
+            fontFamily = Mono, fontWeight = FontWeight.Medium,
+            fontSize = 11.sp, lineHeight = 14.sp, letterSpacing = 1.1.sp,
         ),
     )
 
@@ -216,9 +236,10 @@ val ResurgeTheme = buildThemeV2 {
     )
 
     properties[shapes] = mapOf(
-        ShapeTokens.sm to RoundedCornerShape(10.dp),
-        ShapeTokens.md to RoundedCornerShape(16.dp),
-        ShapeTokens.lg to RoundedCornerShape(28.dp),
+        // Flat and tight: panels, not bubbles.
+        ShapeTokens.sm to RoundedCornerShape(4.dp),
+        ShapeTokens.md to RoundedCornerShape(6.dp),
+        ShapeTokens.lg to RoundedCornerShape(10.dp),
         ShapeTokens.pill to CircleShape,
     )
 }

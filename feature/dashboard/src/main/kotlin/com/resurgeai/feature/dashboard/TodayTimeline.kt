@@ -46,7 +46,8 @@ import kotlin.math.roundToInt
 
 /** Where timeline cards lead. */
 class FeedActions(
-    val onOpenMeal: (String) -> Unit = {},
+    /** Null when meals can't be edited on this device (they're logged through MCP): rows are read-only. */
+    val onOpenMeal: ((String) -> Unit)? = null,
     val onOpenWorkout: (String) -> Unit = {},
     val onOpenSleep: () -> Unit = {},
     val onOpenInsights: () -> Unit = {},
@@ -72,7 +73,7 @@ internal fun Feed(days: List<FeedDay>, today: LocalDate, units: UnitSystem, comm
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             day.items.forEach { item ->
                 when (item) {
-                    is FeedItem.MealEntry -> MealRow(item.meal) { actions.onOpenMeal(item.meal.id) }
+                    is FeedItem.MealEntry -> MealRow(item.meal, actions.onOpenMeal?.let { open -> { open(item.meal.id) } })
                     is FeedItem.WorkoutEntry -> WorkoutRow(item.workout, units) { actions.onOpenWorkout(item.workout.id) }
                     is FeedItem.SleepEntry -> SleepRow(item.session, actions.onOpenSleep)
                     is FeedItem.InsightEntry -> CoachNote(item.insight, commander, actions.onOpenInsights)
@@ -93,10 +94,11 @@ private fun FeedRow(
     caption: String,
     value: String?,
     detail: String?,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
 ) {
     UnstyledButton(
-        onClick = onClick,
+        onClick = { onClick?.invoke() },
+        enabled = onClick != null,
         modifier = Modifier
             .fillMaxWidth()
             .clip(Resurge.shape.md)
@@ -131,7 +133,7 @@ private fun IconTile(icon: Int, tint: Color) {
 }
 
 @Composable
-private fun MealRow(meal: Meal, onClick: () -> Unit) {
+private fun MealRow(meal: Meal, onClick: (() -> Unit)?) {
     val t = meal.totals
     FeedRow(
         icon = {

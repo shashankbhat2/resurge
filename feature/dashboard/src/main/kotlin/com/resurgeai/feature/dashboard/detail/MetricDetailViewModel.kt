@@ -47,6 +47,8 @@ data class MetricDetailUiState(
     /** Index into [periods]; defaults to the latest period. */
     val selected: Int = -1,
     val sleepSessions: List<SleepSession> = emptyList(),
+    /** The last [PATTERN_NIGHTS] nights for the sleep pattern, whatever the range (sleep only). */
+    val patternNights: List<SleepSession> = emptyList(),
     val exerciseSessions: List<ExerciseSession> = emptyList(),
     /** Daily min/max bpm, only loaded for heart rate. */
     val heartRanges: Map<LocalDate, Pair<Long, Long>> = emptyMap(),
@@ -91,6 +93,9 @@ class MetricDetailViewModel @Inject constructor(
                     val sleep = async { if (metric == HealthMetric.SLEEP) healthData.sleepSessions(from, to) else emptyList() }
                     val exercise = async { if (metric == HealthMetric.EXERCISE) healthData.exerciseSessionsBetween(from, to) else emptyList() }
                     val heart = async { if (metric == HealthMetric.HEART_RATE) healthData.readHeartRateRanges(days, zone) else emptyMap() }
+                    val pattern = async {
+                        if (metric == HealthMetric.SLEEP) healthData.sleepSessions(today.minusDays(PATTERN_NIGHTS - 1L).atStartOfDay(zone).toInstant(), to) else emptyList()
+                    }
                     val s = series.await()
                     val periods = when (range) {
                         DetailRange.WEEK -> Periods.daily(s)
@@ -105,6 +110,7 @@ class MetricDetailViewModel @Inject constructor(
                             sleepSessions = sleep.await().sortedByDescending { x -> x.end },
                             exerciseSessions = exercise.await().sortedByDescending { x -> x.start },
                             heartRanges = heart.await(),
+                            patternNights = pattern.await(),
                         )
                     }
                 }
@@ -118,5 +124,8 @@ class MetricDetailViewModel @Inject constructor(
     companion object {
         /** Must match the property name in the navigation route. */
         const val ARG_METRIC = "metric"
+
+        /** Nights folded into the sleep pattern. */
+        const val PATTERN_NIGHTS = 30
     }
 }

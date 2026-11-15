@@ -43,6 +43,8 @@ import com.resurgeai.core.designsystem.components.Divider
 import com.resurgeai.core.designsystem.components.Icon
 import com.resurgeai.core.designsystem.components.MacroVisuals
 import com.resurgeai.core.designsystem.components.ResurgeIcons
+import com.resurgeai.core.designsystem.components.MagnitudeBar
+import com.resurgeai.core.designsystem.components.WindowBar
 import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.model.FoodItem
 import com.resurgeai.core.model.Micro
@@ -70,14 +72,14 @@ internal data class MacroShares(val protein: Float, val carbs: Float, val fat: F
 internal fun MacroSplit(n: Nutrition, modifier: Modifier = Modifier) {
     val shares = MacroShares.of(n)
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Row(
-            Modifier.weight(1f).height(6.dp).clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted),
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            listOf(shares.protein to MacroVisuals.protein(), shares.carbs to MacroVisuals.carbs(), shares.fat to MacroVisuals.fat())
-                .filter { it.first > 0f }
-                .forEach { (share, color) -> Box(Modifier.weight(share).fillMaxHeight().background(color)) }
-        }
+        WindowBar(
+            start = 0f,
+            end = 1f,
+            segments = listOf(shares.protein to MacroVisuals.protein(), shares.carbs to MacroVisuals.carbs(), shares.fat to MacroVisuals.fat())
+                .filter { it.first > 0f },
+            modifier = Modifier.weight(1f),
+            height = 8.dp,
+        )
         Spacer(Modifier.width(10.dp))
         Text(
             "${n.protein.roundToInt()}p · ${n.carbs.roundToInt()}c · ${n.fat.roundToInt()}f",
@@ -226,12 +228,7 @@ private fun MicroRow(m: Micro, value: Double) {
             )
         }
         Spacer(Modifier.height(5.dp))
-        Box(Modifier.fillMaxWidth().height(4.dp).clip(Resurge.shape.pill).background(Resurge.colors.surfaceMuted)) {
-            Box(
-                Modifier.fillMaxHeight().fillMaxWidth(share.coerceIn(0.02f, 1f)).clip(Resurge.shape.pill)
-                    .background(if (m.limit) Resurge.colors.textMuted else Resurge.colors.accent),
-            )
-        }
+        MagnitudeBar(share.coerceIn(0.02f, 1f), if (m.limit) Resurge.colors.textMuted else Resurge.colors.accent, height = 4.dp)
     }
 }
 

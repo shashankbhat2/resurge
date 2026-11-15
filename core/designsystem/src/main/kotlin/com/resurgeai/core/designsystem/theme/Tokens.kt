@@ -59,7 +59,7 @@ object ColorTokens {
 }
 
 object TypeTokens {
-    /** Personality text (greeting, sign-in, onboarding, high tide) and big numbers. Bricolage Grotesque. */
+    /** Personality text (greeting, sign-in, onboarding, high tide). Mono, like every style. */
     val brand = ThemeToken<TextStyle>("brand")
     val brandLarge = ThemeToken<TextStyle>("brand_large")
     /** The tide percentage inside the Today ring. One per screen. */

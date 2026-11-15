@@ -32,6 +32,16 @@ class PreferencesRepository @Inject constructor(
         dataStore.edit { it[THEME] = preference.name }
     }
 
+    /**
+     * Whether meals can be logged in the app itself. Off by default: meals normally arrive through
+     * the user's AI assistant over MCP, and the app only shows them.
+     */
+    val logMealsOnDevice: Flow<Boolean> = dataStore.data.map { it[LOG_MEALS_ON_DEVICE] == true }
+
+    suspend fun setLogMealsOnDevice(enabled: Boolean) {
+        dataStore.edit { it[LOG_MEALS_ON_DEVICE] = enabled }
+    }
+
     /** User's clock preference, or null to follow the device's 12/24-hour setting. */
     val timeFormat: Flow<TimeFormat?> = dataStore.data.map { prefs ->
         prefs[TIME_FORMAT]?.let { stored -> TimeFormat.entries.firstOrNull { it.name == stored } }
@@ -173,5 +183,6 @@ class PreferencesRepository @Inject constructor(
         val HABIT_REMINDER_TIME = stringPreferencesKey("habit_reminder_time")
         val THEME = stringPreferencesKey("theme")
         val TIME_FORMAT = stringPreferencesKey("time_format")
+        val LOG_MEALS_ON_DEVICE = booleanPreferencesKey("log_meals_on_device")
     }
 }

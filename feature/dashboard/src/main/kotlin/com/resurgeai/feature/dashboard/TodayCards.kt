@@ -5,6 +5,9 @@ import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.size
+import com.resurgeai.core.designsystem.components.Divider
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
@@ -93,25 +96,40 @@ internal fun HealthTiles(day: DailyHealth, targets: Targets, weight: WeightGlanc
         }
         add(weightRow(weight, units))
     }
-    Column(verticalArrangement = Arrangement.spacedBy(TILE_GAP)) {
-        rows.chunked(2).forEach { pair ->
-            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(TILE_GAP)) {
-                pair.forEach { row -> HealthTile(row, Modifier.weight(1f).fillMaxHeight()) { onOpen(row.metric) } }
-                if (pair.size == 1) Spacer(Modifier.weight(1f))
-            }
+    // One quiet panel of table rows (like an instrument readout) rather than a grid of tiles.
+    Column(Modifier.fillMaxWidth().clip(Resurge.shape.md).background(Resurge.colors.surface)) {
+        rows.forEachIndexed { i, row ->
+            if (i > 0) Divider(Modifier.padding(start = 16.dp))
+            HealthLine(row) { onOpen(row.metric) }
         }
     }
 }
 
-private val TILE_GAP = 12.dp
+/** One metric as a table row: status dot in the metric's colour, caps label, value, and a dim note. */
+@Composable
+private fun HealthLine(row: HealthRow, onClick: () -> Unit) {
+    UnstyledButton(onClick = onClick, modifier = Modifier.fillMaxWidth(), indication = LocalIndication.current, contentAlignment = Alignment.CenterStart) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(5.dp).clip(Resurge.shape.pill).background(row.color))
+            Spacer(Modifier.width(10.dp))
+            Text(row.label.uppercase(), style = Resurge.type.overline, color = Resurge.colors.textMuted, maxLines = 1, modifier = Modifier.weight(1f))
+            Column(horizontalAlignment = Alignment.End) {
+                Text(row.value ?: "—", style = Resurge.type.headline, maxLines = 1)
+                Text(row.note.uppercase(), style = Resurge.type.caption, color = Resurge.colors.textSubtle, maxLines = 1)
+            }
+            Spacer(Modifier.width(6.dp))
+            Icon(ResurgeIcons.ChevronRight, contentDescription = null, tint = Resurge.colors.textSubtle, size = 16.dp)
+        }
+    }
+}
+
 
 /** Weight is logged in Resurge, so its tile shows without Health Connect too. */
 @Composable
 internal fun WeightTileRow(weight: WeightGlance?, units: UnitSystem, onOpen: (HealthMetric) -> Unit) {
     val row = weightRow(weight, units)
-    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(TILE_GAP)) {
-        HealthTile(row, Modifier.weight(1f).fillMaxHeight()) { onOpen(row.metric) }
-        Spacer(Modifier.weight(1f))
+    Column(Modifier.fillMaxWidth().clip(Resurge.shape.md).background(Resurge.colors.surface)) {
+        HealthLine(row) { onOpen(row.metric) }
     }
 }
 
@@ -143,36 +161,10 @@ private class HealthRow(
     val note: String,
 )
 
-@Composable
-private fun HealthTile(row: HealthRow, modifier: Modifier, onClick: () -> Unit) {
-    UnstyledButton(
-        onClick = onClick,
-        modifier = modifier
-            .clip(Resurge.shape.md)
-            .background(Resurge.colors.surface),
-        indication = LocalIndication.current,
-        contentAlignment = Alignment.TopStart,
-    ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(row.icon, contentDescription = null, tint = row.color, size = 16.dp)
-                Spacer(Modifier.width(6.dp))
-                Text(row.label, style = Resurge.type.caption, color = Resurge.colors.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            Spacer(Modifier.height(10.dp))
-            Text(
-                row.value ?: "—",
-                style = Resurge.type.metric.copy(fontSize = 22.sp, lineHeight = 28.sp),
-                color = if (row.value != null) Resurge.colors.text else Resurge.colors.textSubtle,
-                maxLines = 1,
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(row.note, style = Resurge.type.caption, color = Resurge.colors.textSubtle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-    }
-}
 
 // --- Loading ---
+
+private val TILE_GAP = 12.dp
 
 /** Shimmering tiles shaped like [HealthTiles], shown until the first Health Connect read lands. */
 @Composable

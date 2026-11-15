@@ -3,6 +3,7 @@ package com.resurgeai.feature.food
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.resurgeai.core.data.food.MealsRepository
+import com.resurgeai.core.data.prefs.PreferencesRepository
 import com.resurgeai.core.data.session.SessionRepository
 import com.resurgeai.core.model.MacroTargets
 import com.resurgeai.core.model.Meal
@@ -39,6 +40,8 @@ data class FoodUiState(
     val waterMl: Int = 0,
     val days: List<FoodDay> = emptyList(),
     val deleted: Meal? = null,
+    /** Settings › Data › Log meals on this device. Off: meals come from the AI assistant over MCP and are read-only here. */
+    val logOnDevice: Boolean = false,
 )
 
 /** Food tab: today's calories, macros and water, then the last week of meals. */
@@ -46,6 +49,7 @@ data class FoodUiState(
 class FoodViewModel @Inject constructor(
     private val repository: MealsRepository,
     sessionRepository: SessionRepository,
+    preferences: PreferencesRepository,
 ) : ViewModel() {
     private val zone = ZoneId.systemDefault()
     private val since = LocalDate.now(zone).minusDays(DAYS)
@@ -55,7 +59,7 @@ class FoodViewModel @Inject constructor(
     private val meals = repository.meals(since).catch { emit(emptyList()) }
     private val water = repository.water(LocalDate.now(zone)).catch { emit(emptyMap()) }
 
-    val state: StateFlow<FoodUiState> = combine(meals, water, targets, deleted) { list, waterByDay, (t, mealsGoal), del ->
+    val state: StateFlow<FoodUiState> = combine(meals, water, targets, deleted, preferences.logMealsOnDevice) { list, waterByDay, (t, mealsGoal), del, onDevice ->
         val today = LocalDate.now(zone)
         val days = list.groupBy { it.date }.map { (date, dayMeals) ->
             FoodDay(
@@ -75,6 +79,7 @@ class FoodViewModel @Inject constructor(
             waterMl = waterByDay[today] ?: 0,
             days = days,
             deleted = del,
+            logOnDevice = onDevice,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FoodUiState())
 

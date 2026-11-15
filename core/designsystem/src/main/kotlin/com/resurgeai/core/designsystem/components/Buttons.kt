@@ -35,7 +35,8 @@ fun Button(
     @DrawableRes leadingIcon: Int? = null,
     @DrawableRes trailingIcon: Int? = null,
 ) {
-    val shape = Resurge.shape.pill
+    // Squared-off like a panel control; labels in caps.
+    val shape = Resurge.shape.sm
     val (container, content, border) = when (variant) {
         // Raised pill that follows the theme (white in light, charcoal in dark), like the navbar.
         ButtonVariant.Primary -> Triple(Resurge.colors.inverse, Resurge.colors.onInverse, Resurge.colors.border)
@@ -51,7 +52,7 @@ fun Button(
         onClick = onClick,
         enabled = interactive,
         modifier = modifier
-            .heightIn(min = 52.dp)
+            .heightIn(min = 48.dp)
             .alpha(if (enabled) 1f else 0.4f)
             .clip(shape)
             .background(container, shape)
@@ -67,7 +68,7 @@ fun Button(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     leadingIcon?.let { Icon(it, contentDescription = null, size = 18.dp) }
-                    Text(text, style = Resurge.type.label, color = content)
+                    Text(text.uppercase(), style = Resurge.type.overline, color = content)
                     trailingIcon?.let { Icon(it, contentDescription = null, size = 18.dp) }
                 }
                 if (loading) Spinner(color = content, modifier = Modifier.size(20.dp))

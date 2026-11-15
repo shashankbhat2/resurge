@@ -54,7 +54,7 @@ import java.time.LocalDate
 fun TodayRoute(
     onOpenMetric: (HealthMetric) -> Unit,
     onOpenInsights: () -> Unit,
-    onOpenMeal: (String) -> Unit = {},
+    onOpenMeal: ((String) -> Unit)? = null,
     onOpenWorkout: (String) -> Unit = {},
     onOpenHabit: (String) -> Unit = {},
     onAddHabit: () -> Unit = {},
@@ -112,7 +112,7 @@ fun TodayScreen(
     onRetry: () -> Unit,
     onOpenMetric: (HealthMetric) -> Unit,
     onOpenInsights: () -> Unit = {},
-    onOpenMeal: (String) -> Unit = {},
+    onOpenMeal: ((String) -> Unit)? = null,
     onOpenWorkout: (String) -> Unit = {},
     onToggleHabit: (String) -> Unit = {},
     onOpenHabit: (String) -> Unit = {},
