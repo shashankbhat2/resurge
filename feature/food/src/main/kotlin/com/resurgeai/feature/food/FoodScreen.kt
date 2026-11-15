@@ -88,9 +88,9 @@ fun FoodRoute(
 /** Meals that fill the tide's meals segment (TideMath.MEALS_GOAL on Today). */
 
 /**
- * Food tab: today's fuel (calories, macros, meals and water), then meals by day. Meals normally come
- * from the AI assistant over MCP and are read-only; with "Log meals on this device" on, rows open the
- * manual editor and swipe left deletes.
+ * Food tab: today's fuel (calories, macros, meals and water), then meals by day. In-app logging
+ * (photo, barcode, type) is on by default; the AI assistant can also log meals over MCP. With
+ * "Log meals on this device" off, rows are read-only.
  */
 @Composable
 fun FoodScreen(
@@ -201,8 +201,8 @@ private fun FuelCard(state: FoodUiState, onAddWater: ((Int) -> Unit)?) {
                 value = "$mealsToday ${if (mealsToday == 1) "meal" else "meals"}",
                 label = when {
                     state.mealsGoal == 0 -> "Logged today"
-                    mealsToday >= state.mealsGoal -> "Done for your streak"
-                    else -> "${state.mealsGoal - mealsToday} more for your streak"
+                    mealsToday >= state.mealsGoal -> "Streak complete"
+                    else -> "${state.mealsGoal - mealsToday} more to go"
                 },
                 modifier = Modifier.weight(1f),
             )
@@ -273,7 +273,7 @@ private fun MealRow(meal: Meal, onClick: (() -> Unit)?) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(verticalAlignment = Alignment.Bottom) {
                     Column(Modifier.weight(1f)) {
-                        Text(meal.title, style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight, fontSize = Resurge.type.body.fontSize), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(meal.title, style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight, fontSize = Resurge.type.body.fontSize), maxLines = 2, overflow = TextOverflow.Ellipsis)
                         val time = meal.loggedAt.atZone(ZoneId.systemDefault()).toLocalTime().format(clockFormatter())
                         Text("${meal.type.label} · $time", style = Resurge.type.caption, color = Resurge.colors.textSubtle)
                     }
@@ -298,7 +298,7 @@ private fun EmptyFeed(onLogMeal: () -> Unit) {
     ) {
         Text("Log your first meal", style = Resurge.type.headline)
         Text(
-            "Type the meal and its calories and macros. Your AI assistant can also log meals for you through MCP.",
+            "Snap a photo, scan a barcode or type what you had. Your AI assistant can also log meals through MCP.",
             style = Resurge.type.body,
             color = Resurge.colors.textMuted,
         )
@@ -328,7 +328,7 @@ private fun McpPrompt(onOpenMcpKeys: () -> Unit) {
         }
         Text("Meals are logged through your AI assistant via MCP.", style = Resurge.type.body)
         Text(
-            "Ask it to log what you ate and the meals show up here. To log on this phone instead, turn on Settings › Data › Log meals on this device.",
+            "Ask it to log what you ate and the meals show up here. To also snap, scan or type on this phone, turn on Settings › Data › Log meals on this device.",
             style = Resurge.type.caption,
             color = Resurge.colors.textSubtle,
         )

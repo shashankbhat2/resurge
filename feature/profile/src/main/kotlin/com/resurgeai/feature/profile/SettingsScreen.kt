@@ -218,7 +218,8 @@ internal fun MainMenu(
             MenuDivider()
             ToggleRow(
                 "Log meals on this device",
-                if (state.logMealsOnDevice) "Manual entry in the Food tab" else "Off: meals come from your AI assistant via MCP",
+                if (state.logMealsOnDevice) "Photo, barcode or type in the Food tab. Your AI assistant can also log over MCP."
+                else "Off: meals come from your AI assistant via MCP",
                 checked = state.logMealsOnDevice,
                 onCheckedChange = onLogMealsChange,
             )

@@ -40,8 +40,8 @@ data class FoodUiState(
     val waterMl: Int = 0,
     val days: List<FoodDay> = emptyList(),
     val deleted: Meal? = null,
-    /** Settings › Data › Log meals on this device. Off: meals come from the AI assistant over MCP and are read-only here. */
-    val logOnDevice: Boolean = false,
+    /** Settings › Data › Log meals on this device. On by default; off makes this tab read-only (MCP still logs). */
+    val logOnDevice: Boolean = true,
 )
 
 /** Food tab: today's calories, macros and water, then the last week of meals. */

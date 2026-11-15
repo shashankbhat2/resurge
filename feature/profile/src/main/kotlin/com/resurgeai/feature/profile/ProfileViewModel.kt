@@ -32,8 +32,8 @@ data class ProfileUiState(
     val timeFormat: TimeFormat? = null,
     /** The paired smart scale's model, "2 scales" for several, null when none is set up. */
     val smartScale: String? = null,
-    /** Meals can be logged in the app (device-local; off = meals come from the AI assistant over MCP). */
-    val logMealsOnDevice: Boolean = false,
+    /** Meals can be logged in the app (photo, barcode, type). On by default; MCP logging always works. */
+    val logMealsOnDevice: Boolean = true,
 )
 
 @HiltViewModel
