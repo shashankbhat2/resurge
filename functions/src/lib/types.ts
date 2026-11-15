@@ -6,16 +6,30 @@ export interface DailySummary {
   distanceM?: number | null;
   kcalTotal?: number | null;
   kcalActive?: number | null;
+  /** Time in bed across the night that ended on this date. */
   sleepMin?: number | null;
+  /** Time actually asleep (awake stages removed). */
+  asleepMin?: number | null;
+  /** Null when the source didn't record deep/light/REM stages. */
   sleepStages?: { deep?: number; light?: number; rem?: number; awake?: number } | null;
   exerciseMin?: number | null;
   exerciseDay?: boolean | null;
   exerciseTypes?: string[] | null;
+  /** Each Health Connect session that day, in time order (written by app builds from late 2026). */
+  exerciseSessions?: ExerciseSessionSummary[] | null;
   hrAvg?: number | null;
   hrMin?: number | null;
   hrMax?: number | null;
   restingHr?: number | null;
   weightKg?: number | null;
+}
+
+export interface ExerciseSessionSummary {
+  type: string;
+  title?: string | null;
+  /** Local start time, HH:mm. */
+  start?: string | null;
+  durationMin: number;
 }
 
 export interface WorkoutDetails {

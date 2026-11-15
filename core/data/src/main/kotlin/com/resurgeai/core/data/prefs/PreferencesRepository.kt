@@ -41,11 +41,13 @@ class PreferencesRepository @Inject constructor(
         dataStore.edit { it[TIME_FORMAT] = format.name }
     }
 
+    // Versioned so a change to the daily summary fields backfills the last 30 days once more
+    // (v2: exerciseSessions and stage-less sleep).
     suspend fun isHealthBackfillDone(uid: String): Boolean =
-        dataStore.data.first()[booleanPreferencesKey("health_backfill_$uid")] == true
+        dataStore.data.first()[booleanPreferencesKey("health_backfill_v2_$uid")] == true
 
     suspend fun setHealthBackfillDone(uid: String) {
-        dataStore.edit { it[booleanPreferencesKey("health_backfill_$uid")] = true }
+        dataStore.edit { it[booleanPreferencesKey("health_backfill_v2_$uid")] = true }
     }
 
     /** Health Connect IDs of workouts/nights already posted as events (bounded, newest kept). */

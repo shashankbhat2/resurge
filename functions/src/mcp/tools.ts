@@ -46,7 +46,7 @@ export function createMcpServer(uid: string, deps: McpDeps = defaultDeps, store:
   }, async () => text(formatProfile(await deps.loadProfile(uid))));
 
   server.registerTool("get_daily_summaries", {
-    description: "Daily totals (steps, distance, calories, sleep and stages, exercise, heart rate, weight) for an inclusive date range, at most 120 days.",
+    description: "Daily totals from Health Connect for an inclusive date range, at most 120 days: steps, distance, total/active calories, sleep (in bed, asleep, stages), exercise minutes with each session's type, start and length, heart rate (resting/avg/min/max) and weight. Days are the phone's local dates; a night counts on the day it ended.",
     inputSchema: { from: isoDate, to: isoDate },
   }, (a) => coachTool("get_daily_summaries", a));
 

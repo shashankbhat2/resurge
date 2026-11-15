@@ -16,7 +16,7 @@ export const COACH_TOOLS: Anthropic.Beta.BetaTool[] = [
   {
     name: "get_daily_summaries",
     description:
-      "Daily totals (steps, distance, calories, sleep and stages, exercise, heart rate, weight) for a date range, inclusive. Use for trends beyond the snapshot. At most 120 days per call.",
+      "Daily totals (steps, distance, calories, sleep in bed/asleep and stages, exercise sessions, heart rate, weight) for a date range, inclusive. Use for trends beyond the snapshot. At most 120 days per call.",
     strict: true,
     input_schema: {
       type: "object",

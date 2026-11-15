@@ -25,25 +25,35 @@ export function formatProfile(p: UserProfile): string {
 export function formatSummaries(rows: DailySummary[]): string {
   if (rows.length === 0) return "No daily data synced for this period.";
   const header =
-    "date | steps | km | kcal total/active | sleep (deep/rem/light/awake min) | exercise min (types) | HR rest/avg/min-max | weight kg";
+    "date | steps | km | kcal total/active | sleep in bed/asleep (deep/rem/light/awake min) | exercise min (sessions: type start min) | HR rest/avg/min-max | weight kg";
   const lines = [...rows]
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((r) => {
       const st = r.sleepStages;
       const stages = st ? ` (${n(st.deep)}/${n(st.rem)}/${n(st.light)}/${n(st.awake)})` : "";
-      const types = r.exerciseTypes?.length ? ` (${r.exerciseTypes.join(", ")})` : "";
+      const sleep = r.sleepMin == null && r.asleepMin == null ? "-" : `${hours(r.sleepMin)}/${hours(r.asleepMin)}${stages}`;
       return [
         r.date,
         n(r.steps),
         r.distanceM == null ? "-" : (r.distanceM / 1000).toFixed(1),
         `${n(r.kcalTotal)}/${n(r.kcalActive)}`,
-        `${hours(r.sleepMin)}${stages}`,
-        `${n(r.exerciseMin)}${types}`,
+        sleep,
+        `${n(r.exerciseMin)}${exerciseDetail(r)}`,
         `${n(r.restingHr)}/${n(r.hrAvg)}/${n(r.hrMin)}-${n(r.hrMax)}`,
         n(r.weightKg, 1),
       ].join(" | ");
     });
   return [header, ...lines].join("\n");
+}
+
+/** Per-session detail when the app sent it; older summaries only carry the day's activity types. */
+function exerciseDetail(r: DailySummary): string {
+  if (r.exerciseSessions?.length) {
+    const sessions = r.exerciseSessions.map((x) =>
+      [x.title ? `${x.type} "${x.title}"` : x.type, x.start, n(x.durationMin)].filter(Boolean).join(" "));
+    return ` (${sessions.join(", ")})`;
+  }
+  return r.exerciseTypes?.length ? ` (${r.exerciseTypes.join(", ")})` : "";
 }
 
 function pace(secPerKm: number | null | undefined): string {
