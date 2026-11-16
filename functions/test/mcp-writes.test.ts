@@ -20,7 +20,12 @@ function memStore(tz = "Asia/Kolkata") {
     timezone: async () => tz,
     habitResetTime: async () => "04:00",
     create: async (uid, col, data) => { const id = `id${++n}`; docs[`users/${uid}/${col}/${id}`] = data; return id; },
-    merge: async (uid, col, id, data) => { docs[`users/${uid}/${col}/${id}`] = data; },
+    get: async (uid, col, id) => docs[`users/${uid}/${col}/${id}`] ?? null,
+    merge: async (uid, col, id, data) => {
+      const k = `users/${uid}/${col}/${id}`;
+      docs[k] = { ...docs[k], ...data };
+    },
+    remove: async (uid, col, id) => { delete docs[`users/${uid}/${col}/${id}`]; },
     activeHabits: async () => [{ id: "h1", name: "Walk" }, { id: "h2", name: "Read" }],
     targets: async () => fillTargets(profile.targets),
     updateTargets: async (_u, patch) => { const next: StoredTargets = { ...fillTargets(profile.targets), ...patch }; profile.targets = next; return next; },
@@ -127,6 +132,23 @@ describe("mcp writes", () => {
     await expect(w.setWeightGoal({ mode: "change" })).rejects.toThrow(/goalKg/);
   });
 
+  it("update_meal patches given fields and delete_meal removes an owned meal", async () => {
+    const { store, docs } = memStore();
+    const w = createWriter("u1", store, () => NOW);
+    await w.logMeal({ type: "lunch", title: "Dal rice", kcal: 650, protein: 22, carbs: 100, fat: 15 });
+    const patched = await w.updateMeal({ id: "id1", title: "Dal and rice", protein: 28 });
+    expect(patched).toMatchObject({ id: "id1", title: "Dal and rice", kcal: 650, protein: 28, carbs: 100, fat: 15 });
+    expect(docs["users/u1/meals/id1"]).toMatchObject({ type: "lunch", title: "Dal and rice", source: "manual" });
+    expect((docs["users/u1/meals/id1"].items as Record<string, unknown>[])[0]).toMatchObject({ kcal: 650, protein: 28, carbs: 100 });
+    await w.updateMeal({ id: "id1", type: "dinner", items: [{ name: "Roti", grams: 80, kcal: 300, protein: 10, carbs: 55, fat: 4 }] });
+    expect(docs["users/u1/meals/id1"]).toMatchObject({ type: "dinner" });
+    await expect(w.updateMeal({ id: "id1" })).rejects.toThrow(/at least one/);
+    await expect(w.updateMeal({ id: "nope", title: "x" })).rejects.toThrow(/doesn't exist/);
+    expect(await w.deleteMeal({ id: "id1" })).toEqual({ id: "id1", path: "users/u1/meals/id1", deleted: true });
+    expect(docs["users/u1/meals/id1"]).toBeUndefined();
+    await expect(w.deleteMeal({ id: "id1" })).rejects.toThrow(/doesn't exist/);
+  });
+
   it("get_nutrition_targets reads targets with derived macros", async () => {
     const r = await createWriter("u1", memStore().store, () => NOW).nutritionTargets();
     expect(r).toMatchObject({ calories: 2200, waterMl: 2500, sleepMinutes: 420, steps: 8000, derivedMacrosG: { protein: 165, carbs: 220, fat: 73 }, fiberG: 31 });
@@ -154,6 +176,8 @@ describe("mcp writes", () => {
     await Promise.all([server.connect(a), client.connect(b)]);
     expect((await client.callTool({ name: "log_water", arguments: { ml: 0 } })).isError).toBe(true);
     expect((await client.callTool({ name: "log_meal", arguments: { type: "brunch", kcal: 100 } })).isError).toBe(true);
+    expect((await client.callTool({ name: "delete_meal", arguments: { id: "missing" } })).isError).toBe(true);
+    expect((await client.callTool({ name: "update_meal", arguments: { id: "missing", title: "x" } })).isError).toBe(true);
     expect((await client.callTool({ name: "log_weight", arguments: { kg: 70 } })).isError).toBe(true);
     expect((await client.callTool({ name: "set_profile", arguments: { goals: ["GET_RICH"] } })).isError).toBe(true);
     expect((await client.callTool({ name: "set_nutrition_targets", arguments: { steps: 100 } })).isError).toBe(true);
@@ -162,5 +186,9 @@ describe("mcp writes", () => {
     expect(Object.keys(docs)).toHaveLength(0);
     const ok = await client.callTool({ name: "log_water", arguments: { ml: 250 } });
     expect(parse(ok).path).toMatch(/^users\/u1\/waterDays\//);
+    const logged = await client.callTool({ name: "log_meal", arguments: { type: "lunch", title: "Rice", kcal: 400 } });
+    const mealId = parse(logged).id as string;
+    expect(parse(await client.callTool({ name: "update_meal", arguments: { id: mealId, title: "Rice bowl" } })).title).toBe("Rice bowl");
+    expect(parse(await client.callTool({ name: "delete_meal", arguments: { id: mealId } })).deleted).toBe(true);
   });
 });

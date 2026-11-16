@@ -43,7 +43,9 @@ export interface WriteStore {
   timezone(uid: string): Promise<string>;
   habitResetTime(uid: string): Promise<string>;
   create(uid: string, collection: string, data: Record<string, unknown>): Promise<string>;
+  get(uid: string, collection: string, id: string): Promise<Record<string, unknown> | null>;
   merge(uid: string, collection: string, id: string, data: Record<string, unknown>): Promise<void>;
+  remove(uid: string, collection: string, id: string): Promise<void>;
   activeHabits(uid: string): Promise<{ id: string; name: string }[]>;
   /** Current targets with app defaults filled in. */
   targets(uid: string): Promise<StoredTargets>;
@@ -73,8 +75,15 @@ export const firestoreStore: WriteStore = {
     await ref.set({ ...data, updatedAt: FieldValue.serverTimestamp() });
     return ref.id;
   },
+  async get(uid, collection, id) {
+    const snap = await userDoc(uid).collection(collection).doc(id).get();
+    return snap.exists ? (snap.data() as Record<string, unknown>) : null;
+  },
   async merge(uid, collection, id, data) {
     await userDoc(uid).collection(collection).doc(id).set({ ...data, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  },
+  async remove(uid, collection, id) {
+    await userDoc(uid).collection(collection).doc(id).delete();
   },
   async activeHabits(uid) {
     const snap = await userDoc(uid).collection("habits").where("archived", "==", false).get();
@@ -131,38 +140,117 @@ export function fillTargets(raw: unknown): StoredTargets {
 
 export class WriteError extends Error {}
 
+export type MealWrite = {
+  title?: string;
+  type?: (typeof MEAL_TYPES)[number];
+  at?: string;
+  items?: MealItemIn[];
+  kcal?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+  fiber?: number;
+};
+
+function storedItems(items: MealItemIn[]) {
+  if (items.length > MAX_MEAL_ITEMS) throw new WriteError(`At most ${MAX_MEAL_ITEMS} items.`);
+  return items.map((i) => ({
+    name: i.name.slice(0, 60), grams: i.grams, kcal: i.kcal, protein: i.protein, carbs: i.carbs,
+    fat: i.fat, fiber: i.fiber ?? 0, confidence: null,
+    // A GI the assistant knows for this food; otherwise the app and MCP predict one from macros.
+    ...(i.gi !== undefined ? { gi: i.gi } : {}),
+  }));
+}
+
+function mealTotals(items: MealItemIn[]) {
+  const total = (k: keyof MealItemIn) => Math.round(items.reduce((s, i) => s + (Number(i[k] ?? 0) * i.grams) / 100, 0));
+  return { kcal: total("kcal"), protein: total("protein"), carbs: total("carbs"), fat: total("fat") };
+}
+
+function totalsItem(title: string, a: { kcal: number; protein?: number; carbs?: number; fat?: number; fiber?: number }): MealItemIn[] {
+  return [{ name: (title.trim() || "Meal"), grams: 100, kcal: a.kcal, protein: a.protein ?? 0,
+    carbs: a.carbs ?? 0, fat: a.fat ?? 0, fiber: a.fiber ?? 0 }];
+}
+
+function storedTotals(data: Record<string, unknown>) {
+  const items = (data.items ?? []) as Array<Record<string, unknown>>;
+  const num = (v: unknown) => Number(v ?? 0) || 0;
+  const sum = (k: string) => Math.round(items.reduce((acc, i) => acc + (num(i[k]) * num(i.grams)) / 100, 0));
+  return { kcal: sum("kcal"), protein: sum("protein"), carbs: sum("carbs"), fat: sum("fat"), fiber: sum("fiber") };
+}
+
+function itemsForLog(a: MealWrite): MealItemIn[] {
+  if (a.items && a.items.length > 0) return a.items;
+  if (a.kcal === undefined) throw new WriteError("Give items, or totals with at least kcal.");
+  return totalsItem(a.title ?? "Meal", { kcal: a.kcal, protein: a.protein, carbs: a.carbs, fat: a.fat, fiber: a.fiber });
+}
+
 export function createWriter(uid: string, store: WriteStore = firestoreStore, now: () => number = Date.now) {
   return {
     /** users/{uid}/meals/{auto}: same shape as MealsRepository.save (items carry nutrition per 100 g). */
-    async logMeal(a: { title?: string; type: (typeof MEAL_TYPES)[number]; at?: string; items?: MealItemIn[];
-      kcal?: number; protein?: number; carbs?: number; fat?: number; fiber?: number }) {
+    async logMeal(a: MealWrite & { type: (typeof MEAL_TYPES)[number] }) {
       const { ms, localDate } = await when(store, uid, a.at, now());
-      let items: MealItemIn[];
-      if (a.items && a.items.length > 0) {
-        items = a.items;
-      } else {
-        if (a.kcal === undefined) throw new WriteError("Give items, or totals with at least kcal.");
-        // Totals only: one 100 g item whose per-100 g values are the totals, so totals read back exactly.
-        items = [{ name: (a.title ?? "Meal").trim() || "Meal", grams: 100, kcal: a.kcal, protein: a.protein ?? 0,
-          carbs: a.carbs ?? 0, fat: a.fat ?? 0, fiber: a.fiber ?? 0 }];
-      }
-      if (items.length > MAX_MEAL_ITEMS) throw new WriteError(`At most ${MAX_MEAL_ITEMS} items.`);
+      const items = itemsForLog(a);
       const title = ((a.title ?? "").trim() || items[0].name).slice(0, 80);
       const id = await store.create(uid, "meals", {
-        type: a.type,
-        loggedAtMs: ms,
-        localDate,
-        source: "manual",
-        title,
-        items: items.map((i) => ({
-          name: i.name.slice(0, 60), grams: i.grams, kcal: i.kcal, protein: i.protein, carbs: i.carbs,
-          fat: i.fat, fiber: i.fiber ?? 0, confidence: null,
-          // A GI the assistant knows for this food; otherwise the app and MCP predict one from macros.
-          ...(i.gi !== undefined ? { gi: i.gi } : {}),
-        })),
+        type: a.type, loggedAtMs: ms, localDate, source: "manual", title, items: storedItems(items),
       });
-      const total = (k: keyof MealItemIn) => Math.round(items.reduce((s, i) => s + (Number(i[k] ?? 0) * i.grams) / 100, 0));
-      return { id, path: `users/${uid}/meals/${id}`, localDate, title, kcal: total("kcal"), protein: total("protein"), carbs: total("carbs"), fat: total("fat") };
+      return { id, path: `users/${uid}/meals/${id}`, localDate, title, ...mealTotals(items) };
+    },
+
+    /**
+     * Patch users/{uid}/meals/{id}. Only the fields given change. items replaces the list; kcal/macros
+     * without items rewrite as one totals item (like log_meal), filling unspecified macros from the current meal.
+     */
+    async updateMeal(a: MealWrite & { id: string }) {
+      const id = a.id.trim();
+      if (!id) throw new WriteError("Give the meal id from get_meals.");
+      const existing = await store.get(uid, "meals", id);
+      if (!existing) throw new WriteError("That meal doesn't exist.");
+      const patch: Record<string, unknown> = {};
+      const nutrition = a.kcal !== undefined || a.protein !== undefined || a.carbs !== undefined || a.fat !== undefined || a.fiber !== undefined;
+      let items: MealItemIn[] | undefined;
+      if (a.items && a.items.length > 0) {
+        items = a.items;
+        patch.items = storedItems(items);
+      } else if (nutrition) {
+        const cur = storedTotals(existing);
+        items = totalsItem(String(a.title ?? existing.title ?? "Meal"), {
+          kcal: a.kcal ?? cur.kcal, protein: a.protein ?? cur.protein, carbs: a.carbs ?? cur.carbs,
+          fat: a.fat ?? cur.fat, fiber: a.fiber ?? cur.fiber,
+        });
+        patch.items = storedItems(items);
+      }
+      if (a.type !== undefined) patch.type = a.type;
+      if (a.title !== undefined) {
+        const title = a.title.trim();
+        if (!title) throw new WriteError("title can't be empty.");
+        patch.title = title.slice(0, 80);
+      }
+      if (a.at !== undefined) {
+        const { ms, localDate } = await when(store, uid, a.at, now());
+        patch.loggedAtMs = ms;
+        patch.localDate = localDate;
+      }
+      if (Object.keys(patch).length === 0) throw new WriteError("Give at least one field to change.");
+      await store.merge(uid, "meals", id, patch);
+      const next = { ...existing, ...patch };
+      const t = items ? mealTotals(items) : storedTotals(next);
+      return {
+        id, path: `users/${uid}/meals/${id}`,
+        localDate: String(next.localDate ?? ""),
+        title: String(next.title ?? "Meal"),
+        kcal: t.kcal, protein: t.protein, carbs: t.carbs, fat: t.fat,
+      };
+    },
+
+    /** Deletes users/{uid}/meals/{id}. The path is under that user, so another user's meal can't be hit. */
+    async deleteMeal(a: { id: string }) {
+      const id = a.id.trim();
+      if (!id) throw new WriteError("Give the meal id from get_meals.");
+      if (!(await store.get(uid, "meals", id))) throw new WriteError("That meal doesn't exist.");
+      await store.remove(uid, "meals", id);
+      return { id, path: `users/${uid}/meals/${id}`, deleted: true };
     },
 
     /** users/{uid}/waterDays/{date}: like MealsRepository.addWater, bounded to the rules' 0..20000 ml. */
