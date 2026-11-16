@@ -18,8 +18,8 @@ android {
         applicationId = "com.resurgeai.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.6.0"
+        versionCode = 7
+        versionName = "0.6.5"
     }
 
     // Release signing comes from keystore.properties (git-ignored); without it release builds are unsigned.
