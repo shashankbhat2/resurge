@@ -1,9 +1,12 @@
-# Builds a signed release when a version tag is pushed, and publishes it as a GitHub release.
+# Builds a signed release and publishes it as a GitHub release.
 #
-#   git tag v0.4.0 && git push origin v0.4.0
+# Releases happen on their own: when a merge to main brings a versionName in app/build.gradle.kts that has no
+# v<versionName> tag yet, this builds it, tags that commit and publishes the release. Merges that don't bump the
+# version are skipped. To release, bump versionCode and versionName in a PR and give CHANGELOG.md a
+# "## 0.7.0 (...)" section; its contents become the release notes.
 #
-# The tag must be on main and match versionName in app/build.gradle.kts, and CHANGELOG.md must have a
-# "## 0.4.0 (...)" section; its contents become the release notes.
+# Pushing a tag by hand still works too:  git tag v0.7.0 && git push origin v0.7.0
+# The tag must be on main and match versionName.
 #
 # Secrets (Settings > Secrets and variables > Actions):
 #   RELEASE_KEYSTORE_BASE64       base64 of keystore/resurge-upload.jks
@@ -11,34 +14,74 @@
 #   RELEASE_KEY_ALIAS             keyAlias from keystore.properties
 #   RELEASE_KEY_PASSWORD          keyPassword from keystore.properties
 #   GOOGLE_SERVICES_JSON_BASE64   base64 of app/google-services.json
+#
+# The publish step creates the tag with the workflow token, so the "release tags" ruleset must not restrict tag
+# creation (it only blocks moving and deleting v* tags).
 name: Release
 
 on:
   push:
+    branches: [main]
     tags: ['v*']
 
 permissions:
   contents: write
 
+# One release run at a time, in order, so two quick merges can't both try to publish the same version.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
+  cancel-in-progress: false
 
 jobs:
-  release:
+  decide:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    outputs:
+      release: ${{ steps.check.outputs.release }}
+      version: ${{ steps.check.outputs.version }}
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      # Releases only ship what's already on main.
-      - name: Check tag is on main
+      - name: Is there a new version to release?
+        id: check
         run: |
-          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
-            echo "::error::Tag $GITHUB_REF_NAME points to a commit that isn't on main"
-            exit 1
+          NAME=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            # Releases only ship what's already on main.
+            if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+              echo "::error::Tag $GITHUB_REF_NAME points to a commit that isn't on main"
+              exit 1
+            fi
+            if [ "${GITHUB_REF_NAME#v}" != "$NAME" ]; then
+              echo "::error::Tag $GITHUB_REF_NAME doesn't match versionName $NAME in app/build.gradle.kts"
+              exit 1
+            fi
+            if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+              echo "Release $GITHUB_REF_NAME already exists; nothing to do."
+              echo "release=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          elif git ls-remote --exit-code --tags origin "refs/tags/v$NAME" >/dev/null; then
+            echo "v$NAME is already released; nothing to do."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          echo "Releasing $NAME"
+          echo "release=true" >> "$GITHUB_OUTPUT"
+          echo "version=$NAME" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  release:
+    needs: decide
+    if: needs.decide.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      VERSION: ${{ needs.decide.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-java@v5
         with:
@@ -47,14 +90,8 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Check version and changelog
+      - name: Changelog
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          NAME=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
-          if [ "$VERSION" != "$NAME" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME doesn't match versionName $NAME in app/build.gradle.kts"
-            exit 1
-          fi
           awk -v v="$VERSION" '
             index($0, "## " v " ") == 1 || $0 == "## " v { found = 1; next }
             found && /^## / { exit }
@@ -64,7 +101,6 @@ jobs:
             echo "::error::CHANGELOG.md has no '## $VERSION' section"
             exit 1
           fi
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: Restore signing key and Firebase config
         env:
@@ -114,11 +150,12 @@ jobs:
             app/build/outputs/mapping/release/mapping.txt
           retention-days: 90
 
+      # On a merge to main this also creates the v<version> tag on the merged commit.
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" "out/resurge-$VERSION.apk" \
+          gh release create "v$VERSION" "out/resurge-$VERSION.apk" \
             --title "Resurge $VERSION" \
             --notes-file release-notes.md \
-            --verify-tag
+            --target "$GITHUB_SHA"
