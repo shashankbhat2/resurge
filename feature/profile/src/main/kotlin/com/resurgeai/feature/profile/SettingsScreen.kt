@@ -84,7 +84,7 @@ fun SettingsScreen(
     onOpenSmartScale: (() -> Unit)? = null,
     /** Shown at the bottom of the menu; the app passes its own version. */
     versionName: String = "",
-    /** Open straight on the MCP API keys page (from the Food tab's MCP prompt). */
+    /** Open straight on the MCP API keys page. */
     openMcpKeys: Boolean = false,
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
@@ -218,8 +218,8 @@ internal fun MainMenu(
             MenuDivider()
             ToggleRow(
                 "Log meals on this device",
-                if (state.logMealsOnDevice) "Photo, barcode or type in the Food tab. Your AI assistant can also log over MCP."
-                else "Off: meals come from your AI assistant via MCP",
+                if (state.logMealsOnDevice) "Photo, barcode or type in the Food tab"
+                else "Off: hide snap, scan and type. Logged meals stay here",
                 checked = state.logMealsOnDevice,
                 onCheckedChange = onLogMealsChange,
             )

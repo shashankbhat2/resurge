@@ -44,7 +44,7 @@ class AppViewModel @Inject constructor(
     val timeFormat: StateFlow<TimeFormat?> = preferencesRepository.timeFormat
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    /** Settings › Data › Log meals on this device; on by default. MCP logging always works. */
+    /** Settings › Data › Log meals on this device; on by default. */
     val logMealsOnDevice: StateFlow<Boolean> = preferencesRepository.logMealsOnDevice
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 

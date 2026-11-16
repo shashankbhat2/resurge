@@ -56,9 +56,8 @@ import javax.inject.Inject
 import kotlin.math.roundToInt
 
 /**
- * The one way to log a meal in the app (when Settings › Data › Log meals on this device is on): a
- * meal type, a title and the meal's totals. Also edits or deletes a logged meal. Itemised meals
- * (usually from the AI assistant over MCP) keep their items; only the type and title change here.
+ * Fallback editor: a meal type, a title and the meal's totals. Also edits or deletes a logged meal.
+ * Itemised meals keep their items; only the type and title change here.
  */
 internal object ManualMeals {
     const val MAX_KCAL = 10_000.0
@@ -67,7 +66,7 @@ internal object ManualMeals {
     /** A non-negative number from a field ("12", "12.5", "12,5"), or null. */
     fun parse(text: CharSequence): Double? = text.toString().trim().replace(',', '.').toDoubleOrNull()?.takeIf { it >= 0 && it.isFinite() }
 
-    /** Totals as one 100 g item whose per-100 g values are the totals, as the MCP log_meal tool stores them. */
+    /** Totals as one 100 g item whose per-100 g values are the totals. */
     fun items(title: String, kcal: Double, protein: Double, carbs: Double, fat: Double, fiber: Double = 0.0): List<FoodItem> =
         listOf(FoodItem(title.trim().ifEmpty { "Meal" }.take(60), 100.0, Nutrition(kcal, protein, carbs, fat, fiber)))
 
@@ -204,7 +203,7 @@ private fun Form(meal: Meal?, onSave: (MealType, String, Nutrition) -> Unit, onD
                 Spacer(Modifier.weight(1f))
             }
             Text(
-                "Your AI assistant can log meals item by item through MCP; here it's one line per meal.",
+                "One line for the meal's totals.",
                 style = Resurge.type.caption,
                 color = Resurge.colors.textSubtle,
             )
@@ -217,7 +216,7 @@ private fun Form(meal: Meal?, onSave: (MealType, String, Nutrition) -> Unit, onD
                 }
             }
             Text(
-                "Logged item by item, so only the meal and title change here. Ask your assistant to change the items.",
+                "Logged item by item, so only the meal and title change here.",
                 style = Resurge.type.caption,
                 color = Resurge.colors.textSubtle,
             )

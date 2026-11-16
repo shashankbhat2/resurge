@@ -46,7 +46,7 @@ import kotlin.math.roundToInt
 
 /** Where timeline cards lead. */
 class FeedActions(
-    /** Null when meals can't be edited on this device (they're logged through MCP): rows are read-only. */
+    /** Opens a logged meal for edit. */
     val onOpenMeal: ((String) -> Unit)? = null,
     val onOpenWorkout: (String) -> Unit = {},
     val onOpenSleep: () -> Unit = {},

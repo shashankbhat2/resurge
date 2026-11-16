@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Meals
+- The Food tab filters by date (today, yesterday, last 7, last 30, custom range), meal type and a search of titles and foods, and can sort by time or calories.
+- Each day shows calories, protein, carbs, fat and fibre against your targets. Tap a meal to edit it; swipe to delete. That works for meals you logged and meals your assistant logged.
+- In-app snap / scan / type is back (on by default). Settings › Data › Log meals on this device hides the logger; meals stay editable.
+- The Food tab no longer pushes MCP. Personal keys stay under Settings › Data › MCP API keys.
+
+### Assistant meal edits
+- `get_meals` includes each meal's id. `update_meal` and `delete_meal` let an assistant change or remove a log.
+
 ## 0.6.0 (15 November 2026)
 
 ### Connect your AI assistant

@@ -33,8 +33,8 @@ class PreferencesRepository @Inject constructor(
     }
 
     /**
-     * Whether meals can be logged in the app (photo, barcode, type). On by default; the AI assistant
-     * can still log meals over MCP either way. Off hides in-app logging.
+     * Whether meals can be logged in the app (photo, barcode, type). On by default. Off hides
+     * snap / scan / type; meals already logged stay visible and editable.
      */
     val logMealsOnDevice: Flow<Boolean> = dataStore.data.map { it[LOG_MEALS_ON_DEVICE] != false }
 

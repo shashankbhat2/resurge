@@ -203,7 +203,7 @@ fun MainScreen(
     openInsightsSignal: Int = 0,
     openHabitsSignal: Int = 0,
     openFoodSignal: FoodSignal = FoodSignal(),
-    /** Settings › Data › Log meals on this device: when off, meals are read-only here (MCP still logs). */
+    /** Settings › Data › Log meals on this device: when off, hide snap / scan / type. Meals stay editable. */
     logMealsOnDevice: Boolean = true,
     openProgressSignal: ProgressSignal = ProgressSignal(),
     openWeightSignal: WeightSignal = WeightSignal(),
@@ -254,7 +254,6 @@ fun MainScreen(
                     if (metric == HealthMetric.WEIGHT) rootNav.navigate(WeightScreenRoute()) else rootNav.navigate(MetricDetailRoute(metric.name))
                 },
                 onOpenSettings = { rootNav.navigate(SettingsRoute()) },
-                onOpenMcpKeys = { rootNav.navigate(SettingsRoute(mcpKeys = true)) },
                 onOpenCoach = { rootNav.navigate(CoachScreenRoute(newChat = true)) },
                 onOpenInsights = { rootNav.navigate(InsightsScreenRoute) },
                 onOpenHabit = { id -> rootNav.navigate(HabitDetailRoute(id)) },
@@ -262,7 +261,7 @@ fun MainScreen(
                 onLogWorkout = { rootNav.navigate(ActivityPickerRoute()) },
                 onOpenWorkout = { id -> rootNav.navigate(WorkoutEditorRoute(workoutId = id)) },
                 onLogMeal = if (logMealsOnDevice) { { rootNav.navigate(FoodLogRoute()) } } else null,
-                onOpenMeal = if (logMealsOnDevice) { { id -> rootNav.navigate(MealReviewRoute(mealId = id)) } } else null,
+                onOpenMeal = { id -> rootNav.navigate(MealReviewRoute(mealId = id)) },
                 onOpenReel = { id -> rootNav.navigate(ReelRoute(id)) },
                 openFoodTabSignal = if (openFoodSignal.mode == null || !logMealsOnDevice) openFoodSignal.count else 0,
                 openHabitsSignal = openHabitsSignal,
@@ -447,9 +446,8 @@ private fun TabsShell(
     onAddHabit: () -> Unit,
     onLogWorkout: () -> Unit,
     onOpenWorkout: (String) -> Unit,
-    onOpenMcpKeys: () -> Unit,
     onLogMeal: (() -> Unit)?,
-    onOpenMeal: ((String) -> Unit)?,
+    onOpenMeal: (String) -> Unit,
     onOpenReel: (String) -> Unit,
     openFoodTabSignal: Int,
     openHabitsSignal: Int,
@@ -504,7 +502,7 @@ private fun TabsShell(
                 }
                 composable<FitnessRoute> { FitnessScreenRoute(onOpenWorkout = onOpenWorkout, onLogWorkout = onLogWorkout) }
                 composable<FoodRoute> {
-                    FoodScreenRoute(onOpenMeal = { id -> onOpenMeal?.invoke(id) }, onLogMeal = { onLogMeal?.invoke() }, onOpenMcpKeys = onOpenMcpKeys)
+                    FoodScreenRoute(onOpenMeal = onOpenMeal, onLogMeal = { onLogMeal?.invoke() })
                 }
                 composable<HabitsRoute> { HabitsScreenRoute(onOpenHabit = onOpenHabit, onAddHabit = onAddHabit) }
             }

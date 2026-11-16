@@ -32,7 +32,7 @@ import java.time.ZoneId
 /** Record with :feature:food:recordRoborazziDebug. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35], qualifiers = "w400dp-h1500dp-xhdpi")
+@Config(sdk = [35], qualifiers = "w400dp-h1900dp-xhdpi")
 class FoodScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
@@ -59,14 +59,18 @@ class FoodScreenshotTest {
         ),
         item("Cucumber raita", 80.0, 60.0, 3.0, 5.0, 3.0, source = FoodSource("estimate", "Estimate", verified = false)))
 
+    private val days = listOf(FoodDay(today, listOf(breakfast, lunch)))
     private val state = FoodUiState(
         loading = false,
         today = today,
         todayTotals = breakfast.totals + lunch.totals,
+        todayMealCount = 2,
         targets = Targets(2200, 3000),
         macroTargets = MacroTargets.from(2200),
         waterMl = 1250,
-        days = listOf(FoodDay(today, listOf(MealType.BREAKFAST to listOf(breakfast), MealType.LUNCH to listOf(lunch)))),
+        days = days,
+        weekDays = days,
+        hasAnyMeals = true,
     )
 
     private fun capture(name: String, content: @androidx.compose.runtime.Composable () -> Unit, scheme: ColorScheme = ColorScheme.Light) {
@@ -77,16 +81,24 @@ class FoodScreenshotTest {
     }
 
     private fun feed(s: FoodUiState) = @androidx.compose.runtime.Composable {
-        FoodScreen(s, onOpenMeal = {}, onLogMeal = {}, onOpenMcpKeys = {}, onAddWater = {}, onDelete = {}, onUndo = {}, onUndoTimeout = {})
+        FoodScreen(s, onOpenMeal = {}, onLogMeal = {}, onAddWater = {}, onDelete = {}, onUndo = {}, onUndoTimeout = {})
     }
 
-    // Default: in-app logging (photo / barcode / type) plus MCP.
     @Test fun feed() = capture("feed", feed(state))
     @Test fun feedDark() = capture("feed_dark", feed(state), ColorScheme.Dark)
 
-    // Settings › Data › Log meals on this device turned off: MCP-only, read-only.
-    @Test fun feedMcp() = capture("feed_mcp", feed(state.copy(logOnDevice = false)))
-    @Test fun empty() = capture("empty", feed(state.copy(days = emptyList(), todayTotals = Nutrition.Zero, waterMl = 0)))
+    @Test fun feedLoggerOff() = capture("feed_logger_off", feed(state.copy(logOnDevice = false)))
+    @Test fun feedLunch() = capture(
+        "feed_lunch",
+        feed(
+            state.copy(
+                filters = FoodFeed.Filters(types = setOf(MealType.LUNCH)),
+                days = listOf(FoodDay(today, listOf(lunch))),
+            ),
+        ),
+    )
+    @Test fun empty() = capture("empty", feed(state.copy(days = emptyList(), todayTotals = Nutrition.Zero, todayMealCount = 0, waterMl = 0, weekDays = emptyList(), hasAnyMeals = false)))
+    @Test fun emptyFilters() = capture("empty_filters", feed(state.copy(days = emptyList(), weekDays = emptyList())))
 
     private fun manual(s: ManualMealState) = @androidx.compose.runtime.Composable {
         ManualMealScreen(s, onBack = {}, onSave = { _, _, _ -> }, onDelete = {})

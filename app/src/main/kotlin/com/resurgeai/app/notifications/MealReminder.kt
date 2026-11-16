@@ -82,7 +82,7 @@ object MealReminder {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
-    /** [onDevice]: in-app Scan / Type actions; MCP logging is always available either way. */
+    /** [onDevice]: in-app Scan / Type actions. */
     internal fun notify(context: Context, type: MealType, onDevice: Boolean) {
         val (title, text) = when (type) {
             MealType.BREAKFAST -> "Logged breakfast?" to if (onDevice) "Snap your plate, type it, or tell your AI assistant." else "Tell your AI assistant what you had."

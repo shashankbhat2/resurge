@@ -2,13 +2,12 @@ package com.resurgeai.feature.food
 
 import com.resurgeai.core.designsystem.components.OverviewFooterHeight
 import com.resurgeai.core.designsystem.components.OverviewBodyHeight
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -48,7 +47,6 @@ import com.resurgeai.core.designsystem.components.Overline
 import com.resurgeai.core.designsystem.components.ResurgeIcons
 import com.resurgeai.core.designsystem.components.Ring
 import com.resurgeai.core.designsystem.components.RingSegment
-import com.resurgeai.core.designsystem.components.SectionLabel
 import com.resurgeai.core.designsystem.components.SkeletonBox
 import com.resurgeai.core.designsystem.components.SkeletonGroup
 import com.resurgeai.core.designsystem.components.StatCell
@@ -57,8 +55,11 @@ import com.resurgeai.core.designsystem.components.SwipeToDelete
 import com.resurgeai.core.designsystem.components.UndoBar
 import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.designsystem.theme.clockFormatter
+import com.resurgeai.core.model.MacroTargets
 import com.resurgeai.core.model.Meal
+import com.resurgeai.core.model.MealType
 import com.resurgeai.core.model.Nutrition
+import com.resurgeai.core.model.Targets
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -69,7 +70,6 @@ import kotlin.math.roundToInt
 fun FoodRoute(
     onOpenMeal: (String) -> Unit,
     onLogMeal: () -> Unit,
-    onOpenMcpKeys: () -> Unit,
     viewModel: FoodViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -77,31 +77,38 @@ fun FoodRoute(
         state = state,
         onOpenMeal = onOpenMeal,
         onLogMeal = onLogMeal,
-        onOpenMcpKeys = onOpenMcpKeys,
         onAddWater = viewModel::addWater,
         onDelete = viewModel::delete,
         onUndo = viewModel::undoDelete,
         onUndoTimeout = viewModel::clearDeleted,
+        onRange = viewModel::setRange,
+        onPickDate = viewModel::pickCustomDate,
+        onToggleType = viewModel::toggleType,
+        onClearTypes = viewModel::clearTypes,
+        onSort = viewModel::setSort,
+        onQuery = viewModel::setQuery,
     )
 }
 
-/** Meals that fill the tide's meals segment (TideMath.MEALS_GOAL on Today). */
-
 /**
- * Food tab: today's fuel (calories, macros, meals and water), then meals by day. In-app logging
- * (photo, barcode, type) is on by default; the AI assistant can also log meals over MCP. With
- * "Log meals on this device" off, rows are read-only.
+ * Food tab: today's fuel, then a filterable log. Rows open the meal editor; swipe left deletes.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FoodScreen(
     state: FoodUiState,
     onOpenMeal: (String) -> Unit,
     onLogMeal: () -> Unit,
-    onOpenMcpKeys: () -> Unit,
     onAddWater: (Int) -> Unit,
     onDelete: (Meal) -> Unit,
     onUndo: () -> Unit,
     onUndoTimeout: () -> Unit,
+    onRange: (FoodFeed.Range) -> Unit = {},
+    onPickDate: (LocalDate) -> Unit = {},
+    onToggleType: (MealType) -> Unit = {},
+    onClearTypes: () -> Unit = {},
+    onSort: (FoodFeed.Sort) -> Unit = {},
+    onQuery: (String) -> Unit = {},
 ) {
     val top = LocalHeaderInset.current + 12.dp
     val bottom = LocalFloatingBarInset.current + 24.dp
@@ -120,25 +127,31 @@ fun FoodScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 item(key = "fuel") { FuelCard(state, onAddWater.takeIf { state.logOnDevice }) }
-                if (!state.logOnDevice) item(key = "mcp") { McpPrompt(onOpenMcpKeys) }
-                if (state.todayTotals.micros.isNotEmpty() || state.todayTotals.fiber > 0) item(key = "micros") { TodayMicros(state.todayTotals, state.macroTargets.fiber) }
-                if (state.days.isNotEmpty()) item(key = "glycemic") { GlycemicCard(state) }
-                if (state.days.isEmpty() && state.logOnDevice) item(key = "empty") { EmptyFeed(onLogMeal) }
+                item(key = "filters") {
+                    FilterBar(state, onRange, onPickDate, onToggleType, onClearTypes, onSort, onQuery)
+                }
+                if (state.todayTotals.micros.isNotEmpty() || state.todayTotals.fiber > 0) {
+                    item(key = "micros") { TodayMicros(state.todayTotals, state.macroTargets.fiber) }
+                }
+                if (showGlycemic(state)) item(key = "glycemic") { GlycemicCard(state) }
+                when {
+                    state.days.isNotEmpty() -> { /* days below */ }
+                    !state.hasAnyMeals && state.logOnDevice -> item(key = "empty") { EmptyFeed(onLogMeal) }
+                    !state.hasAnyMeals -> item(key = "empty") { EmptyLog() }
+                    else -> item(key = "empty-filter") { EmptyFilters() }
+                }
                 state.days.forEach { day ->
-                    val meals = day.slots.flatMap { it.second }
-                    item(key = "d${day.date}") {
-                        SectionLabel(
-                            dayLabel(day.date, state.today),
-                            Modifier.padding(top = 8.dp),
-                            trailing = "${meals.size} ${if (meals.size == 1) "meal" else "meals"} · ${kcal(day.totals.kcal)}",
+                    stickyHeader(key = "d${day.date}") {
+                        DayTotals(
+                            day = day,
+                            today = state.today,
+                            targets = state.targets,
+                            macros = state.macroTargets,
+                            modifier = Modifier.background(Resurge.colors.bg).padding(top = 8.dp, bottom = 4.dp),
                         )
                     }
-                    items(meals, key = { it.id }) { meal ->
-                        if (state.logOnDevice) {
-                            SwipeToDelete(onDelete = { onDelete(meal) }) { MealRow(meal) { onOpenMeal(meal.id) } }
-                        } else {
-                            MealRow(meal, onClick = null)
-                        }
+                    items(day.meals, key = { it.id }) { meal ->
+                        SwipeToDelete(onDelete = { onDelete(meal) }) { MealRow(meal) { onOpenMeal(meal.id) } }
                     }
                 }
             }
@@ -152,6 +165,11 @@ fun FoodScreen(
     }
 }
 
+private fun showGlycemic(state: FoodUiState): Boolean {
+    val f = state.filters
+    return f.range == FoodFeed.Range.LAST_7 && f.types.isEmpty() && f.query.isBlank() && state.weekDays.isNotEmpty()
+}
+
 /**
  * The tab's hero, like Today's tide card: the calorie ring and macro bars on top, then a footer of
  * meals (toward the tide's meals segment) and water with a quick +250.
@@ -161,7 +179,7 @@ private fun FuelCard(state: FoodUiState, onAddWater: ((Int) -> Unit)?) {
     val eaten = state.todayTotals
     val target = state.targets.calories
     val left = target - eaten.kcal.roundToInt()
-    val mealsToday = state.days.firstOrNull { it.date == state.today }?.slots?.sumOf { it.second.size } ?: 0
+    val mealsToday = state.todayMealCount
     Column(Modifier.fillMaxWidth().clip(Resurge.shape.lg).background(Resurge.colors.surface)) {
         Column(Modifier.fillMaxWidth().height(OverviewBodyHeight).padding(20.dp)) {
             Overline("Fuel today")
@@ -256,7 +274,52 @@ private fun WaterCell(ml: Int, target: Int, onAdd: (() -> Unit)?, modifier: Modi
     }
 }
 
-/** A logged meal: photo, title, slot and time, calories, and its macro split. Tapping opens it (when [onClick] is set). */
+@Composable
+internal fun DayTotals(
+    day: FoodDay,
+    today: LocalDate,
+    targets: Targets,
+    macros: MacroTargets,
+    modifier: Modifier = Modifier,
+) {
+    val n = day.totals
+    val meals = day.meals.size
+    Column(
+        modifier.fillMaxWidth().clip(Resurge.shape.md).background(Resurge.colors.surface).padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(dayLabel(day.date, today), style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight), modifier = Modifier.weight(1f))
+            Text(
+                "$meals ${if (meals == 1) "meal" else "meals"} · ${kcalNumber(n.kcal)} / %,d kcal".format(targets.calories),
+                style = Resurge.type.caption.copy(fontFeatureSettings = "tnum"),
+                color = Resurge.colors.textSubtle,
+            )
+        }
+        MagnitudeBar((n.kcal / targets.calories.coerceAtLeast(1)).toFloat().coerceIn(0f, 1f), Resurge.colors.energy, height = 6.dp)
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            DayMacro("P", n.protein, macros.protein, MacroVisuals.protein(), Modifier.weight(1f))
+            DayMacro("C", n.carbs, macros.carbs, MacroVisuals.carbs(), Modifier.weight(1f))
+            DayMacro("F", n.fat, macros.fat, MacroVisuals.fat(), Modifier.weight(1f))
+            DayMacro("Fi", n.fiber, macros.fiber, Resurge.colors.accent, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun DayMacro(label: String, grams: Double, target: Int, color: Color, modifier: Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            "$label ${grams.roundToInt()}/${target.coerceAtLeast(0)}",
+            style = Resurge.type.caption.copy(fontFeatureSettings = "tnum"),
+            color = Resurge.colors.textMuted,
+            maxLines = 1,
+        )
+        MagnitudeBar((grams / target.coerceAtLeast(1)).toFloat().coerceIn(0f, 1f), color, height = 5.dp)
+    }
+}
+
+/** A logged meal: photo, title, slot and time, calories, and its macro split. Tapping opens it. */
 @Composable
 private fun MealRow(meal: Meal, onClick: (() -> Unit)?) {
     val totals = meal.totals
@@ -298,7 +361,7 @@ private fun EmptyFeed(onLogMeal: () -> Unit) {
     ) {
         Text("Log your first meal", style = Resurge.type.headline)
         Text(
-            "Snap a photo, scan a barcode or type what you had. Your AI assistant can also log meals through MCP.",
+            "Snap a photo, scan a barcode or type what you had.",
             style = Resurge.type.body,
             color = Resurge.colors.textMuted,
         )
@@ -306,33 +369,33 @@ private fun EmptyFeed(onLogMeal: () -> Unit) {
     }
 }
 
-/**
- * Shown while "Log meals on this device" is off: meals arrive from the AI assistant over MCP, so the
- * tab points there instead of offering its own logging.
- */
 @Composable
-private fun McpPrompt(onOpenMcpKeys: () -> Unit) {
+private fun EmptyLog() {
     Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp)
-            .clip(Resurge.shape.md)
-            .border(1.dp, Resurge.colors.border, Resurge.shape.md)
-            .padding(16.dp),
+        Modifier.fillMaxWidth().padding(top = 8.dp).clip(Resurge.shape.md).background(Resurge.colors.surface).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(5.dp).clip(Resurge.shape.pill).background(Resurge.colors.accent))
-            Spacer(Modifier.width(8.dp))
-            Overline("Meal logging · MCP", color = Resurge.colors.text)
-        }
-        Text("Meals are logged through your AI assistant via MCP.", style = Resurge.type.body)
+        Text("No meals yet", style = Resurge.type.headline)
         Text(
-            "Ask it to log what you ate and the meals show up here. To also snap, scan or type on this phone, turn on Settings › Data › Log meals on this device.",
-            style = Resurge.type.caption,
-            color = Resurge.colors.textSubtle,
+            "Meals you log, or that your assistant logs, show up here.",
+            style = Resurge.type.body,
+            color = Resurge.colors.textMuted,
         )
-        Button("MCP API keys", onClick = onOpenMcpKeys, variant = ButtonVariant.Secondary, leadingIcon = ResurgeIcons.Key)
+    }
+}
+
+@Composable
+private fun EmptyFilters() {
+    Column(
+        Modifier.fillMaxWidth().padding(top = 8.dp).clip(Resurge.shape.md).background(Resurge.colors.surface).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text("No meals in this range", style = Resurge.type.headline)
+        Text(
+            "Try another date, meal type or search.",
+            style = Resurge.type.body,
+            color = Resurge.colors.textMuted,
+        )
     }
 }
 

@@ -24,7 +24,7 @@ class ManualMealsTest {
     }
 
     @Test
-    fun `totals become one 100 g item, like MCP log_meal, so they read back exactly`() {
+    fun `totals become one 100 g item so they read back exactly`() {
         val items = ManualMeals.items("  Dal and rice ", 640.0, 22.0, 98.0, 14.0, 9.0)
         assertEquals(1, items.size)
         assertEquals("Dal and rice", items[0].name)
@@ -34,7 +34,7 @@ class ManualMealsTest {
     }
 
     @Test
-    fun `kcal is required and values stay within the MCP limits`() {
+    fun `kcal is required and values stay within the typed limits`() {
         assertTrue(ManualMeals.valid(640.0, 22.0, null, null))
         assertFalse(ManualMeals.valid(null, 22.0))
         assertFalse(ManualMeals.valid(10_001.0))
