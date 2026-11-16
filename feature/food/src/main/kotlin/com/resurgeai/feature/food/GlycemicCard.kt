@@ -25,16 +25,17 @@ import java.time.format.TextStyle
 import java.util.Locale
 
 /**
- * Predicted glycaemic load: the last 7 days as dot columns (with the low/medium line at 80), then
- * today's meals with their predicted GI and GL. Clearly marked as a prediction, never a measurement.
+ * Predicted glycaemic load: the 7 days up to the picked day as dot columns (low/medium line at 80),
+ * then that day's meals with their predicted GI and GL. Clearly marked as a prediction, never a measurement.
  */
 @Composable
 internal fun GlycemicCard(state: FoodUiState) {
-    val dates = (6 downTo 0).map { state.today.minusDays(it.toLong()) }
+    val dates = (6 downTo 0).map { state.selected.minusDays(it.toLong()) }
     val byDay = state.weekDays.associate { d -> d.date to d.meals }
     val dayGl = dates.map { date -> byDay[date]?.sumOf { Glycemic.estimate(it).gl }?.toDouble() }
-    val today = byDay[state.today].orEmpty()
+    val today = byDay[state.selected].orEmpty()
     val todayGl = dayGl.last()?.toInt()
+    val name = dayLabel(state.selected, state.today)
     val zone = ZoneId.systemDefault()
     val clock = clockFormatter()
 
@@ -47,7 +48,7 @@ internal fun GlycemicCard(state: FoodUiState) {
             PredictedTag()
         }
         Text(
-            todayGl?.let { "Today ~$it · ${band(Glycemic.dayBand(it))}" } ?: "No meals today",
+            todayGl?.let { "$name ~$it · ${band(Glycemic.dayBand(it))}" } ?: "No meals ${name.lowercase()}",
             style = Resurge.type.headline,
         )
         BarChart(
@@ -56,7 +57,7 @@ internal fun GlycemicCard(state: FoodUiState) {
             color = Resurge.colors.energy,
             target = 80.0,
             chartHeight = 84.dp,
-            modifier = Modifier.semantics { contentDescription = "Predicted glycaemic load for the last 7 days" },
+            modifier = Modifier.semantics { contentDescription = "Predicted glycaemic load for the 7 days to ${name.lowercase()}" },
         )
         today.forEach { meal ->
             val e = Glycemic.estimate(meal)

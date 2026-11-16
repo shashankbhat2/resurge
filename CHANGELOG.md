@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.6 (16 November 2026)
+
+### Food, one day at a time
+- A strip of days sits at the top of the Food tab. Scroll it sideways to go back through the last 90 days. The day you pick stays in the middle, and Today → jumps back.
+- Each day's ring shows how it went: dashed for nothing logged, a partial arc for under target, a full blue ring for on target, and a full ring with a dot for over.
+- Fuel, meals, water, micronutrients and glycaemic load all show the picked day. The date, meal type, sort and search filters are gone.
+- Log meal is now a small button at the bottom right of the Food tab, not the "+" in the header.
+
 ## 0.6.5 (16 November 2026)
 
 ### Meals

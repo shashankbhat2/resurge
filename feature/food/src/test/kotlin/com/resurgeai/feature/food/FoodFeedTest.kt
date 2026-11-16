@@ -4,6 +4,7 @@ import com.resurgeai.core.model.FoodItem
 import com.resurgeai.core.model.Meal
 import com.resurgeai.core.model.MealSource
 import com.resurgeai.core.model.MealType
+import com.resurgeai.feature.food.FoodFeed.DayState
 import com.resurgeai.core.model.Nutrition
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -35,58 +36,50 @@ class FoodFeedTest {
     private val all = listOf(breakfast, lunch, yesterdaySnack, oldDinner)
 
     @Test
-    fun `last 7 days is today and the six before`() {
-        val (from, to) = FoodFeed.bounds(today, FoodFeed.Filters(range = FoodFeed.Range.LAST_7))
-        assertEquals(today.minusDays(6), from)
-        assertEquals(today, to)
+    fun dayStateFollowsCaloriesAgainstTarget() {
+        assertEquals(DayState.EMPTY, FoodFeed.dayState(today, today, 0.0, 0, 2000))
+        assertEquals(DayState.UNDER, FoodFeed.dayState(today, today, 1200.0, 2, 2000))
+        assertEquals(DayState.ON_TARGET, FoodFeed.dayState(today, today, 1850.0, 3, 2000))
+        assertEquals(DayState.ON_TARGET, FoodFeed.dayState(today, today, 2200.0, 3, 2000))
+        assertEquals(DayState.OVER, FoodFeed.dayState(today, today, 2600.0, 4, 2000))
+        assertEquals(DayState.FUTURE, FoodFeed.dayState(today.plusDays(1), today, 0.0, 0, 2000))
     }
 
     @Test
-    fun `custom range uses the two picked days, either order`() {
-        val filters = FoodFeed.Filters(range = FoodFeed.Range.CUSTOM, customFrom = today, customTo = today.minusDays(3))
-        val (from, to) = FoodFeed.bounds(today, filters)
-        assertEquals(today.minusDays(3), from)
-        assertEquals(today, to)
+    fun calendarRunsFromHistoryStartToAWeekAhead() {
+        val from = today.minusDays(FoodFeed.HISTORY_DAYS)
+        val cal = FoodFeed.calendar(all, today, from, 2000)
+        assertEquals(FoodFeed.HISTORY_DAYS + FoodFeed.FUTURE_DAYS + 1, cal.size.toLong())
+        assertEquals(from, cal.first().date)
+        assertEquals(today.plusDays(FoodFeed.FUTURE_DAYS), cal.last().date)
+        val t = cal.single { it.date == today }
+        assertEquals(2, t.meals)
+        assertEquals(1310.0, t.kcal, 0.01)
+        assertEquals(DayState.UNDER, t.state)
+        assertEquals(DayState.EMPTY, cal.single { it.date == today.minusDays(2) }.state)
+        assertTrue(cal.filter { it.date.isAfter(today) }.all { it.state == DayState.FUTURE })
     }
 
     @Test
-    fun `search matches title or an item name`() {
-        assertTrue(FoodFeed.matchesQuery(lunch, "paneer"))
-        assertTrue(FoodFeed.matchesQuery(lunch, "basmati"))
-        assertFalse(FoodFeed.matchesQuery(lunch, "omelette"))
-        assertTrue(FoodFeed.matchesQuery(lunch, "  "))
+    fun dayListsOnlyThatDayInEatingOrder() {
+        val day = FoodFeed.day(listOf(lunch, yesterdaySnack, breakfast), today)
+        assertEquals(listOf("b", "l"), day.meals.map { it.id })
+        assertEquals(1310.0, day.totals.kcal, 0.01)
+        assertTrue(FoodFeed.day(all, today.minusDays(2)).meals.isEmpty())
     }
 
     @Test
-    fun `type filter and last 7 hide older dinners`() {
-        val days = FoodFeed.days(all, today, FoodFeed.Filters(types = setOf(MealType.LUNCH)))
-        assertEquals(listOf("l"), days.flatMap { it.meals.map { m -> m.id } })
+    fun weekCoversSevenDaysEndingOnTheDay() {
+        val week = FoodFeed.week(all, today)
+        assertEquals(listOf(today.minusDays(1), today), week.map { it.date })
+        assertFalse(week.any { it.date == oldDinner.date })
     }
 
     @Test
-    fun `yesterday range is only that day`() {
-        val days = FoodFeed.days(all, today, FoodFeed.Filters(range = FoodFeed.Range.YESTERDAY))
-        assertEquals(listOf(today.minusDays(1)), days.map { it.date })
-        assertEquals(listOf("s"), days.single().meals.map { it.id })
-    }
-
-    @Test
-    fun `high kcal sorts meals inside a day`() {
-        val days = FoodFeed.days(listOf(breakfast, lunch), today, FoodFeed.Filters(sort = FoodFeed.Sort.HIGH_KCAL))
-        assertEquals(listOf("l", "b"), days.single().meals.map { it.id })
-    }
-
-    @Test
-    fun `oldest lists days then meals ascending`() {
-        val days = FoodFeed.days(all, today, FoodFeed.Filters(range = FoodFeed.Range.LAST_30, sort = FoodFeed.Sort.OLDEST))
-        assertEquals(listOf(today.minusDays(10), today.minusDays(1), today), days.map { it.date })
-        assertEquals(listOf("b", "l"), days.last().meals.map { it.id })
-    }
-
-    @Test
-    fun `toggling every type clears the filter`() {
-        var types = emptySet<MealType>()
-        MealType.entries.forEach { types = FoodFeed.toggleType(types, it) }
-        assertTrue(types.isEmpty())
+    fun clampKeepsPicksInsideHistory() {
+        val from = today.minusDays(FoodFeed.HISTORY_DAYS)
+        assertEquals(today, FoodFeed.clamp(today.plusDays(3), today, from))
+        assertEquals(from, FoodFeed.clamp(from.minusDays(5), today, from))
+        assertEquals(today.minusDays(4), FoodFeed.clamp(today.minusDays(4), today, from))
     }
 }

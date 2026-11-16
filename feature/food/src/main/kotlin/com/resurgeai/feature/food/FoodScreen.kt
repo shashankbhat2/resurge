@@ -2,7 +2,6 @@ package com.resurgeai.feature.food
 
 import com.resurgeai.core.designsystem.components.OverviewFooterHeight
 import com.resurgeai.core.designsystem.components.OverviewBodyHeight
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -35,8 +35,6 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composeunstyled.Text
 import com.composeunstyled.UnstyledButton
-import com.resurgeai.core.designsystem.components.Button
-import com.resurgeai.core.designsystem.components.ButtonVariant
 import com.resurgeai.core.designsystem.components.Divider
 import com.resurgeai.core.designsystem.components.Icon
 import com.resurgeai.core.designsystem.components.LocalFloatingBarInset
@@ -47,6 +45,7 @@ import com.resurgeai.core.designsystem.components.Overline
 import com.resurgeai.core.designsystem.components.ResurgeIcons
 import com.resurgeai.core.designsystem.components.Ring
 import com.resurgeai.core.designsystem.components.RingSegment
+import com.resurgeai.core.designsystem.components.SectionLabel
 import com.resurgeai.core.designsystem.components.SkeletonBox
 import com.resurgeai.core.designsystem.components.SkeletonGroup
 import com.resurgeai.core.designsystem.components.StatCell
@@ -55,11 +54,8 @@ import com.resurgeai.core.designsystem.components.SwipeToDelete
 import com.resurgeai.core.designsystem.components.UndoBar
 import com.resurgeai.core.designsystem.theme.Resurge
 import com.resurgeai.core.designsystem.theme.clockFormatter
-import com.resurgeai.core.model.MacroTargets
 import com.resurgeai.core.model.Meal
-import com.resurgeai.core.model.MealType
 import com.resurgeai.core.model.Nutrition
-import com.resurgeai.core.model.Targets
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -81,19 +77,15 @@ fun FoodRoute(
         onDelete = viewModel::delete,
         onUndo = viewModel::undoDelete,
         onUndoTimeout = viewModel::clearDeleted,
-        onRange = viewModel::setRange,
-        onPickDate = viewModel::pickCustomDate,
-        onToggleType = viewModel::toggleType,
-        onClearTypes = viewModel::clearTypes,
-        onSort = viewModel::setSort,
-        onQuery = viewModel::setQuery,
+        onSelectDay = viewModel::select,
     )
 }
 
 /**
- * Food tab: today's fuel, then a filterable log. Rows open the meal editor; swipe left deletes.
+ * Food tab: a day strip on top (today in the middle, scroll back through past days), then the
+ * picked day's fuel, its meals and its micronutrients. Rows open the meal editor; swipe left deletes.
+ * Log meal sits small in the bottom-right corner while logging on this device is on.
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FoodScreen(
     state: FoodUiState,
@@ -103,21 +95,19 @@ fun FoodScreen(
     onDelete: (Meal) -> Unit,
     onUndo: () -> Unit,
     onUndoTimeout: () -> Unit,
-    onRange: (FoodFeed.Range) -> Unit = {},
-    onPickDate: (LocalDate) -> Unit = {},
-    onToggleType: (MealType) -> Unit = {},
-    onClearTypes: () -> Unit = {},
-    onSort: (FoodFeed.Sort) -> Unit = {},
-    onQuery: (String) -> Unit = {},
+    onSelectDay: (LocalDate) -> Unit = {},
 ) {
     val top = LocalHeaderInset.current + 12.dp
-    val bottom = LocalFloatingBarInset.current + 24.dp
+    val barInset = LocalFloatingBarInset.current
+    val bottom = barInset + 24.dp + if (state.logOnDevice) 56.dp else 0.dp
+    val day = state.day
     Box(Modifier.fillMaxSize()) {
         if (state.loading) {
             SkeletonGroup {
                 Column(Modifier.padding(start = 16.dp, end = 16.dp, top = top), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SkeletonBox(Modifier.fillMaxWidth().height(170.dp), Resurge.shape.lg)
                     SkeletonBox(Modifier.fillMaxWidth().height(300.dp), Resurge.shape.lg)
-                    repeat(3) { SkeletonBox(Modifier.fillMaxWidth().height(84.dp), Resurge.shape.md) }
+                    repeat(2) { SkeletonBox(Modifier.fillMaxWidth().height(84.dp), Resurge.shape.md) }
                 }
             }
         } else {
@@ -126,48 +116,60 @@ fun FoodScreen(
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = top, bottom = bottom),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                item(key = "fuel") { FuelCard(state, onAddWater.takeIf { state.logOnDevice }) }
-                item(key = "filters") {
-                    FilterBar(state, onRange, onPickDate, onToggleType, onClearTypes, onSort, onQuery)
+                item(key = "calendar") { DayStrip(state, onSelectDay) }
+                item(key = "fuel") { FuelCard(state, onAddWater.takeIf { state.logOnDevice && state.isToday }) }
+                item(key = "meals-label") {
+                    SectionLabel(
+                        "Meals",
+                        modifier = Modifier.padding(top = 12.dp, bottom = 2.dp),
+                        trailing = if (day.meals.isEmpty()) null else "${day.meals.size} · ${kcal(day.totals.kcal)}",
+                    )
                 }
-                if (state.todayTotals.micros.isNotEmpty() || state.todayTotals.fiber > 0) {
-                    item(key = "micros") { TodayMicros(state.todayTotals, state.macroTargets.fiber) }
-                }
-                if (showGlycemic(state)) item(key = "glycemic") { GlycemicCard(state) }
-                when {
-                    state.days.isNotEmpty() -> { /* days below */ }
-                    !state.hasAnyMeals && state.logOnDevice -> item(key = "empty") { EmptyFeed(onLogMeal) }
-                    !state.hasAnyMeals -> item(key = "empty") { EmptyLog() }
-                    else -> item(key = "empty-filter") { EmptyFilters() }
-                }
-                state.days.forEach { day ->
-                    stickyHeader(key = "d${day.date}") {
-                        DayTotals(
-                            day = day,
-                            today = state.today,
-                            targets = state.targets,
-                            macros = state.macroTargets,
-                            modifier = Modifier.background(Resurge.colors.bg).padding(top = 8.dp, bottom = 4.dp),
-                        )
-                    }
+                if (day.meals.isEmpty()) {
+                    item(key = "empty") { EmptyDay(state) }
+                } else {
                     items(day.meals, key = { it.id }) { meal ->
                         SwipeToDelete(onDelete = { onDelete(meal) }) { MealRow(meal) { onOpenMeal(meal.id) } }
                     }
                 }
+                if (day.totals.micros.isNotEmpty() || day.totals.fiber > 0) {
+                    item(key = "micros") { DayMicros(state, day.totals, state.macroTargets.fiber) }
+                }
+                if (day.meals.isNotEmpty()) item(key = "glycemic") { GlycemicCard(state) }
             }
+        }
+        if (state.logOnDevice && !state.loading && state.deleted == null) {
+            LogMealButton(onLogMeal, Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = barInset + 12.dp))
         }
         UndoBar(
             message = state.deleted?.let { "${it.title} deleted" },
             onUndo = onUndo,
             onTimeout = onUndoTimeout,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = LocalFloatingBarInset.current + 8.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = barInset + 8.dp),
         )
     }
 }
 
-private fun showGlycemic(state: FoodUiState): Boolean {
-    val f = state.filters
-    return f.range == FoodFeed.Range.LAST_7 && f.types.isEmpty() && f.query.isBlank() && state.weekDays.isNotEmpty()
+/** Small and out of the way: bottom right, just above the navbar. */
+@Composable
+private fun LogMealButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    UnstyledButton(
+        onClick = onClick,
+        role = Role.Button,
+        modifier = modifier
+            .height(40.dp)
+            .clip(Resurge.shape.sm)
+            .background(Resurge.colors.brandInk)
+            .semantics { contentDescription = "Log a meal" },
+        contentPadding = PaddingValues(start = 12.dp, end = 14.dp),
+        indication = LocalIndication.current,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(ResurgeIcons.Plus, contentDescription = null, tint = Resurge.colors.onAccent, size = 16.dp)
+            Spacer(Modifier.width(6.dp))
+            Text("LOG MEAL", style = Resurge.type.overline, color = Resurge.colors.onAccent)
+        }
+    }
 }
 
 /**
@@ -176,13 +178,13 @@ private fun showGlycemic(state: FoodUiState): Boolean {
  */
 @Composable
 private fun FuelCard(state: FoodUiState, onAddWater: ((Int) -> Unit)?) {
-    val eaten = state.todayTotals
+    val eaten = state.day.totals
     val target = state.targets.calories
     val left = target - eaten.kcal.roundToInt()
-    val mealsToday = state.todayMealCount
+    val mealsToday = state.day.meals.size
     Column(Modifier.fillMaxWidth().clip(Resurge.shape.lg).background(Resurge.colors.surface)) {
         Column(Modifier.fillMaxWidth().height(OverviewBodyHeight).padding(20.dp)) {
-            Overline("Fuel today")
+            Overline(if (state.isToday) "Fuel today" else "Fuel · ${dayLabel(state.selected, state.today)}")
             Spacer(Modifier.height(14.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Ring(
@@ -218,9 +220,10 @@ private fun FuelCard(state: FoodUiState, onAddWater: ((Int) -> Unit)?) {
                 iconBackground = Resurge.colors.surfaceMuted,
                 value = "$mealsToday ${if (mealsToday == 1) "meal" else "meals"}",
                 label = when {
-                    state.mealsGoal == 0 -> "Logged today"
+                    state.mealsGoal == 0 -> if (state.isToday) "Logged today" else "Logged"
                     mealsToday >= state.mealsGoal -> "Streak complete"
-                    else -> "${state.mealsGoal - mealsToday} more to go"
+                    state.isToday -> "${state.mealsGoal - mealsToday} more to go"
+                    else -> "${state.mealsGoal - mealsToday} short of ${state.mealsGoal}"
                 },
                 modifier = Modifier.weight(1f),
             )
@@ -230,11 +233,11 @@ private fun FuelCard(state: FoodUiState, onAddWater: ((Int) -> Unit)?) {
     }
 }
 
-/** Today's micronutrients from the meals logged so far, against an adult's daily guide. */
+/** The picked day's micronutrients from its meals, against an adult's daily guide. */
 @Composable
-private fun TodayMicros(n: Nutrition, fiberTarget: Int) {
-    Column(Modifier.fillMaxWidth().clip(Resurge.shape.lg).background(Resurge.colors.surface).padding(20.dp)) {
-        Overline("Fibre and micronutrients today")
+private fun DayMicros(state: FoodUiState, n: Nutrition, fiberTarget: Int) {
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp).clip(Resurge.shape.lg).background(Resurge.colors.surface).padding(20.dp)) {
+        Overline(if (state.isToday) "Fibre and micronutrients today" else "Fibre and micronutrients · ${dayLabel(state.selected, state.today)}")
         Spacer(Modifier.height(4.dp))
         Text("From the foods' nutrition tables, as a share of an adult's daily guide", style = Resurge.type.caption, color = Resurge.colors.textSubtle)
         Spacer(Modifier.height(14.dp))
@@ -274,51 +277,6 @@ private fun WaterCell(ml: Int, target: Int, onAdd: (() -> Unit)?, modifier: Modi
     }
 }
 
-@Composable
-internal fun DayTotals(
-    day: FoodDay,
-    today: LocalDate,
-    targets: Targets,
-    macros: MacroTargets,
-    modifier: Modifier = Modifier,
-) {
-    val n = day.totals
-    val meals = day.meals.size
-    Column(
-        modifier.fillMaxWidth().clip(Resurge.shape.md).background(Resurge.colors.surface).padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(dayLabel(day.date, today), style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight), modifier = Modifier.weight(1f))
-            Text(
-                "$meals ${if (meals == 1) "meal" else "meals"} · ${kcalNumber(n.kcal)} / %,d kcal".format(targets.calories),
-                style = Resurge.type.caption.copy(fontFeatureSettings = "tnum"),
-                color = Resurge.colors.textSubtle,
-            )
-        }
-        MagnitudeBar((n.kcal / targets.calories.coerceAtLeast(1)).toFloat().coerceIn(0f, 1f), Resurge.colors.energy, height = 6.dp)
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            DayMacro("P", n.protein, macros.protein, MacroVisuals.protein(), Modifier.weight(1f))
-            DayMacro("C", n.carbs, macros.carbs, MacroVisuals.carbs(), Modifier.weight(1f))
-            DayMacro("F", n.fat, macros.fat, MacroVisuals.fat(), Modifier.weight(1f))
-            DayMacro("Fi", n.fiber, macros.fiber, Resurge.colors.accent, Modifier.weight(1f))
-        }
-    }
-}
-
-@Composable
-private fun DayMacro(label: String, grams: Double, target: Int, color: Color, modifier: Modifier) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            "$label ${grams.roundToInt()}/${target.coerceAtLeast(0)}",
-            style = Resurge.type.caption.copy(fontFeatureSettings = "tnum"),
-            color = Resurge.colors.textMuted,
-            maxLines = 1,
-        )
-        MagnitudeBar((grams / target.coerceAtLeast(1)).toFloat().coerceIn(0f, 1f), color, height = 5.dp)
-    }
-}
-
 /** A logged meal: photo, title, slot and time, calories, and its macro split. Tapping opens it. */
 @Composable
 private fun MealRow(meal: Meal, onClick: (() -> Unit)?) {
@@ -354,48 +312,21 @@ private fun MealRow(meal: Meal, onClick: (() -> Unit)?) {
 }
 
 @Composable
-private fun EmptyFeed(onLogMeal: () -> Unit) {
-    Column(
-        Modifier.fillMaxWidth().padding(top = 8.dp).clip(Resurge.shape.md).background(Resurge.colors.surface).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text("Log your first meal", style = Resurge.type.headline)
-        Text(
-            "Snap a photo, scan a barcode or type what you had.",
-            style = Resurge.type.body,
-            color = Resurge.colors.textMuted,
-        )
-        Button("Log a meal", onClick = onLogMeal, variant = ButtonVariant.Accent)
+private fun EmptyDay(state: FoodUiState) {
+    val (title, body) = when {
+        !state.hasAnyMeals && state.logOnDevice -> "Log your first meal" to "Snap a photo, scan a barcode or type what you had. Log meal is bottom right."
+        !state.hasAnyMeals -> "No meals yet" to "Meals you log, or that your assistant logs, show up here."
+        state.isToday && state.logOnDevice -> "Nothing logged yet today" to "Use Log meal, bottom right, when you eat."
+        state.isToday -> "Nothing logged yet today" to "Meals your assistant logs show up here."
+        state.selected == state.today.minusDays(1) -> "Nothing logged yesterday" to "Scroll the days above to see another."
+        else -> "Nothing logged on ${dayLabel(state.selected, state.today)}" to "Scroll the days above to see another."
     }
-}
-
-@Composable
-private fun EmptyLog() {
     Column(
-        Modifier.fillMaxWidth().padding(top = 8.dp).clip(Resurge.shape.md).background(Resurge.colors.surface).padding(20.dp),
+        Modifier.fillMaxWidth().clip(Resurge.shape.md).background(Resurge.colors.surface).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("No meals yet", style = Resurge.type.headline)
-        Text(
-            "Meals you log, or that your assistant logs, show up here.",
-            style = Resurge.type.body,
-            color = Resurge.colors.textMuted,
-        )
-    }
-}
-
-@Composable
-private fun EmptyFilters() {
-    Column(
-        Modifier.fillMaxWidth().padding(top = 8.dp).clip(Resurge.shape.md).background(Resurge.colors.surface).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text("No meals in this range", style = Resurge.type.headline)
-        Text(
-            "Try another date, meal type or search.",
-            style = Resurge.type.body,
-            color = Resurge.colors.textMuted,
-        )
+        Text(title, style = Resurge.type.headline)
+        Text(body, style = Resurge.type.body, color = Resurge.colors.textMuted)
     }
 }
 

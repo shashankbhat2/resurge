@@ -522,17 +522,13 @@ private fun TabsShell(
                 { Text(greeting(profile), style = Resurge.type.brand.copy(fontSize = 20.sp, lineHeight = 26.sp), maxLines = 1, overflow = TextOverflow.Ellipsis) }
             } else null,
             trailing = {
-                // Fitness and Food get a "+" to log, left of the profile photo.
-                val onAdd = when (currentTab) {
-                    Tab.Fitness -> onLogWorkout
-                    Tab.Food -> onLogMeal // null (no "+") while in-app logging is off
-                    else -> null
-                }
-                if (onAdd != null) {
+                // Fitness gets a "+" to log, left of the profile photo. Food logs from its own
+                // bottom-right button instead.
+                if (currentTab == Tab.Fitness) {
                     IconButton(
                         ResurgeIcons.Plus,
-                        contentDescription = if (currentTab == Tab.Fitness) "Log a workout" else "Log a meal",
-                        onClick = onAdd,
+                        contentDescription = "Log a workout",
+                        onClick = onLogWorkout,
                     )
                     Spacer(Modifier.width(10.dp))
                 }

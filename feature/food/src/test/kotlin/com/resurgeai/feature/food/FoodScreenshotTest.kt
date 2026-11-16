@@ -59,19 +59,33 @@ class FoodScreenshotTest {
         ),
         item("Cucumber raita", 80.0, 60.0, 3.0, 5.0, 3.0, source = FoodSource("estimate", "Estimate", verified = false)))
 
-    private val days = listOf(FoodDay(today, listOf(breakfast, lunch)))
-    private val state = FoodUiState(
+    private fun past(id: String, daysAgo: Long, kcal: Double) = Meal(
+        id, MealType.LUNCH, today.minusDays(daysAgo).atTime(13, 0).atZone(zone).toInstant(), today.minusDays(daysAgo),
+        MealSource.TEXT, "Dal, rice and sabzi", listOf(item("Dal, rice and sabzi", 100.0, kcal, kcal * 0.04, kcal * 0.13, kcal * 0.03)),
+    )
+
+    // Two weeks of history with every state: on target, under, over, nothing logged.
+    private val history = listOf(
+        past("p1", 1, 2950.0), past("p2", 2, 2150.0), past("p3", 3, 1200.0), past("p5", 5, 2050.0),
+        past("p6", 6, 2600.0), past("p7", 7, 900.0), past("p8", 8, 2250.0), past("p10", 10, 1900.0),
+    )
+    private val allMeals = listOf(breakfast, lunch) + history
+    private val from = today.minusDays(14)
+
+    private fun stateFor(selected: LocalDate, meals: List<Meal> = allMeals) = FoodUiState(
         loading = false,
         today = today,
-        todayTotals = breakfast.totals + lunch.totals,
-        todayMealCount = 2,
+        selected = selected,
+        calendar = FoodFeed.calendar(meals, today, from, 2200),
+        day = FoodFeed.day(meals, selected),
         targets = Targets(2200, 3000),
         macroTargets = MacroTargets.from(2200),
-        waterMl = 1250,
-        days = days,
-        weekDays = days,
-        hasAnyMeals = true,
+        waterMl = if (selected == today) 1250 else 2100,
+        weekDays = FoodFeed.week(meals, selected),
+        hasAnyMeals = meals.isNotEmpty(),
     )
+
+    private val state = stateFor(today)
 
     private fun capture(name: String, content: @androidx.compose.runtime.Composable () -> Unit, scheme: ColorScheme = ColorScheme.Light) {
         compose.mainClock.autoAdvance = false
@@ -88,17 +102,9 @@ class FoodScreenshotTest {
     @Test fun feedDark() = capture("feed_dark", feed(state), ColorScheme.Dark)
 
     @Test fun feedLoggerOff() = capture("feed_logger_off", feed(state.copy(logOnDevice = false)))
-    @Test fun feedLunch() = capture(
-        "feed_lunch",
-        feed(
-            state.copy(
-                filters = FoodFeed.Filters(types = setOf(MealType.LUNCH)),
-                days = listOf(FoodDay(today, listOf(lunch))),
-            ),
-        ),
-    )
-    @Test fun empty() = capture("empty", feed(state.copy(days = emptyList(), todayTotals = Nutrition.Zero, todayMealCount = 0, waterMl = 0, weekDays = emptyList(), hasAnyMeals = false)))
-    @Test fun emptyFilters() = capture("empty_filters", feed(state.copy(days = emptyList(), weekDays = emptyList())))
+    @Test fun feedPastDay() = capture("feed_past_day", feed(stateFor(today.minusDays(1))), ColorScheme.Dark)
+    @Test fun feedEmptyDay() = capture("feed_empty_day", feed(stateFor(today.minusDays(4))), ColorScheme.Dark)
+    @Test fun empty() = capture("empty", feed(stateFor(today, emptyList())))
 
     private fun manual(s: ManualMealState) = @androidx.compose.runtime.Composable {
         ManualMealScreen(s, onBack = {}, onSave = { _, _, _ -> }, onDelete = {})
