@@ -151,7 +151,8 @@ export function formatMeals(meals: MealSummary[], water: Record<string, number> 
       .map((k) => `${MICROS[k].label} ${Math.round(micros[k] * 10) / 10} ${MICROS[k].unit}`).join(", ");
     if (microText) lines.push(`  micronutrients: ${microText}`);
     for (const m of list) {
-      lines.push(`  - ${m.type}${m.time ? ` ${m.time}` : ""}: ${m.title} — ${m.kcal} kcal, P${m.protein} C${m.carbs} F${m.fat} fibre ${m.fiber} g, ${glText(m.glycemic)} (${m.items.join(", ")})`);
+      const id = m.id ? `${m.id} · ` : "";
+      lines.push(`  - ${id}${m.type}${m.time ? ` ${m.time}` : ""}: ${m.title} — ${m.kcal} kcal, P${m.protein} C${m.carbs} F${m.fat} fibre ${m.fiber} g, ${glText(m.glycemic)} (${m.items.join(", ")})`);
     }
   }
   if (meals.length > 0) lines.push(`Note: ${GLYCEMIC_NOTE}`);

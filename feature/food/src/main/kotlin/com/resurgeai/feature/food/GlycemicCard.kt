@@ -31,7 +31,7 @@ import java.util.Locale
 @Composable
 internal fun GlycemicCard(state: FoodUiState) {
     val dates = (6 downTo 0).map { state.today.minusDays(it.toLong()) }
-    val byDay = state.days.associate { d -> d.date to d.slots.flatMap { it.second } }
+    val byDay = state.weekDays.associate { d -> d.date to d.meals }
     val dayGl = dates.map { date -> byDay[date]?.sumOf { Glycemic.estimate(it).gl }?.toDouble() }
     val today = byDay[state.today].orEmpty()
     val todayGl = dayGl.last()?.toInt()

@@ -46,7 +46,7 @@ import kotlin.math.roundToInt
 
 /** Where timeline cards lead. */
 class FeedActions(
-    /** Null when meals can't be edited on this device (they're logged through MCP): rows are read-only. */
+    /** Opens a logged meal for edit. */
     val onOpenMeal: ((String) -> Unit)? = null,
     val onOpenWorkout: (String) -> Unit = {},
     val onOpenSleep: () -> Unit = {},
@@ -110,7 +110,7 @@ private fun FeedRow(
             icon()
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(title, style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight, fontSize = Resurge.type.body.fontSize), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(title, style = Resurge.type.label.copy(fontWeight = Resurge.type.headline.fontWeight, fontSize = Resurge.type.body.fontSize), maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(caption, style = Resurge.type.caption, color = Resurge.colors.textSubtle, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             if (value != null) {

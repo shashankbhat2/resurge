@@ -37,7 +37,7 @@ describe("mcp", () => {
     expect(names).toEqual([
       "get_activities", "get_coach_history", "get_daily_summaries", "get_day_streak", "get_habits", "get_health_snapshot",
       "get_insights", "get_meals", "get_nutrition_targets", "get_profile", "get_progress", "get_weight", "get_workout_logs",
-      "log_meal", "log_water", "set_habit_status", "set_nutrition_targets", "set_profile", "set_weight_goal",
+      "delete_meal", "log_meal", "log_water", "set_habit_status", "set_nutrition_targets", "set_profile", "set_weight_goal", "update_meal",
     ].sort());
   });
 

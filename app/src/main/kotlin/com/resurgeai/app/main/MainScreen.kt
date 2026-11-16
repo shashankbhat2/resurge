@@ -93,8 +93,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.resurgeai.feature.fitness.ActivityPickerRoute as ActivityPickerScreen
 import com.resurgeai.feature.fitness.FitnessRoute as FitnessScreenRoute
 import com.resurgeai.feature.fitness.WorkoutEditorRoute as WorkoutEditorScreen
+import com.resurgeai.feature.food.FoodLogRoute as FoodLogScreen
 import com.resurgeai.feature.food.FoodRoute as FoodScreenRoute
-import com.resurgeai.feature.food.ManualMealRoute as ManualMealScreen
+import com.resurgeai.feature.food.MealReviewRoute as MealReviewScreen
 import com.resurgeai.feature.progress.ProgressStrip
 import com.resurgeai.feature.weight.GoalCelebrationHost
 import com.resurgeai.feature.progress.ReelReadyCard
@@ -129,8 +130,11 @@ import com.resurgeai.feature.scale.SmartScaleRoute as SmartScaleScreen
 /** Log a workout ([activityId]) or edit one ([workoutId]). */
 @Serializable data class WorkoutEditorRoute(val workoutId: String? = null, val activityId: String? = null)
 
-/** The one in-app meal entry: log a meal (mealId null) or edit / delete one. Only reachable with "Log meals on this device" on. */
-@Serializable data class ManualMealRoute(val mealId: String? = null)
+/** In-app meal logger (photo / barcode / gallery / describe). [mode] "scan" or "type" from a reminder. */
+@Serializable data class FoodLogRoute(val mode: String? = null)
+
+/** Review a new estimate or edit a logged meal. */
+@Serializable data class MealReviewRoute(val mealId: String? = null)
 
 /** Weight trend, goal and weigh-ins; [log] opens the log sheet straight away, [newGoal] the goal editor for a fresh goal. */
 @Serializable data class WeightScreenRoute(val log: Boolean = false, val newGoal: Boolean = false)
@@ -199,8 +203,8 @@ fun MainScreen(
     openInsightsSignal: Int = 0,
     openHabitsSignal: Int = 0,
     openFoodSignal: FoodSignal = FoodSignal(),
-    /** Settings › Data › Log meals on this device: when off there is no in-app meal logging or editing. */
-    logMealsOnDevice: Boolean = false,
+    /** Settings › Data › Log meals on this device: when off, hide snap / scan / type. Meals stay editable. */
+    logMealsOnDevice: Boolean = true,
     openProgressSignal: ProgressSignal = ProgressSignal(),
     openWeightSignal: WeightSignal = WeightSignal(),
 ) {
@@ -208,6 +212,14 @@ fun MainScreen(
     // A tapped insight notification opens Coach on the Insights tab.
     LaunchedEffect(openInsightsSignal) {
         if (openInsightsSignal > 0) rootNav.navigate(InsightsScreenRoute) { launchSingleTop = true }
+    }
+    // Meal reminder Scan / Type open the in-app logger in that mode.
+    LaunchedEffect(openFoodSignal.count) {
+        val mode = openFoodSignal.mode
+        if (openFoodSignal.count > 0 && mode != null && logMealsOnDevice) {
+            rootNav.popBackStack(TabsRoute, inclusive = false)
+            rootNav.navigate(FoodLogRoute(mode))
+        }
     }
     // Launcher shortcut: straight to the camera; a reel notification: the Progress screen.
     LaunchedEffect(openProgressSignal.count) {
@@ -242,17 +254,16 @@ fun MainScreen(
                     if (metric == HealthMetric.WEIGHT) rootNav.navigate(WeightScreenRoute()) else rootNav.navigate(MetricDetailRoute(metric.name))
                 },
                 onOpenSettings = { rootNav.navigate(SettingsRoute()) },
-                onOpenMcpKeys = { rootNav.navigate(SettingsRoute(mcpKeys = true)) },
                 onOpenCoach = { rootNav.navigate(CoachScreenRoute(newChat = true)) },
                 onOpenInsights = { rootNav.navigate(InsightsScreenRoute) },
                 onOpenHabit = { id -> rootNav.navigate(HabitDetailRoute(id)) },
                 onAddHabit = { rootNav.navigate(HabitEditorRoute()) },
                 onLogWorkout = { rootNav.navigate(ActivityPickerRoute()) },
                 onOpenWorkout = { id -> rootNav.navigate(WorkoutEditorRoute(workoutId = id)) },
-                onLogMeal = if (logMealsOnDevice) { { rootNav.navigate(ManualMealRoute()) } } else null,
-                onOpenMeal = if (logMealsOnDevice) { { id -> rootNav.navigate(ManualMealRoute(mealId = id)) } } else null,
+                onLogMeal = if (logMealsOnDevice) { { rootNav.navigate(FoodLogRoute()) } } else null,
+                onOpenMeal = { id -> rootNav.navigate(MealReviewRoute(mealId = id)) },
                 onOpenReel = { id -> rootNav.navigate(ReelRoute(id)) },
-                openFoodTabSignal = openFoodSignal.count,
+                openFoodTabSignal = if (openFoodSignal.mode == null || !logMealsOnDevice) openFoodSignal.count else 0,
                 openHabitsSignal = openHabitsSignal,
                 onReturnToTabs = { rootNav.popBackStack(TabsRoute, inclusive = false) },
             )
@@ -302,8 +313,19 @@ fun MainScreen(
                 )
             }
         }
-        composable<ManualMealRoute> {
-            FullScreen { ManualMealScreen(onDone = { rootNav.popBackStack() }) }
+        composable<FoodLogRoute> { entry ->
+            FullScreen {
+                FoodLogScreen(
+                    mode = entry.toRoute<FoodLogRoute>().mode,
+                    onReview = {
+                        rootNav.navigate(MealReviewRoute()) { popUpTo<FoodLogRoute> { inclusive = true } }
+                    },
+                    onBack = { rootNav.popBackStack() },
+                )
+            }
+        }
+        composable<MealReviewRoute> {
+            FullScreen { MealReviewScreen(onDone = { rootNav.popBackStack() }) }
         }
         composable<WeightScreenRoute> { entry ->
             FullScreen {
@@ -424,9 +446,8 @@ private fun TabsShell(
     onAddHabit: () -> Unit,
     onLogWorkout: () -> Unit,
     onOpenWorkout: (String) -> Unit,
-    onOpenMcpKeys: () -> Unit,
     onLogMeal: (() -> Unit)?,
-    onOpenMeal: ((String) -> Unit)?,
+    onOpenMeal: (String) -> Unit,
     onOpenReel: (String) -> Unit,
     openFoodTabSignal: Int,
     openHabitsSignal: Int,
@@ -481,7 +502,7 @@ private fun TabsShell(
                 }
                 composable<FitnessRoute> { FitnessScreenRoute(onOpenWorkout = onOpenWorkout, onLogWorkout = onLogWorkout) }
                 composable<FoodRoute> {
-                    FoodScreenRoute(onOpenMeal = { id -> onOpenMeal?.invoke(id) }, onLogMeal = { onLogMeal?.invoke() }, onOpenMcpKeys = onOpenMcpKeys)
+                    FoodScreenRoute(onOpenMeal = onOpenMeal, onLogMeal = { onLogMeal?.invoke() })
                 }
                 composable<HabitsRoute> { HabitsScreenRoute(onOpenHabit = onOpenHabit, onAddHabit = onAddHabit) }
             }
@@ -504,7 +525,7 @@ private fun TabsShell(
                 // Fitness and Food get a "+" to log, left of the profile photo.
                 val onAdd = when (currentTab) {
                     Tab.Fitness -> onLogWorkout
-                    Tab.Food -> onLogMeal // null (no "+") while meals come from MCP
+                    Tab.Food -> onLogMeal // null (no "+") while in-app logging is off
                     else -> null
                 }
                 if (onAdd != null) {
@@ -554,7 +575,7 @@ private fun TabsShell(
 
 private const val PICKED_ACTIVITY = "pickedActivity"
 
-/** Request from a meal reminder: [mode] "scan" / "type" opens the log screen, null opens the Food tab. */
+/** Request from a meal reminder: [mode] "scan" / "type" opens the in-app logger, null opens the Food tab. */
 data class FoodSignal(val count: Int = 0, val mode: String? = null)
 
 /** Open Progress; [capture] goes on to the camera, [reelId] plays that reel. */

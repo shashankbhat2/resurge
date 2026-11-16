@@ -27,18 +27,19 @@ describe("coach food and workout formatting", () => {
     const dal = mealSummary({
       localDate: "2026-10-14", type: "lunch", title: "Dal rice", loggedAtMs: Date.parse("2026-10-14T07:45:00Z"),
       items: [{ name: "Dal rice", grams: 100, kcal: 600, protein: 22, carbs: 100, fat: 15, fiber: 8, micros: { sodium: 300, iron: 4 } }],
-    }, "Asia/Kolkata");
+    }, "Asia/Kolkata", "meal_dal");
     const apple = mealSummary({
       localDate: "2026-10-14", type: "snack", title: "Apple", loggedAtMs: Date.parse("2026-10-14T10:00:00Z"),
       items: [{ name: "Apple", grams: 150, kcal: 52, protein: 0.3, carbs: 14, fat: 0.2, fiber: 2.4, gi: 36 }],
-    }, "Asia/Kolkata");
+    }, "Asia/Kolkata", "meal_apple");
     expect(dal).toMatchObject({ time: "13:15", fiber: 8, micros: { sodium: 300, iron: 4 }, glycemic: { gi: 58, gl: 53, band: "high", basis: "predicted" } });
     expect(apple.glycemic).toMatchObject({ gi: 36, basis: "assistant" });
     const text = formatMeals([apple, dal], { "2026-10-14": 1500, "2026-10-13": 750 });
     const lines = text.split("\n");
     expect(lines[0]).toBe("2026-10-14: 678 kcal, protein 22 g, carbs 121 g, fat 15 g, fibre 12 g · water 1.50 L · predicted day GL ~59 (low)");
     expect(lines[1]).toBe("  micronutrients: sodium 300 mg, iron 4 mg");
-    expect(text).toContain("lunch 13:15: Dal rice — 600 kcal, P22 C100 F15 fibre 8 g, predicted GI ~58 / GL ~53 (high)");
+    expect(text).toContain("meal_dal · lunch 13:15: Dal rice — 600 kcal, P22 C100 F15 fibre 8 g, predicted GI ~58 / GL ~53 (high)");
+    expect(text).toContain("meal_apple · snack");
     expect(text).toContain("(GI 36 from assistant)");
     expect(text).toContain("2026-10-13: no meals logged · water 0.75 L");
     expect(text).toMatch(/Note: GI\/GL are PREDICTED, not measured/);

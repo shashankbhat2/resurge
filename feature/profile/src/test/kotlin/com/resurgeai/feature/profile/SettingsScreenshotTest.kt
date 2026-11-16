@@ -22,7 +22,7 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** The settings menu, with meal logging on this device off (default) and on. Record with :feature:profile:recordRoborazziDebug. */
+/** The settings menu, with meal logging on this device on (default) and off. Record with :feature:profile:recordRoborazziDebug. */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [35], qualifiers = "w400dp-h1100dp-xhdpi")

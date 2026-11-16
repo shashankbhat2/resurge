@@ -57,7 +57,7 @@ export const COACH_TOOLS: Anthropic.Beta.BetaTool[] = [
   {
     name: "get_meals",
     description:
-      "Meals and water the user logged over the last N days (1-60): per-meal calories, protein, carbs, fat, fibre, items and a predicted glycaemic index/load, with daily totals, micronutrients and water. Use for nutrition questions.",
+      "Meals and water the user logged over the last N days (1-60): each meal's document id, calories, protein, carbs, fat, fibre, items and a predicted glycaemic index/load, with daily totals, micronutrients and water. Use for nutrition questions.",
     strict: true,
     input_schema: {
       type: "object",

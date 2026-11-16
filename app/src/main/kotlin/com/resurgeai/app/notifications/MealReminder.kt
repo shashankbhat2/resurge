@@ -35,7 +35,6 @@ object MealReminder {
     const val CHANNEL = "meals"
     private const val ACTION_FIRE = "com.resurgeai.app.MEAL_REMINDER"
     private const val EXTRA_MEAL = "meal"
-    // Scan / Type actions were removed; kept so reminders already posted by older builds still open the app.
     const val OPEN_SCAN = "food_scan"
     const val OPEN_TYPE = "food_type"
     const val OPEN_FOOD = "food"
@@ -83,23 +82,24 @@ object MealReminder {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
-    /** [onDevice]: "Log meals on this device" is on; otherwise meals are logged by telling the AI assistant. */
+    /** [onDevice]: in-app Scan / Type actions. */
     internal fun notify(context: Context, type: MealType, onDevice: Boolean) {
-        val how = if (onDevice) "Add it in Resurge or tell your AI assistant." else "Tell your AI assistant what you had."
-        val title = when (type) {
-            MealType.BREAKFAST -> "Logged breakfast?"
-            MealType.LUNCH -> "What's for lunch?"
-            else -> "Log your dinner"
+        val (title, text) = when (type) {
+            MealType.BREAKFAST -> "Logged breakfast?" to if (onDevice) "Snap your plate, type it, or tell your AI assistant." else "Tell your AI assistant what you had."
+            MealType.LUNCH -> "What's for lunch?" to if (onDevice) "A quick photo, or tell your AI assistant." else "Tell your AI assistant what you had."
+            else -> "Log your dinner" to if (onDevice) "Scan it, type it, or tell your AI assistant." else "Tell your AI assistant what you had."
         }
-        val text = how
-        val notification = NotificationCompat.Builder(context, CHANNEL)
+        val builder = NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(text)
             .setContentIntent(open(context, type, OPEN_FOOD, 0))
             .setAutoCancel(true)
-            .build()
-        runCatching { NotificationManagerCompat.from(context).notify(request(type), notification) }
+        if (onDevice) {
+            builder.addAction(0, "Scan", open(context, type, OPEN_SCAN, 1))
+            builder.addAction(0, "Type", open(context, type, OPEN_TYPE, 2))
+        }
+        runCatching { NotificationManagerCompat.from(context).notify(request(type), builder.build()) }
     }
 }
 

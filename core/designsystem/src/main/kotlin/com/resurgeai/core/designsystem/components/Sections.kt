@@ -88,7 +88,7 @@ fun StatCell(
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(value, style = Resurge.type.metric.copy(fontSize = 18.sp, lineHeight = 22.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(label, style = Resurge.type.caption, color = Resurge.colors.textSubtle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(label, style = Resurge.type.caption, color = Resurge.colors.textSubtle, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
     }
 }
