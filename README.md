@@ -94,10 +94,10 @@ cd functions && npm test          # backend tests
 ## Releasing
 
 1. Bump `versionCode` and `versionName` in `app/build.gradle.kts`.
-2. In `CHANGELOG.md`, rename `## Unreleased` to `## 0.5.0 (date)`. It becomes the release notes.
-3. Commit, then `git tag v0.5.0 && git push origin main v0.5.0`.
+2. In `CHANGELOG.md`, rename `## Unreleased` to `## 0.7.0 (date)`. It becomes the release notes.
+3. Open a PR and merge it to `main`.
 
-[The release workflow](.github/workflows/release.yml) publishes the signed APK on GitHub and keeps the Play bundle on the workflow run.
+When a merge brings a `versionName` that has no tag yet, [the release workflow](.github/workflows/release.yml) tests and builds it, tags the commit `v0.7.0`, publishes the signed APK on GitHub and keeps the Play bundle on the workflow run. Merges that don't bump the version don't release anything.
 
 ## Privacy
 
