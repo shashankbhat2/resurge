@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.5 (16 November 2026)
 
 ### Meals
 - The Food tab filters by date (today, yesterday, last 7, last 30, custom range), meal type and a search of titles and foods, and can sort by time or calories.
