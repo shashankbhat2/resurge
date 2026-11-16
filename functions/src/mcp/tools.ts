@@ -30,8 +30,8 @@ const text = (t: string, isError = false) => ({ content: [{ type: "text" as cons
 
 /**
  * MCP tools over one signed-in user's Resurge data. Everything the app stores is readable (reads reuse
- * the coach's loaders and tools in coach/tools.ts); writes (./writes.ts) log meals, water and habit
- * check-ins, and change targets, profile and the weight goal.
+ * the coach's loaders and tools in coach/tools.ts); writes (./writes.ts) log, update and delete meals,
+ * log water, check in habits, and change targets, profile and the weight goal.
  */
 export function createMcpServer(uid: string, deps: McpDeps = defaultDeps, store: WriteStore = firestoreStore): McpServer {
   const server = new McpServer({ name: "resurge", version: "0.1.0" });
@@ -73,7 +73,7 @@ export function createMcpServer(uid: string, deps: McpDeps = defaultDeps, store:
   }, (a) => coachTool("get_insights", a));
 
   server.registerTool("get_meals", {
-    description: "Meals and water over the last N days (1-60): per-meal calories, protein, carbs, fat, fibre and items, daily totals, micronutrients (sugar, sodium, iron...), water drunk, and a PREDICTED glycaemic index/load per meal and day (an estimate, not a measurement).",
+    description: "Meals and water over the last N days (1-60): each meal's document id (for update_meal/delete_meal), calories, protein, carbs, fat, fibre and items, daily totals, micronutrients (sugar, sodium, iron...), water drunk, and a PREDICTED glycaemic index/load per meal and day (an estimate, not a measurement).",
     inputSchema: { days: z.number().int() },
   }, (a) => coachTool("get_meals", a));
 
@@ -134,23 +134,35 @@ export function createMcpServer(uid: string, deps: McpDeps = defaultDeps, store:
   };
   const iso = z.string().max(40).describe("ISO 8601 time with offset, e.g. 2026-11-05T13:30:00+05:30; default now");
   const n = (max: number) => z.number().min(0).max(max);
+  const mealId = z.string().trim().min(1).max(128).describe("Meal document id from get_meals");
+  const mealFields = {
+    type: z.enum(MEAL_TYPES).optional(),
+    title: z.string().trim().max(80).optional(),
+    at: iso.optional(),
+    items: z.array(z.object({
+      name: z.string().trim().min(1).max(60),
+      grams: z.number().positive().max(5000),
+      kcal: n(900).describe("per 100 g"), protein: n(100).describe("per 100 g"), carbs: n(100).describe("per 100 g"),
+      fat: n(100).describe("per 100 g"), fiber: n(100).optional().describe("per 100 g"),
+      gi: z.number().min(0).max(110).optional().describe("glycaemic index of this food if you know it (glucose = 100); otherwise it's predicted from macros"),
+    })).max(MAX_MEAL_ITEMS).optional(),
+    kcal: n(10000).optional(), protein: n(1000).optional(), carbs: n(1000).optional(), fat: n(1000).optional(), fiber: n(500).optional(),
+  };
 
   server.registerTool("log_meal", {
     description: "Log a meal by hand (no AI analysis), like typing it into the app. Give items (nutrition per 100 g plus grams) or just totals (kcal and optional macros in grams).",
-    inputSchema: {
-      type: z.enum(MEAL_TYPES),
-      title: z.string().trim().max(80).optional(),
-      at: iso.optional(),
-      items: z.array(z.object({
-        name: z.string().trim().min(1).max(60),
-        grams: z.number().positive().max(5000),
-        kcal: n(900).describe("per 100 g"), protein: n(100).describe("per 100 g"), carbs: n(100).describe("per 100 g"),
-        fat: n(100).describe("per 100 g"), fiber: n(100).optional().describe("per 100 g"),
-        gi: z.number().min(0).max(110).optional().describe("glycaemic index of this food if you know it (glucose = 100); otherwise it's predicted from macros"),
-      })).max(MAX_MEAL_ITEMS).optional(),
-      kcal: n(10000).optional(), protein: n(1000).optional(), carbs: n(1000).optional(), fat: n(1000).optional(), fiber: n(500).optional(),
-    },
+    inputSchema: { ...mealFields, type: z.enum(MEAL_TYPES) },
   }, (a) => write(() => writer.logMeal(a)));
+
+  server.registerTool("update_meal", {
+    description: "Change a meal the user owns (id from get_meals). Only the fields given change. items replaces the food list; kcal/macros without items rewrite totals like log_meal. 404-style error if the id is missing.",
+    inputSchema: { id: mealId, ...mealFields },
+  }, (a) => write(() => writer.updateMeal(a)));
+
+  server.registerTool("delete_meal", {
+    description: "Delete one meal the user owns (id from get_meals). 404-style error if it isn't theirs or is already gone. Water corrections use log_water with negative ml.",
+    inputSchema: { id: mealId },
+  }, (a) => write(() => writer.deleteMeal(a)));
 
   server.registerTool("log_water", {
     description: "Add water drunk (ml, negative to correct) to a day; default today, up to 7 days back.",

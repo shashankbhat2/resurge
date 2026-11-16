@@ -96,6 +96,8 @@ export async function loadHabits(uid: string, from: string): Promise<HabitSummar
 }
 
 export interface MealSummary {
+  /** Firestore document id under users/{uid}/meals; empty when formatting a raw doc in tests. */
+  id: string;
   date: string;
   type: string;
   title: string;
@@ -116,12 +118,12 @@ export interface MealSummary {
 export async function loadMeals(uid: string, from: string, limit = 120, timeZone = "UTC"): Promise<MealSummary[]> {
   const snap = await userDoc(uid).collection("meals").where("localDate", ">=", from).limit(limit).get();
   return snap.docs
-    .map((d) => mealSummary(d.data(), timeZone))
+    .map((d) => mealSummary(d.data(), timeZone, d.id))
     .sort((a, b) => (a.date === b.date ? (a.time < b.time ? 1 : -1) : a.date < b.date ? 1 : -1));
 }
 
 /** Pure: one stored meal document to its summary (exported for tests). */
-export function mealSummary(data: Record<string, unknown>, timeZone = "UTC"): MealSummary {
+export function mealSummary(data: Record<string, unknown>, timeZone = "UTC", id = ""): MealSummary {
   const items = (data.items ?? []) as Array<Record<string, unknown>>;
   const num = (v: unknown) => Number(v ?? 0) || 0;
   const sum = (k: string) => Math.round(items.reduce((acc, i) => acc + (num(i[k]) * num(i.grams)) / 100, 0));
@@ -134,6 +136,7 @@ export function mealSummary(data: Record<string, unknown>, timeZone = "UTC"): Me
   for (const k of Object.keys(micros)) micros[k] = Math.round(micros[k] * 10) / 10;
   const lp = typeof data.loggedAtMs === "number" ? localParts(timeZone, new Date(data.loggedAtMs)) : null;
   return {
+    id,
     date: String(data.localDate ?? ""),
     type: String(data.type ?? "snack"),
     title: String(data.title ?? "Meal"),
